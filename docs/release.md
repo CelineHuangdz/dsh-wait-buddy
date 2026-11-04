@@ -75,6 +75,38 @@ npm publish
 
 > 本机的 link 安装与 registry 安装是两个来源。要在本机验证 registry 版本，先 Remove 现有 bundle，再按包名安装（管理器会拒绝"已安装同名包"的二次安装）。
 
+## 3.4 Git 仓库（本机已初始化）
+
+仓库已 `git init -b main` 并完成首个提交（14 个受版本控制的文件，`node_modules/`、`dist/`、`*.tgz` 已忽略）。
+
+**推到远端**（需要你自己建仓库，我没有你的平台账号）：
+
+```bash
+# GitHub
+git remote add origin https://github.com/<你的用户名>/dsh-wait-buddy.git
+git push -u origin main
+git tag v0.3.0 && git push --tags
+
+# 或 Gitee（国内网络更稳）
+git remote add origin https://gitee.com/<你的用户名>/dsh-wait-buddy.git
+git push -u origin main
+git tag v0.3.0 && git push --tags
+```
+
+**对方安装**（Plugins → Add plugin 里填）：
+
+| 平台 | 填什么 |
+|---|---|
+| GitHub | `github:<用户名>/dsh-wait-buddy` 或 `https://github.com/<用户名>/dsh-wait-buddy.git` |
+| Gitee / GitLab / 自建 | 完整 URL：`https://gitee.com/<用户名>/dsh-wait-buddy.git` |
+
+**注意**：
+
+- 对方机器上要装有 `git`（安装过程是 git clone + pack）。
+- 仓库要**公开**。私有仓库需要 git 凭据，而管理器对 GitHub 的预检会禁用凭据提示，很容易装不上。
+- 更新：`git push` 新提交后，对方重新安装一次（git 安装锁定的是提交，不是版本号语义）。
+- 打 tag 只是给人看的版本标记；DSH 安装以提交为准。
+
 ## 3.5 没有 npm 账号 / 网络受限时的分发
 
 npm 不是唯一通道。以下三种都不需要注册任何账号：

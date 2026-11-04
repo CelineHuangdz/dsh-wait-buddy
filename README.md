@@ -63,7 +63,7 @@ DSH 桌面版 · Agent 长任务陪伴监控面板。本仓库当前完成 **M1�
 
 - **tarball**：`npm pack --pack-destination dist` 生成 `dist/dsh-wait-buddy-0.3.0.tgz`，对方在 Add plugin 里填该文件的绝对路径；
 - **源码目录**：直接填解压后目录的绝对路径；
-- **Git 仓库**：填完整 Git URL（`github:用户/仓库` 仅对 GitHub 有效）。
+- **Git 仓库**：推送后对方填 `github:用户名/dsh-wait-buddy`（GitHub）或完整 URL（Gitee/GitLab，如 `https://gitee.com/用户名/dsh-wait-buddy.git`）。
 
 tarball / 目录是静态副本（更新需重新打包），且 `.tgz` 内为明文源码。详见 [docs/release.md](docs/release.md)。
 
