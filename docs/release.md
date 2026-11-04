@@ -79,7 +79,9 @@ npm publish
 
 仓库已 `git init -b main` 并完成首个提交（14 个受版本控制的文件，`node_modules/`、`dist/`、`*.tgz` 已忽略）。
 
-**推到远端**（需要你自己建仓库，我没有你的平台账号）：
+**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main` 与 `v0.3.0`）。
+
+**推送到远端**（首次流程，已执行过一遍）：
 
 ```bash
 # GitHub
@@ -100,9 +102,15 @@ git tag v0.3.0 && git push --tags
 | GitHub | `github:<用户名>/dsh-wait-buddy` 或 `https://github.com/<用户名>/dsh-wait-buddy.git` |
 | Gitee / GitLab / 自建 | 完整 URL：`https://gitee.com/<用户名>/dsh-wait-buddy.git` |
 
+**验证过的事实**（2026-11-04）：
+
+- `pnpm add git+ssh://git@github.com/CelineHuangdz/dsh-wait-buddy.git` 成功，装出来的包含 `index.js` / `client.js` / `cordis.patch.yml` / `locale` / `icon.svg`，`dsh.bundle` 与 `dsh.client` 声明完好（耗时约 2 分钟）。
+- 本机网络：`github.com:443`（HTTPS）不可达（8s 超时），但 `api.github.com`、`codeload.github.com` 与 **SSH 22 端口可用**。
+
 **注意**：
 
 - 对方机器上要装有 `git`（安装过程是 git clone + pack）。
+- `github:` 简写与 `https://github.com/...` 都走 **HTTPS 443**；如果对方网络和本机一样屏蔽了 github.com 的 443，安装会在预检阶段超时（`failedAt: 'spec-host'`）。这类环境要么改用 SSH spec（需要对方的 GitHub 账号与密钥），要么改用 Gitee 镜像。
 - 仓库要**公开**。私有仓库需要 git 凭据，而管理器对 GitHub 的预检会禁用凭据提示，很容易装不上。
 - 更新：`git push` 新提交后，对方重新安装一次（git 安装锁定的是提交，不是版本号语义）。
 - 打 tag 只是给人看的版本标记；DSH 安装以提交为准。
