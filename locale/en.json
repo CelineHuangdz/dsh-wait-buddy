@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "WaitBuddy",
+    "description": "Adds a WaitBuddy session view that monitors this session's Agent long task: status, completed steps, the latest tool action, and approval or failure reminders."
+  }
+}

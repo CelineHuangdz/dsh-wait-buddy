@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "WaitBuddy",
+    "description": "在当前会话视图中加入 WaitBuddy 面板，监控本会话 Agent 长任务：状态、已完成步数、最近工具动作，以及审批与失败提醒。"
+  }
+}
