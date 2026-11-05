@@ -1,131 +1,230 @@
-# dsh-wait-buddy
+# WaitBuddy
 
-DSH 桌面版 · Agent 长任务陪伴监控面板。本仓库当前完成 **M1（状态看板）+ M2（内嵌贪吃蛇，游戏与任务解耦）**，并已落地 **M3 核心联动（`agent:*` 信号 + 审批暂停 + step/+5、success/+50）**。
+<p align="center">
+  <img src="icon.svg" width="76" alt="WaitBuddy icon" />
+</p>
 
-- 版本：`0.4.0`（M1 + M2 + M3 核心）
-- 插件标识：`dsh-wait-buddy`
-- 会话视图标签：**WaitBuddy**
-- 定位：监控优先、游戏为辅；只做 Agent → 界面单向信号，不提供任何反向控制
-- 文档：[界面规范](docs/ui-spec.md) · [决策记录](docs/decisions.md)
-- 评审：[2026-11-05 三方评审存档](docs/reviews/README.md) · [后续迭代计划](docs/iteration-plan.md)
-- 变更：[CHANGELOG](CHANGELOG.md)
-- 基线：[M0 定稿](docs/baseline-m0.md) · [M0 对照与偏差](docs/m0-compliance.md) · [M1 验收](docs/m1-acceptance.md) · [M3 实现](docs/m3-implementation.md) · [验收 Runbook](docs/acceptance-runbook.md)
+<p align="center">
+  <strong>DSH 会话视图里的 Agent 长任务监控面板 + 轻量小游戏</strong><br />
+  监控优先、游戏为辅 · 只读 · Agent → 游戏单向联动
+</p>
 
-> **变更流程**：先改文档（`docs/` 或本 README），再改代码；实现必须与文档一致。
+<p align="center">
+  <a href="README.en.md">English</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="docs/acceptance-runbook.md">验收 Runbook</a> ·
+  <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
+</p>
 
-## M1 交付内容
+![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
+![Tests](https://img.shields.io/badge/tests-59%20%2B%204%20visual-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-| 能力 | 实现 |
-|---|---|
-| Session View | 在 `conversation.view` 槽注册 `waitbuddy` 视图，与 Chat / Trajectory 并列为会话视图标签 |
-| 状态看板 | 状态点 + 状态文案 + 已完成步数 + 脉冲条 + 最近动作 |
-| 告警 | 等待审批 / 任务失败时显示辅助提醒横幅，明确标注不拦截、不替代原生审批弹窗 |
-| 会话隔离 | 视图按 `sessionId` 绑定；切换会话即切换监控上下文，互不影响 |
+> 当前版本 **0.4.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 核心单向联动。已在 DSH `0.2.1-rc.5` 上测试。
 
-## M2：内嵌贪吃蛇
+## 目录
 
-- Canvas 实现，无外部图片资源、无第三方游戏 SDK；棋盘宽度 100%、高度 `min(46vh,480px)`（弹性填充，下限 200px、上限 520px），格数按实测像素推导（约 18px/格，列 16–120、行 ≥8），格子保持近似正方形。
-- 操作：**仅键盘方向键**（焦点在视图内才生效，不会抢输入框的键）；不提供软方向键，保留「暂停 / 重置」按钮（决策 D7）。
-- 第二款游戏：**五子棋**（15×15，人执黑 vs 简单启发式电脑），与贪吃蛇通过说明行左侧页签切换，两局各自保留（决策 D16）。
-- 设置：贪吃蛇可选起始速度（慢 / 标准 / 快），五子棋可选难度（初级 / 中级 / 高级）；选择存于本地 `dsh-wait-buddy.settings.v1`，刷新后保留（决策 D17）。
-- 状态：得分、最高分、长度、暂停、结束、重置；每吃一个果实 +10 分并轻微加速（140ms → 最低 70ms）。
-- 解耦：M2 阶段游戏不读取任何监控状态；M3 起游戏只消费 `agent:*` 信号，不直接读监控状态。
-- 生命周期：视图切到 Chat 或切换会话时游戏自动暂停、进度保留（模块级单局）；页面隐藏（`visibilitychange`）同样暂停。最高分与当前局仅存内存，不做持久化（持久化属于 M4/备选池）。
+- [这是什么](#这是什么)
+- [特性](#特性)
+- [快速开始](#快速开始)
+- [使用](#使用)
+- [配置](#配置)
+- [架构](#架构)
+- [兼容性与已知偏离](#兼容性与已知偏离)
+- [开发](#开发)
+- [项目结构](#项目结构)
+- [文档](#文档)
+- [路线图](#路线图)
+- [安全与隐私](#安全与隐私)
+- [贡献](#贡献)
+- [License](#license)
 
-### 一屏布局
+## 这是什么
 
-- 上下分区、整宽铺满（决策 D10）：状态区在上（状态行 + 更新时间 + 免责说明 + 活动流），游戏区在下（棋盘 + 说明 + 操作），两段都占满视图宽度；不设 max-width，也不做左右分栏。
-- 棋盘吃满横向空间（`width:100%`），高度弹性填充（基准 `min(46vh,480px)`，下限 200px、上限 520px）；对局中窗口缩放只拉伸绘制、不改格数，避免蛇出界（决策 D12/D19）。
-- 游戏浮层的「开始 / 继续 / 再来一局」使用游戏配色（薄荷绿 + 深色文字），不依赖 `brand-primary`（该 token 在深色主题下是浅色，白字会不可见）。
-- 下方输入框属于 Conversation shell，**插件不替换、不隐藏它**：替换 `conversation.composer.bar` 会 shadow 原生 composer，影响输入、队列与审批接管。若需要完全无 chrome 的界面，应走备选池里的“悬浮独立浮窗”。
+WaitBuddy 是 DSH 桌面版的一个**会话视图插件**。它在当前会话的 Chat / Trajectory 旁边增加一个 **WaitBuddy** 标签，用来：
 
-## M3：Agent → 游戏单向联动
+- 看 Agent 当前在做什么：状态、已完成步数、最近命令/工具调用；
+- 在等待审批、任务失败时给出醒目的辅助提醒；
+- 在长任务等待期间提供贪吃蛇/五子棋，消磨时间；
+- 在 M3 中让 Agent 事件**单向驱动**游戏：审批暂停、step +5、success +50。
 
-- 监控层把事件折叠成 `agent:task_start` / `agent:step_advance` / `agent:approval_enter` / `agent:approval_leave` / `agent:task_finish` 五类信号；监控层不定义奖励。
-- 贪吃蛇消费信号：每步 +5 分并浮字 `+5`；success +50 分并提示；failed/abort 只提示、不重置本局；approval 自动暂停。
-- 审批消失后**不自动恢复**，浮层提示「已处理，按空格或点击继续」，由用户手动继续（M0 §9）。
-- 信号带去重 key：两个视图看同一会话不会重复奖励；baseline 不补发历史奖励，但打开视图时已有审批会补发一次暂停。
-- 详见 [M3 实现记录](docs/m3-implementation.md)。
+它不控制 Agent，不拦截原生审批，不写会话日志。
 
-## 事件映射
+## 特性
 
-| 基线事件 | 数据来源 | 面板表现 |
+### 监控
+
+- **Session View**：注册到 `conversation.view`，与 Chat / Trajectory 并列。
+- **状态真实性**：区分 loading / ready / degraded / stale；不把投影失败伪装成“空闲”。
+- **真实步数**：显示「已完成 N 步」，不显示总步数、不显示百分比。
+- **活动流**：只显示 `tool/call` 的命令/工具条目，最多 3 条；**不展示模型推理原文**（D27）。
+- **独立告警区**：审批/失败告警在滚动容器外，不会被棋盘滚走。
+
+### 游戏
+
+- **贪吃蛇**：Canvas、无外部资源、键盘方向键；方向队列、暂停/重置、速度档位。
+- **五子棋**：15×15，人执黑 vs 启发式电脑；难度档位；窗口缩放重绘。
+- 两局独立保留；切换会话/视图时暂停，不重置进度。
+
+### 单向联动（M3）
+
+- 审批出现：游戏自动暂停，显示「等待审批」。
+- 审批处理完：**不自动恢复**，提示「已处理，按空格或点击继续」，由用户手动继续。
+- step +5、success +50、failed/abort 只提示，不重置本局。
+- 信号按 `agent:*` 广播，游戏只消费信号；监控层不定义奖励。
+
+## 快速开始
+
+### 环境要求
+
+- DSH 桌面版 `0.2.1-rc.5`（当前唯一验证版本）
+- 本地开发需要 Node.js 22+ 与 pnpm
+
+### 安装
+
+DSH 侧边栏 → **Plugins** → **Add plugin**，任选一种：
+
+| 方式 | 填入 | 说明 |
 |---|---|---|
-| `session.task.start` | `turn/start` | 绿色 · 「任务开始，Agent 正在规划」，步数归零 |
-| `session.step.update` | `step/end` | 计数并在状态行显示「已完成 N 步」（总步数不显示）；同时供 M3 计分 |
-| 活动流 | `tool/call` | 命令 / 工具调用，最多 3 条，最新在上；不展示模型推理原文 |
-| `session.tool.pending_approval` | `ctx.uiSession.sessionStatus.pendingInteraction`（进程内，不入日志） | 橙红色 · 告警横幅「等待你审批工具调用」 |
-| `session.task.success` | `turn/end`，reason=`completed` | 绿色 · 「任务执行成功 ✅」 |
-| `session.task.failed` | `turn/end`，reason=`error` / `max-tokens` / `blocked` | 红色 · 「任务执行失败」+ 错误摘要 |
-| `session.task.abort` | `turn/end`，reason=`aborted` / `interrupted` | 灰色 · 「任务已中断」 |
-| `session.active.change` | 视图按 `sessionId` 重建 | 自动切换监控上下文，无跨会话串扰 |
+| Git（推荐，含 0.4.0） | `github:CelineHuangdz/dsh-wait-buddy` | 跟随仓库最新提交 |
+| 本地目录 | `/abs/path/to/dsh-wait-buddy` | 开发调试用，需先 `pnpm install` |
+| tarball | `dist/dsh-wait-buddy-0.4.0.tgz` 的绝对路径 | `npm pack --pack-destination dist` 生成 |
+| npm | `dsh-wait-buddy` | npm 上的版本可能落后于本仓库 |
 
-> **为什么只显示「已完成 N 步」**：DSH 的 Agent 循环是开放式循环，没有可靠的总步数分母，因此不显示总步数、不显示百分比（决策 D1、M0 §6）。但单步计数本身是真实的，仍显示为「已完成 N 步」；活动流作为补充，回答「它现在在干什么」。D9 的「完全隐藏步数」与 M0 §6 冲突，待产品负责人确认是否作为偏离。
+安装后启用插件并刷新页面，在会话视图标签栏选择 **WaitBuddy**。
 
-## 发布给别人用
+> 本地目录安装前先执行 `pnpm install`（Host 半使用 `zod` 做投影 schema 校验）。
 
-完整 runbook 见 [docs/release.md](docs/release.md)，最短路径：
+## 使用
 
-1. 决定包名。包名同时是 Client 模块 id，**必须三处一致**：`package.json` 的 `name`、`cordis.patch.yml` 的 `name`、`client.js` 里的 `__ModuleLoader__.load({ id })`。
-2. 去掉 `package.json` 的 `"private": true`，补 `repository` / `homepage`（`license`、`author`、`files` 已就绪）。
-3. `npm pack --dry-run` 核对产物 → `npm publish --access public`。
-4. 在另一台机器验证：侧边栏 → **Plugins** → **Add plugin** → 填包名 → 安装 → 启用 → 刷新页面。
+1. 打开一个会话，切到 **WaitBuddy**。
+2. 发一个任务：状态、步数、活动流会随 `turn/start` / `step/end` / `tool/call` 更新。
+3. 点「开始游戏」玩贪吃蛇；方向键需要焦点在视图内（点一下棋盘）。
+4. 审批出现：游戏自动暂停，在原生审批面板处理；处理后手动继续。
+5. 任务完成：+50 分提示；切视图不会重复播放。
 
-也支持其他三种不需要 npm 账号的分发方式（同一套安装流程）：
+> 方向键只在视图内生效，不会抢输入框的按键。触屏/纯鼠标设备无法控制方向（D7，已批准偏离）。
 
-- **tarball**：`npm pack --pack-destination dist` 生成 `dist/dsh-wait-buddy-0.4.0.tgz`，对方在 Add plugin 里填该文件的绝对路径；
-- **源码目录**：直接填解压后目录的绝对路径；
-- **Git 仓库**（当前发布方式）：<https://github.com/CelineHuangdz/dsh-wait-buddy>，对方填 `github:CelineHuangdz/dsh-wait-buddy`；若对方网络访问不了 github.com 的 443，需改用 SSH spec 或 Gitee 镜像。
+## 配置
 
-tarball / 目录是静态副本（更新需重新打包），且 `.tgz` 内为明文源码。详见 [docs/release.md](docs/release.md)。
+| 项 | 存储 | 可选值 |
+|---|---|---|
+| 贪吃蛇速度 | `localStorage` → `dsh-wait-buddy.settings.v1` | 慢 / 标准 / 快 |
+| 五子棋难度 | 同上 | 初级 / 中级 / 高级 |
 
-> ⚠️ 插件在 DSH 进程内以当前用户权限运行，没有沙箱；本插件只读会话事件、不写日志、不发网络请求，设置只存本机 localStorage。
+- 设置只存本机，不上传、不跨设备同步。
+- 最高分/当前局仅存内存，不做持久化（M4 备选池）。
+- 没有环境变量、没有远程配置。
 
-## 安装（当前 profile）
+## 架构
 
-```bash
-# 1. 装 Host 依赖（zod，供会话投影的 schema 校验）
-pnpm install
-
-# 2. 以本地目录安装 bundle（会写入 profile 的 package.json / bundles 列表）
-#    plugin_manager install_bundle → target: /abs/path/to/dsh-wait-buddy
+```text
+Host (index.js)
+  session log ── pure fold ──> waitbuddy projection (stateVersion 4)
+                                      │
+Client (client.js)                    ▼
+  projection + sessionStatus ──> composeMonitor ──> TrackState ──> WaitBuddyView
+                                      │
+                                      └── diffMonitorSignals ──> agent:* SignalHub
+                                                                     │
+                                                                     ▼
+                                                              gameStore (snake)
 ```
 
-安装完成后刷新页面，在会话视图标签栏选择 **WaitBuddy**。
+- **Host**：注册 `waitbuddy` 会话投影，纯函数 fold，只读日志，不写日志。
+- **Client**：`conversation.view` 入口；合并 durable 投影与进程内 `running` / `pendingInteraction`。
+- **M3 信号层**：`task_start` / `step_advance` / `approval_enter` / `approval_leave` / `task_finish`。
+- **游戏层**：只消费信号，不直接读监控状态；没有反向控制接口。
 
-## 测试
+## 兼容性与已知偏离
+
+| 能力 | 状态 |
+|---|---|
+| M1 状态看板 | ✅ |
+| M2 贪吃蛇 / 五子棋 | ✅ |
+| M3 信号 / 审批暂停 / +5/+50 | ✅ 核心；真机审批暂停/手动恢复已验证 |
+| D7 软按钮 | 已批准偏离：仅键盘方向键 |
+| D16/D17 五子棋/设置 | 已批准偏离：M4 范围提前实现 |
+| D28 question / plan-review | 暂不纳入基线，下一迭代评审 |
+| D22 unknown 终态 | 用 `aborted` + 原因文本，不新增枚举 |
+
+- 已验证 DSH `0.2.1-rc.5`；未承诺其他版本。
+- 320px 通过视觉回归；双实例建议发布前再做一次真机 smoke。
+- 不覆盖真实 DSH Canvas 绘制与原生审批链路（自动化测试边界见 Runbook）。
+
+## 开发
 
 ```bash
-npm test             # 纯逻辑 + 组件文案，55 个用例
-npm run test:visual  # 无头浏览器布局检查（1200/320、success/failed/approval）
+pnpm install
+npx playwright install chromium   # 首次运行视觉测试需要
+
+npm test             # 59 个纯逻辑/组件用例
+npm run test:visual  # 4 个无头布局场景（含宿主 tab bar / Todo dock / composer）
 npm run test:all     # 两者都跑
 ```
 
-`test:visual` 用 React 服务端渲染真实视图 + Playwright/Chromium，并模拟宿主 tab bar、Todo dock、composer；检查顶部/底部间距、无横向滚动、告警在滚动容器外、窄窗隐藏设置、暂停浮层文案。不覆盖真实 DSH 画布和原生审批链路。
+- CI：`.github/workflows/ci.yml`，push/PR 自动跑 `npm test` + `npm run test:visual`。
+- 测试文件：`test/*.test.js`；视觉脚本：`tools/visual-layout.mjs`。
+- 视觉测试用 React 服务端渲染真实视图 + Playwright/Chromium，检查间距、横向溢出、告警位置和暂停浮层文案。
 
-> 首次运行 `test:visual` 需要 Chromium：`npx playwright install chromium`（或使用已缓存的 Playwright 浏览器）。CI 见 `.github/workflows/ci.yml`，会自动跑 `npm test` + `npm run test:visual`。
+### 变更流程
 
-## 结构
-
-```
-index.js          Host 半：注册 waitbuddy 会话投影（纯 fold，只读日志，不写日志）
-client.js         Client 半：conversation.view 入口 + 监控数据源 + 看板 UI + 贪吃蛇（游戏 store / 渲染 / 方向键控制）
-cordis.patch.yml  Bundler 行：id = wait-buddy
-locale/*.json     插件管理页展示用标题 / 描述
-icon.svg          插件图标
-```
-
-数据流：Host 投影（日志派生，可 checkpoint）→ Client `createMonitorSource()` 合并
-进程内的 `running` / `pendingInteraction` → `TrackState` → 看板。
-
-## 变更流程
-
-1. 先改文档：界面/文案 → [docs/ui-spec.md](docs/ui-spec.md)；边界/取舍 → [docs/decisions.md](docs/decisions.md)；能力范围 → 本 README。
+1. 先改文档：界面/文案 → [docs/ui-spec.md](docs/ui-spec.md)；边界/取舍 → [docs/decisions.md](docs/decisions.md)。
 2. 再改代码，使实现与文档一致。
-3. M0 基线保持冻结：涉及基线语义的改动必须在 decisions 中显式标注。
+3. M0 基线保持冻结；涉及基线语义的改动必须在 decisions 中显式标注。
 
-## 铁律
+## 项目结构
 
-1. 原生审批弹窗优先级最高：本插件只读 `pendingInteraction`，从不注册审批应答，不改变审批链路。
-2. 不提供取消 / 重试 / 自动审批等反向控制。
-3. 不订阅基线之外的事件；新增信号类型走需求评审（M0 §11）。
+```text
+index.js            Host 半：注册 waitbuddy 会话投影（纯 fold，只读日志）
+client.js           Client 半：conversation.view + 监控源 + 看板 + 游戏 + M3 信号消费
+cordis.patch.yml    Bundler 行：id = wait-buddy
+locale/*.json       插件管理页展示用标题/描述
+icon.svg            插件图标
+docs/               基线、界面规范、决策、评审、验收、发布文档
+test/               node:test 单元/组件测试
+test-support/       测试加载器（VM + 最小浏览器 stub）
+tools/              无头视觉布局检查
+CHANGELOG.md        版本变更
+```
+
+## 文档
+
+| 文档 | 内容 |
+|---|---|
+| [M0 基线](docs/baseline-m0.md) | 冻结的产品基线 |
+| [M0 对照](docs/m0-compliance.md) | 实现 vs 基线的逐条对照与偏离 |
+| [M1 验收](docs/m1-acceptance.md) | M1 验收记录 |
+| [M3 实现](docs/m3-implementation.md) | 信号、暂停、奖励的实现记录 |
+| [界面规范](docs/ui-spec.md) | 布局、文案、交互规格 |
+| [决策记录](docs/decisions.md) | ADR-lite，D1–D28 |
+| [验收 Runbook](docs/acceptance-runbook.md) | 人工验收步骤与判定 |
+| [三方评审](docs/reviews/README.md) | 2026-11-05 评审原文与汇总 |
+| [迭代计划](docs/iteration-plan.md) | 问题总表与后续迭代 |
+| [发布 Runbook](docs/release.md) | 打包、npm、Git 分发 |
+| [CHANGELOG](CHANGELOG.md) | 版本变更 |
+
+## 路线图
+
+- **0.4.x**：修复真机回归；补 DSH 真机 E2E（审批、双实例、Canvas）。
+- **下一迭代**：评估 D28 question/plan-review；M4 备选池（多游戏切换、分数持久化、等待统计/导出）。
+- **不做**：游戏内审批、自动审批、任何反向控制 Agent 的能力。
+
+## 安全与隐私
+
+- 插件在 DSH 进程内以当前用户权限运行，**没有沙箱**。
+- 只读会话事件；不写会话日志；不发网络请求；无遥测。
+- 设置只存本机 `localStorage`。
+- 活动流会显示工具/命令参数，可能包含路径或查询词；D27 已移除模型推理原文。
+- 不注册、不替换、不拦截原生审批面板；审批仍由 DSH 处理。
+
+## 贡献
+
+- 先开 issue/讨论，再提 PR；涉及界面/行为变更先改文档。
+- 提交前跑 `npm run test:all`。
+- 不要引入反向控制 Agent、替换 composer、伪造进度等基线红线（见 [decisions.md](docs/decisions.md)）。
+
+## License
+
+[MIT](LICENSE)
