@@ -33,9 +33,13 @@ window.__ModuleLoader__.load({
       'status.success': '任务执行成功 ✅',
       'status.failed': '任务执行失败',
       'status.aborted': '任务已中断',
+      'status.loading': '正在读取监控数据…',
+      'status.degraded': '监控数据不可用',
+      'status.stale': '状态同步中断（可能已断开）',
+      'status.endedUnknown': '本轮已结束（未知原因）',
+      'status.steps': '已完成 {count} 步',
       'status.openChat': '查看对话',
       'status.updated': '更新于 {time}',
-      'feed.thinking': '思考',
       'feed.command': '命令',
       'feed.tool': '工具',
       'feed.empty': '等待 Agent 活动',
@@ -49,9 +53,20 @@ window.__ModuleLoader__.load({
       'game.pause': '暂停',
       'game.resume': '继续',
       'game.reset': '重置',
-      'game.startBody': '方向键或软按钮控制，吃到果实得分。',
+      'game.startBody': '方向键控制，吃到果实得分。',
       'game.start': '开始游戏',
       'game.pausedTitle': '已暂停',
+      'game.approvalPausedTitle': '等待审批',
+      'game.approvalPausedBody': 'Agent 等待审批，已自动暂停',
+      'game.resumeReadyBody': '已处理，按空格或点击继续',
+      'game.sessionPausedBody': '切换会话后已暂停，点击继续恢复',
+      'game.manualPausedBody': '已手动暂停，点击继续恢复',
+      'game.viewPausedBody': '视图切换后已暂停，点击继续恢复',
+      'game.reward': '+{amount}',
+      'game.notice.success': '任务完成！+50 分',
+      'game.notice.failed': '任务失败',
+      'game.notice.aborted': '任务已中断',
+      'game.notice.unknown': '本轮已结束',
       'game.overTitle': '游戏结束',
       'game.overBody': '本局得分 {score}',
       'game.again': '再来一局',
@@ -85,9 +100,13 @@ window.__ModuleLoader__.load({
       'status.success': 'Task finished successfully ✅',
       'status.failed': 'Task failed',
       'status.aborted': 'Task was interrupted',
+      'status.loading': 'Loading monitoring data…',
+      'status.degraded': 'Monitoring data unavailable',
+      'status.stale': 'Status sync interrupted (possibly disconnected)',
+      'status.endedUnknown': 'Turn ended (unknown reason)',
+      'status.steps': '{count} steps completed',
       'status.openChat': 'Open chat',
       'status.updated': 'Updated {time}',
-      'feed.thinking': 'Think',
       'feed.command': 'Command',
       'feed.tool': 'Tool',
       'feed.empty': 'Waiting for agent activity',
@@ -101,9 +120,20 @@ window.__ModuleLoader__.load({
       'game.pause': 'Pause',
       'game.resume': 'Resume',
       'game.reset': 'Reset',
-      'game.startBody': 'Arrow keys or soft buttons — eat the fruit to score.',
+      'game.startBody': 'Arrow keys only — eat the fruit to score.',
       'game.start': 'Start game',
       'game.pausedTitle': 'Paused',
+      'game.approvalPausedTitle': 'Waiting for approval',
+      'game.approvalPausedBody': 'The agent is waiting for approval; the game is paused.',
+      'game.resumeReadyBody': 'Handled — press Space or click Resume to continue.',
+      'game.sessionPausedBody': 'Session changed — the game is paused. Resume when ready.',
+      'game.manualPausedBody': 'Paused manually. Resume when ready.',
+      'game.viewPausedBody': 'View changed — the game is paused. Resume when ready.',
+      'game.reward': '+{amount}',
+      'game.notice.success': 'Task complete! +50 points',
+      'game.notice.failed': 'Task failed',
+      'game.notice.aborted': 'Task interrupted',
+      'game.notice.unknown': 'Turn ended',
       'game.overTitle': 'Game over',
       'game.overBody': 'Score {score}',
       'game.again': 'Play again',
@@ -141,6 +171,9 @@ window.__ModuleLoader__.load({
       updatedAt: 0,
       revision: 0,
       approvalTool: '',
+      pendingKind: '',
+      pendingKey: '',
+      health: 'loading',
       isAlerting: false,
       ready: false,
     }
@@ -157,6 +190,9 @@ window.__ModuleLoader__.load({
         left.updatedAt === right.updatedAt &&
         left.revision === right.revision &&
         left.approvalTool === right.approvalTool &&
+        left.pendingKind === right.pendingKind &&
+        left.pendingKey === right.pendingKey &&
+        left.health === right.health &&
         left.isAlerting === right.isAlerting &&
         left.ready === right.ready
       )
@@ -170,16 +206,179 @@ window.__ModuleLoader__.load({
 
 
     /**
+     * Pure state reconciliation between the durable Host projection and the
+     * process-local session status. `status` stays within the M0 six-value
+     * enum; `health` / `pendingKind` / `pendingKey` are client-only metadata.
+     */
+    function composeMonitor(input) {
+      const durable = input.durable
+      const live = input.status
+      const session = input.session
+      const pending = input.pending
+      const now = input.now
+      const mountedAt = input.mountedAt
+      const mismatchSince = input.mismatchSince
+      const projectionError = input.projectionError === true
+      const ready = durable !== undefined
+      const base = ready ? durable : EMPTY_STATE
+      const approval =
+        pending !== undefined && pending !== null && pending.kind === 'approval' ? pending : undefined
+      const liveRunning =
+        live !== undefined && live.running !== undefined
+          ? live.running
+          : session === undefined
+            ? undefined
+            : session.running
+      const running = liveRunning === true
+
+      let health = 'ready'
+      if (!ready) {
+        health = now - mountedAt < 1500 && !projectionError ? 'loading' : 'degraded'
+      } else if (liveRunning === false && base.status === 'running') {
+        health =
+          mismatchSince !== undefined && mismatchSince !== null && now - mismatchSince >= 5000
+            ? 'stale'
+            : 'ready'
+      }
+
+      let nextStatus = base.status
+      if (approval !== undefined) nextStatus = 'pending_approval'
+      else if (running) nextStatus = 'running'
+
+      return {
+        status: nextStatus,
+        health,
+        running,
+        stepCount: base.stepCount === undefined ? 0 : base.stepCount,
+        turn: base.turn === undefined ? 0 : base.turn,
+        errorMessage: base.errorMessage === undefined ? '' : base.errorMessage,
+        activity: Array.isArray(base.activity) ? base.activity : EMPTY_ACTIVITY,
+        updatedAt: base.updatedAt === undefined ? 0 : base.updatedAt,
+        revision: base.revision === undefined ? 0 : base.revision,
+        approvalTool:
+          approval !== undefined && typeof approval.toolName === 'string' ? approval.toolName : '',
+        pendingKind: approval === undefined ? '' : 'approval',
+        pendingKey:
+          approval !== undefined && typeof approval.key === 'string' ? approval.key : '',
+        isAlerting: nextStatus === 'pending_approval' || nextStatus === 'failed',
+        ready,
+      }
+    }
+
+    /** Bound on remembered signal keys; enough for one long turn's steps. */
+    const SIGNAL_SEEN_LIMIT = 500
+
+    /**
+     * Client-only signal hub. Monitor sources publish; game runtimes consume.
+     * Dedupe is global so two views of the same session cannot double-reward.
+     */
+    function createSignalHub() {
+      const listeners = new Set()
+      const seen = new Set()
+      return {
+        emit(signal) {
+          const identity = `${signal.type}:${signal.sessionId}:${signal.key}`
+          if (seen.has(identity)) return
+          seen.add(identity)
+          if (seen.size > SIGNAL_SEEN_LIMIT) {
+            const oldest = seen.values().next().value
+            if (oldest !== undefined) seen.delete(oldest)
+          }
+          for (const listener of [...listeners]) {
+            try {
+              listener(signal)
+            } catch (error) {
+              console.error('[wait-buddy] signal listener failed', error)
+            }
+          }
+        },
+        subscribe(listener) {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+        dispose() {
+          listeners.clear()
+          seen.clear()
+        },
+      }
+    }
+
+    /**
+     * Pure edge detection between two monitor snapshots. The first ready
+     * snapshot is a baseline: only a currently-pending approval is emitted
+     * (so opening the view during an approval still pauses the game), never
+     * historical task/step/finish signals.
+     */
+    function diffMonitorSignals(previous, next, meta) {
+      const sessionId = meta.sessionId
+      const at = typeof meta.at === 'number' ? meta.at : Date.now()
+      const baseline = meta.baseline === true || (!previous.ready && next.ready)
+      const make = (type, key, detail) => ({ type, sessionId, key, at, detail: detail === undefined ? {} : detail })
+      const approvalDetail = {
+        kind: next.pendingKind,
+        tool: next.approvalTool,
+      }
+      if (baseline) {
+        if (next.pendingKey === '') return []
+        return [make('agent:approval_enter', next.pendingKey, approvalDetail)]
+      }
+      if (!next.ready && next.pendingKey === '' && previous.pendingKey === '') return []
+
+      const signals = []
+      if (previous.pendingKey !== next.pendingKey) {
+        if (previous.pendingKey !== '') {
+          signals.push(make('agent:approval_leave', previous.pendingKey, { kind: previous.pendingKind }))
+        }
+        if (next.pendingKey !== '') {
+          signals.push(make('agent:approval_enter', next.pendingKey, approvalDetail))
+        }
+      }
+
+      const startedFromIdle =
+        next.status === 'running' && previous.status === 'idle' && next.turn === previous.turn
+      if (next.turn > previous.turn || startedFromIdle) {
+        signals.push(make('agent:task_start', String(next.turn), { turn: next.turn }))
+      }
+
+      if (next.stepCount > previous.stepCount) {
+        signals.push(
+          make('agent:step_advance', `${next.turn}:${next.stepCount}`, {
+            delta: next.stepCount - previous.stepCount,
+            stepCount: next.stepCount,
+          }),
+        )
+      }
+
+      const terminal =
+        next.status === 'success' || next.status === 'failed' || next.status === 'aborted'
+      if (terminal && next.status !== previous.status) {
+        signals.push(
+          make('agent:task_finish', `${next.turn}:${next.status}`, {
+            status: next.status,
+            reasonKind: next.errorMessage,
+          }),
+        )
+      }
+      return signals
+    }
+
+    /**
      * Merge the durable projection with the process-local pending-interaction
      * state into the single TrackState the view renders.
      * @param ctx - client root context.
      * @param sessionId - the session this view instance is bound to.
      */
-    function createMonitorSource(ctx, sessionId) {
+    function createMonitorSource(ctx, sessionId, signalHub) {
       let snapshot = { ...EMPTY_STATE }
       const listeners = new Set()
       let subscribers = 0
       let disposers = []
+      let mountedAt = Date.now()
+      let mismatchSince = null
+      let projectionError = false
+      let healthTimer = null
+      let refreshRequested = false
+      let hasBaseline = false
 
       const bindingOf = () => ctx.sessions.binding(sessionId)
 
@@ -203,63 +402,105 @@ window.__ModuleLoader__.load({
 
       const compose = () => {
         const durable = readDurable()
-        const status = readSessionStatus()
+        const live = readSessionStatus()
         const session = readSession()
-        const pending = status === undefined ? undefined : status.pendingInteraction
-        const approval =
-          pending !== undefined && pending !== null && pending.kind === 'approval'
-            ? pending
-            : undefined
-        const running =
-          status !== undefined && status.running !== undefined
-            ? status.running
+        const pending = live === undefined ? undefined : live.pendingInteraction
+        const liveRunning =
+          live !== undefined && live.running !== undefined
+            ? live.running
             : session === undefined
               ? undefined
               : session.running
-        const base = durable === undefined ? EMPTY_STATE : durable
-        let nextStatus = base.status
-        if (approval !== undefined) nextStatus = 'pending_approval'
-        else if (nextStatus === 'idle' && running === true) nextStatus = 'running'
-        return {
-          status: nextStatus,
-          running: running === true,
-          stepCount: base.stepCount === undefined ? 0 : base.stepCount,
-          turn: base.turn === undefined ? 0 : base.turn,
-          errorMessage: base.errorMessage === undefined ? '' : base.errorMessage,
-          activity: Array.isArray(base.activity) ? base.activity : EMPTY_ACTIVITY,
-          updatedAt: base.updatedAt === undefined ? 0 : base.updatedAt,
-          revision: base.revision === undefined ? 0 : base.revision,
-          approvalTool:
-            approval !== undefined && typeof approval.toolName === 'string' ? approval.toolName : '',
-          isAlerting: nextStatus === 'pending_approval' || nextStatus === 'failed',
-          ready: durable !== undefined,
+        if (durable !== undefined && durable.status === 'running' && liveRunning === false) {
+          if (mismatchSince === null) mismatchSince = Date.now()
+        } else {
+          mismatchSince = null
         }
+        return composeMonitor({
+          durable,
+          status: live,
+          session,
+          pending,
+          now: Date.now(),
+          mountedAt,
+          mismatchSince,
+          projectionError,
+        })
       }
 
       const publish = (next) => {
         if (sameMonitor(snapshot, next)) return
+        const previous = snapshot
         snapshot = next
         for (const listener of [...listeners]) listener()
+        if (signalHub !== undefined) {
+          const signals = diffMonitorSignals(previous, next, {
+            sessionId,
+            baseline: !hasBaseline,
+          })
+          hasBaseline = true
+          for (const signal of signals) signalHub.emit(signal)
+        }
       }
 
-      const refresh = () => publish(compose())
+      const clearHealthTimer = () => {
+        if (healthTimer !== null) {
+          clearTimeout(healthTimer)
+          healthTimer = null
+        }
+      }
 
-      let refreshRequested = false
+      const scheduleHealth = (next) => {
+        clearHealthTimer()
+        const now = Date.now()
+        let delay = null
+        if (next.health === 'loading') delay = Math.max(0, 1500 - (now - mountedAt))
+        else if (next.health === 'ready' && mismatchSince !== null) {
+          delay = Math.max(0, 5000 - (now - mismatchSince))
+        }
+        if (delay === null) return
+        healthTimer = setTimeout(() => {
+          healthTimer = null
+          refresh()
+        }, delay)
+      }
+
+      const refresh = () => {
+        const next = compose()
+        publish(next)
+        scheduleHealth(next)
+      }
+
       /** Ask the controller once for a fresh projection read when the key is still missing. */
       const ensureProjection = () => {
         if (refreshRequested || readDurable() !== undefined) return
         refreshRequested = true
+        const failed = (error) => {
+          projectionError = true
+          refresh()
+          console.error('[wait-buddy] projection refresh failed', error)
+        }
         try {
           const pending = ctx.sessions.refreshProjections(sessionId)
-          if (pending !== undefined && typeof pending.catch === 'function') {
-            pending.catch((error) => console.error('[wait-buddy] projection refresh failed', error))
+          if (pending !== undefined && typeof pending.then === 'function') {
+            Promise.resolve(pending)
+              .then(() => {
+                projectionError = false
+                refresh()
+              })
+              .catch(failed)
           }
         } catch (error) {
-          console.error('[wait-buddy] projection refresh failed', error)
+          failed(error)
         }
       }
 
       const start = () => {
+        mountedAt = Date.now()
+        mismatchSince = null
+        projectionError = false
+        refreshRequested = false
+        hasBaseline = false
         ensureProjection()
         const disposersNext = []
         const binding = bindingOf()
@@ -277,6 +518,7 @@ window.__ModuleLoader__.load({
       }
 
       const stop = () => {
+        clearHealthTimer()
         for (const dispose of disposers) {
           try {
             dispose()
@@ -304,13 +546,18 @@ window.__ModuleLoader__.load({
 
     /** Locale keys for the activity kinds (kept literal so doc/code checks can see them). */
     const FEED_LABEL = {
-      thinking: 'feed.thinking',
       command: 'feed.command',
       tool: 'feed.tool',
     }
 
     /** Status line copy for one monitor state. */
     function statusText(t, state) {
+      // Approval/failure are the highest-priority copy; health never hides them.
+      if (state.status !== 'pending_approval' && state.status !== 'failed') {
+        if (state.health === 'loading') return t('status.loading')
+        if (state.health === 'degraded') return t('status.degraded')
+        if (state.health === 'stale') return t('status.stale')
+      }
       switch (state.status) {
         case 'running':
           return state.activity.length > 0 ? t('status.running') : t('status.runningStart')
@@ -321,15 +568,18 @@ window.__ModuleLoader__.load({
         case 'failed':
           return t('status.failed')
         case 'aborted':
-          return t('status.aborted')
+          return state.errorMessage === '' ? t('status.aborted') : t('status.endedUnknown')
         default:
           return t('status.idle')
       }
     }
 
-    /** Right-hand meta: the last observed time. */
+    /** Right-hand meta: last observed time + real step count (M0 §6). */
     function metaText(t, state) {
-      return state.updatedAt > 0 ? t('status.updated', { time: clockOf(state.updatedAt) }) : ''
+      const parts = []
+      if (state.updatedAt > 0) parts.push(t('status.updated', { time: clockOf(state.updatedAt) }))
+      if (state.stepCount > 0) parts.push(t('status.steps', { count: state.stepCount }))
+      return parts.join(' · ')
     }
 
     /** Clock label for the last observed event. */
@@ -413,14 +663,20 @@ window.__ModuleLoader__.load({
         status: 'idle',
         snake,
         dir: 'right',
-        nextDir: null,
+        dirQueue: [],
         food: placeFood(snake, cols, rows, Math.random),
         score: 0,
+        eaten: 0,
         best: best === undefined ? 0 : best,
         tickMs: SPEED_PRESETS[speed].start,
         speed,
         cols,
         rows,
+        pauseReason: '',
+        resumeReason: '',
+        resumeReady: false,
+        reward: null,
+        notice: null,
       }
     }
 
@@ -432,18 +688,20 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Queue one direction change; reverses and non-running states are ignored. */
+    /** Queue up to two direction changes; validate against the queue tail. */
     function turnGame(state, dir) {
       if (state.status !== 'running') return state
-      const current = state.nextDir === null ? state.dir : state.nextDir
-      if (dir === current || dir === OPPOSITE[current]) return state
-      return { ...state, nextDir: dir }
+      const queue = state.dirQueue
+      if (queue.length >= 2) return state
+      const last = queue.length > 0 ? queue[queue.length - 1] : state.dir
+      if (dir === last || dir === OPPOSITE[last]) return state
+      return { ...state, dirQueue: [...queue, dir] }
     }
 
     /** One movement step: walls, self collision, food, growth and speed-up. */
     function tickGame(state) {
       if (state.status !== 'running') return state
-      const dir = state.nextDir === null ? state.dir : state.nextDir
+      const dir = state.dirQueue.length > 0 ? state.dirQueue[0] : state.dir
       const vector = DIR_VECTORS[dir]
       const head = state.snake[0]
       const next = { x: head.x + vector.x, y: head.y + vector.y }
@@ -456,12 +714,17 @@ window.__ModuleLoader__.load({
           ...state,
           status: 'over',
           dir,
-          nextDir: null,
+          dirQueue: [],
           best: Math.max(state.best, state.score),
         }
       }
       if (!eating) {
-        return { ...state, snake: [next, ...state.snake.slice(0, -1)], dir, nextDir: null }
+        return {
+          ...state,
+          snake: [next, ...state.snake.slice(0, -1)],
+          dir,
+          dirQueue: state.dirQueue.slice(1),
+        }
       }
       const grown = [next, ...state.snake]
       const score = state.score + FOOD_SCORE
@@ -470,9 +733,10 @@ window.__ModuleLoader__.load({
         ...state,
         snake: grown,
         dir,
-        nextDir: null,
+        dirQueue: state.dirQueue.slice(1),
         food,
         score,
+        eaten: (state.eaten === undefined ? 0 : state.eaten) + 1,
         best: Math.max(state.best, score),
         tickMs: Math.max(
           (SPEED_PRESETS[state.speed] || SPEED_PRESETS.normal).min,
@@ -506,22 +770,37 @@ window.__ModuleLoader__.load({
       let state = createGameState(0, 48, 16)
       const listeners = new Set()
       let timer = null
+      let timerKey = null
       let subscribers = 0
+      let manualPaused = false
+      const pauseReasons = new Set()
+      let resumeReason = ''
+      let resumeReady = false
+      let rewardSeq = 0
+      let noticeSeq = 0
+      let rewardTimer = null
+      let noticeTimer = null
 
       const clearTimer = () => {
         if (timer !== null) {
           clearInterval(timer)
           timer = null
         }
+        timerKey = null
       }
 
       const notify = () => {
         for (const listener of [...listeners]) listener()
       }
 
+      // A ticker is rebuilt only when the pace changes; a keypress or a score
+      // update no longer pushes the next movement tick back.
       const schedule = () => {
+        const nextKey = state.status === 'running' ? `${state.tickMs}` : ''
+        if (timer !== null && timerKey === nextKey) return
         clearTimer()
         if (state.status !== 'running' || subscribers === 0) return
+        timerKey = nextKey
         timer = setInterval(() => {
           set(tickGame(state))
         }, state.tickMs)
@@ -534,8 +813,128 @@ window.__ModuleLoader__.load({
         schedule()
       }
 
+      const clearTransientTimers = () => {
+        if (rewardTimer !== null) {
+          clearTimeout(rewardTimer)
+          rewardTimer = null
+        }
+        if (noticeTimer !== null) {
+          clearTimeout(noticeTimer)
+          noticeTimer = null
+        }
+      }
+
+      const reasonLabel = () => {
+        for (const reason of pauseReasons) {
+          if (reason.startsWith('approval:')) return 'approval'
+        }
+        if (pauseReasons.has('hidden')) return 'hidden'
+        if (pauseReasons.has('view-inactive')) return 'view-inactive'
+        return manualPaused ? 'manual' : ''
+      }
+
+      const addPause = (reason, signal) => {
+        if (state.status !== 'running' && state.status !== 'paused') {
+          if (!signal) return
+          pauseReasons.add(reason)
+          resumeReady = true
+          resumeReason = 'approval'
+          // Keep the reason visible even when the round already ended/idle:
+          // approval outranks the game-over overlay.
+          set({ ...state, pauseReason: reasonLabel(), resumeReason: 'approval', resumeReady: true })
+          return
+        }
+        pauseReasons.add(reason)
+        if (signal) {
+          resumeReady = true
+          resumeReason = 'approval'
+        }
+        if (state.status === 'running') {
+          set({ ...state, status: 'paused', pauseReason: reasonLabel(), resumeReason, resumeReady })
+        } else {
+          set({ ...state, pauseReason: reasonLabel(), resumeReason, resumeReady })
+        }
+      }
+
+      const releasePause = (reason) => {
+        if (!pauseReasons.has(reason)) return
+        pauseReasons.delete(reason)
+        if (pauseReasons.size === 0) resumeReady = state.status === 'paused' && !manualPaused
+        set({ ...state, pauseReason: reasonLabel(), resumeReason, resumeReady })
+      }
+
+      const manualPause = () => {
+        if (state.status !== 'running') return
+        manualPaused = true
+        resumeReady = false
+        resumeReason = ''
+        set({ ...state, status: 'paused', pauseReason: reasonLabel(), resumeReason: '', resumeReady: false })
+      }
+
+      const pauseWithHint = (reason) => {
+        if (state.status !== 'running') return
+        if (pauseReasons.size > 0) return
+        clearTransientTimers()
+        manualPaused = false
+        resumeReady = true
+        resumeReason = ''
+        set({
+          ...state,
+          status: 'paused',
+          pauseReason: reason,
+          resumeReason: '',
+          resumeReady: true,
+          reward: null,
+          notice: null,
+        })
+      }
+
+      const manualResume = () => {
+        if (state.status !== 'paused') return
+        if (pauseReasons.size > 0) return
+        manualPaused = false
+        resumeReady = false
+        resumeReason = ''
+        set({ ...state, status: 'running', pauseReason: '', resumeReason: '', resumeReady: false })
+      }
+
+      const addScore = (amount) => {
+        if (state.status === 'idle') return
+        const id = (rewardSeq += 1)
+        const score = state.score + amount
+        if (rewardTimer !== null) clearTimeout(rewardTimer)
+        set({
+          ...state,
+          score,
+          best: Math.max(state.best, score),
+          reward: { id, amount },
+        })
+        rewardTimer = setTimeout(() => {
+          rewardTimer = null
+          if (state.reward !== null && state.reward.id === id) {
+            set({ ...state, reward: null })
+          }
+        }, 1200)
+        rewardTimer.unref?.()
+      }
+
+      const setNotice = (kind) => {
+        if (state.status === 'idle') return
+        const id = (noticeSeq += 1)
+        if (noticeTimer !== null) clearTimeout(noticeTimer)
+        set({ ...state, notice: { id, kind } })
+        noticeTimer = setTimeout(() => {
+          noticeTimer = null
+          if (state.notice !== null && state.notice.id === id) {
+            set({ ...state, notice: null })
+          }
+        }, 4000)
+        noticeTimer.unref?.()
+      }
+
       const onVisibility = () => {
-        if (document.hidden && state.status === 'running') set(pauseGame(state))
+        if (document.hidden) addPause('hidden', false)
+        else releasePause('hidden')
       }
       document.addEventListener('visibilitychange', onVisibility)
 
@@ -544,13 +943,20 @@ window.__ModuleLoader__.load({
         subscribe(listener) {
           listeners.add(listener)
           subscribers += 1
-          if (subscribers === 1) schedule()
+          if (subscribers === 1) {
+            releasePause('view-inactive')
+            schedule()
+          }
           return () => {
             listeners.delete(listener)
             subscribers -= 1
             if (subscribers === 0) {
               clearTimer()
-              set(pauseGame(state))
+              pauseWithHint('view-inactive')
+              clearTransientTimers()
+              if (state.notice !== null || state.reward !== null) {
+                set({ ...state, notice: null, reward: null })
+              }
             }
           }
         },
@@ -558,26 +964,95 @@ window.__ModuleLoader__.load({
         setGrid(cols, rows) {
           if (state.status === 'running' || state.status === 'paused') return
           if (state.cols === cols && state.rows === rows) return
-          set(createGameState(state.best, cols, rows))
+          set(createGameState(state.best, cols, rows, state.speed))
         },
-        start: (speedId) => set(startGame(state, speedId)),
-        pause: () => set(pauseGame(state)),
+        start: (speedId) => {
+          clearTransientTimers()
+          manualPaused = false
+          const paused = pauseReasons.size > 0
+          set({
+            ...startGame(state, speedId),
+            status: paused ? 'paused' : 'running',
+            pauseReason: reasonLabel(),
+            resumeReason: paused ? resumeReason : '',
+            resumeReady: paused ? resumeReady : false,
+            reward: null,
+            notice: null,
+          })
+        },
+        pause: () => manualPause(),
+        pauseWithHint: (reason) => pauseWithHint(reason),
+        resume: () => manualResume(),
         turn: (dir) => set(turnGame(state, dir)),
-        togglePause: () => set(state.status === 'paused' ? resumeGame(state) : pauseGame(state)),
-        reset: (speedId) => set(resetGame(state, speedId)),
-        /** Change the pace; a live round adopts the new starting interval immediately. */
+        togglePause: () => {
+          if (state.status === 'running') manualPause()
+          else if (state.status === 'paused') manualResume()
+        },
+        reset: (speedId) => {
+          clearTransientTimers()
+          manualPaused = false
+          const paused = pauseReasons.size > 0
+          set({
+            ...resetGame(state, speedId),
+            status: paused ? 'paused' : 'idle',
+            pauseReason: reasonLabel(),
+            resumeReason: paused ? resumeReason : '',
+            resumeReady: paused ? resumeReady : false,
+            reward: null,
+            notice: null,
+          })
+        },
+        /** Change the pace; paused/idle rounds keep the new pace for the next run. */
         setSpeed(speedId) {
           if (SPEED_PRESETS[speedId] === undefined || state.speed === speedId) return
+          const preset = SPEED_PRESETS[speedId]
+          const eaten = state.eaten === undefined ? 0 : state.eaten
           set({
             ...state,
             speed: speedId,
-            tickMs: state.status === 'running' ? SPEED_PRESETS[speedId].start : state.tickMs,
+            tickMs: Math.max(preset.min, preset.start - eaten * preset.step),
           })
+        },
+        /** M3: consume one agent signal; never touches the Agent. */
+        handleSignal(signal) {
+          if (signal === undefined) return
+          if (signal.type === 'agent:approval_enter') {
+            addPause(`approval:${signal.key}`, true)
+            return
+          }
+          if (signal.type === 'agent:approval_leave') {
+            releasePause(`approval:${signal.key}`)
+            return
+          }
+          if (signal.type === 'agent:step_advance') {
+            addScore(5)
+            return
+          }
+          if (signal.type === 'agent:task_finish') {
+            const status = signal.detail === undefined ? '' : signal.detail.status
+            if (status === 'success') {
+              addScore(50)
+              setNotice('success')
+            } else if (status === 'aborted') {
+              const reasonKind =
+                signal.detail === undefined || signal.detail.reasonKind === undefined
+                  ? ''
+                  : signal.detail.reasonKind
+              setNotice(reasonKind === '' ? 'aborted' : 'unknown')
+            } else {
+              setNotice('failed')
+            }
+          }
         },
         dispose() {
           clearTimer()
+          clearTransientTimers()
           listeners.clear()
           subscribers = 0
+          pauseReasons.clear()
+          manualPaused = false
+          resumeReason = ''
+          resumeReady = false
           document.removeEventListener('visibilitychange', onVisibility)
         },
       }
@@ -585,29 +1060,8 @@ window.__ModuleLoader__.load({
 
     const gameStore = createGameStore()
 
-    /** Module-scope canvas handle; only one WaitBuddy view renders at a time. */
-    let gameCanvas = null
-
-    /** Module-scope board box; used to derive the grid from its measured size. */
-    let boardEl = null
-
-    /** Stable ref callback for the board box. */
-    function attachBoard(node) {
-      boardEl = node
-    }
-
-    /** Module-scope view root; used to return keyboard focus to the board after a click. */
-    let rootEl = null
-
-    /** Stable ref callback for the view root. */
-    function attachRoot(node) {
-      rootEl = node
-    }
-
-    /** Move focus to the view so arrow keys work right after pressing an overlay button. */
-    function focusRoot() {
-      if (rootEl !== null && typeof rootEl.focus === 'function') rootEl.focus({ preventScroll: true })
-    }
+    /** Process-local signal hub; monitor sources publish, the game consumes. */
+    const signalHub = createSignalHub()
 
     /** Logical 324x324 board drawn into a 2x backing store for crisp edges. */
     function drawGame(canvas, state) {
@@ -687,12 +1141,6 @@ window.__ModuleLoader__.load({
       ctx.fill()
     }
 
-    /** Stable ref callback: keeps the canvas handle and paints the current state. */
-    function attachCanvas(node) {
-      gameCanvas = node
-      if (node !== null) drawGame(node, gameStore.getSnapshot())
-    }
-
     /** Arrow keys act only while focus is inside this view, so the composer keeps its keys. */
     function onGameKeyDown(event) {
       if (modeStore.getSnapshot() !== 'snake') return
@@ -706,6 +1154,19 @@ window.__ModuleLoader__.load({
       ) {
         return
       }
+      if (event.key === ' ' || event.key === 'Spacebar') {
+        if (
+          target !== null &&
+          target !== undefined &&
+          typeof target.closest === 'function' &&
+          target.closest('button, a[href], [role="button"]') !== null
+        ) {
+          return
+        }
+        event.preventDefault()
+        gameStore.togglePause()
+        return
+      }
       const dir = ARROW_DIRECTIONS[event.key]
       if (dir === undefined) return
       event.preventDefault()
@@ -713,7 +1174,24 @@ window.__ModuleLoader__.load({
     }
 
     /** Centred overlay shown whenever the round is not running. */
-    function gameOverlay(t, state) {
+    function gameOverlay(t, state, focusRoot) {
+      if (state.pauseReason === 'approval') {
+        return h(
+          'div',
+          { className: 'wb-overlay' },
+          h('div', { className: 'wb-overlayTitle' }, t('game.approvalPausedTitle')),
+          h('div', { className: 'wb-overlayBody' }, t('game.approvalPausedBody')),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-btn wb-btnPrimary',
+              disabled: true,
+            },
+            t('game.resume'),
+          ),
+        )
+      }
       if (state.status === 'idle') {
         return h(
           'div',
@@ -734,15 +1212,30 @@ window.__ModuleLoader__.load({
         )
       }
       if (state.status === 'paused') {
+        const waiting = state.pauseReason === 'approval'
+        const body =
+          state.pauseReason === 'approval'
+            ? t('game.approvalPausedBody')
+            : state.pauseReason === 'session-switch'
+              ? t('game.sessionPausedBody')
+              : state.pauseReason === 'view-inactive'
+                ? t('game.viewPausedBody')
+                : state.pauseReason === 'manual'
+                  ? t('game.manualPausedBody')
+                  : state.resumeReason === 'approval' && state.resumeReady
+                    ? t('game.resumeReadyBody')
+                    : null
         return h(
           'div',
           { className: 'wb-overlay' },
-          h('div', { className: 'wb-overlayTitle' }, t('game.pausedTitle')),
+          h('div', { className: 'wb-overlayTitle' }, waiting ? t('game.approvalPausedTitle') : t('game.pausedTitle')),
+          body === null ? null : h('div', { className: 'wb-overlayBody' }, body),
           h(
             'button',
             {
               type: 'button',
               className: 'wb-btn wb-btnPrimary',
+              disabled: waiting,
               onClick: () => {
                 gameStore.togglePause()
                 focusRoot()
@@ -764,7 +1257,7 @@ window.__ModuleLoader__.load({
               type: 'button',
               className: 'wb-btn wb-btnPrimary',
               onClick: () => {
-                gameStore.reset()
+                gameStore.start(settingsStore.getSnapshot().speed)
                 focusRoot()
               },
             },
@@ -1063,14 +1556,6 @@ window.__ModuleLoader__.load({
 
     const modeStore = createModeStore()
 
-    /** Module-scope gomoku canvas handle. */
-    let gomokuCanvas = null
-
-    function attachGomokuCanvas(node) {
-      gomokuCanvas = node
-      if (node !== null) drawGomoku(node, gomokuStore.getSnapshot())
-    }
-
     function drawGomoku(canvas, state) {
       if (canvas === null || canvas === undefined) return
       const width = canvas.clientWidth
@@ -1161,7 +1646,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Gomoku result overlay. */
-    function gomokuOverlay(t, state) {
+    function gomokuOverlay(t, state, focusRoot) {
       if (state.status === 'playing') return null
       const title =
         state.status === 'won'
@@ -1189,7 +1674,16 @@ window.__ModuleLoader__.load({
     }
 
     /** Game area: mode switch, one board, one control row. */
-    function GameArea({ t }) {
+    function GameArea({ t, sessionId, focusRoot }) {
+      const canvasRef = React.useRef(null)
+      const boardRef = React.useRef(null)
+      const gomokuCanvasRef = React.useRef(null)
+      const lastSession = React.useRef(sessionId)
+      React.useEffect(() => {
+        if (lastSession.current === sessionId) return
+        lastSession.current = sessionId
+        gameStore.pauseWithHint('session-switch')
+      }, [sessionId])
       const [mode, setMode] = React.useState(() => modeStore.getSnapshot())
       React.useEffect(() => modeStore.subscribe(() => setMode(modeStore.getSnapshot())), [])
       const [snake, setSnake] = React.useState(() => gameStore.getSnapshot())
@@ -1212,15 +1706,15 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => {
         if (mode !== 'snake') return
-        drawGame(gameCanvas, snake)
+        drawGame(canvasRef.current, snake)
       }, [mode, snake])
       React.useEffect(() => {
         if (mode !== 'gomoku') return
-        drawGomoku(gomokuCanvas, gomoku)
+        drawGomoku(gomokuCanvasRef.current, gomoku)
       }, [mode, gomoku])
       React.useEffect(() => {
         if (mode !== 'snake') return undefined
-        const element = boardEl
+        const element = boardRef.current
         if (element === null) return undefined
         const measure = () => {
           const rect = element.getBoundingClientRect()
@@ -1228,6 +1722,18 @@ window.__ModuleLoader__.load({
           const grid = gridFor(rect.width, rect.height)
           gameStore.setGrid(grid.cols, grid.rows)
         }
+        measure()
+        if (typeof ResizeObserver !== 'function') return undefined
+        const observer = new ResizeObserver(measure)
+        observer.observe(element)
+        return () => observer.disconnect()
+      }, [mode])
+
+      React.useEffect(() => {
+        if (mode !== 'gomoku') return undefined
+        const element = boardRef.current
+        if (element === null) return undefined
+        const measure = () => drawGomoku(gomokuCanvasRef.current, gomokuStore.getSnapshot())
         measure()
         if (typeof ResizeObserver !== 'function') return undefined
         const observer = new ResizeObserver(measure)
@@ -1290,30 +1796,44 @@ window.__ModuleLoader__.load({
         mode === 'snake'
           ? h(
               'div',
-              { className: 'wb-boardWrap', tabIndex: 0, ref: attachBoard },
+              { className: 'wb-boardWrap', tabIndex: 0, ref: boardRef },
               h('canvas', {
-                ref: attachCanvas,
+                ref: canvasRef,
                 className: 'wb-board',
                 role: 'img',
                 'aria-label': t('game.canvasLabel', { score: snake.score }),
               }),
-              gameOverlay(t, snake),
+              gameOverlay(t, snake, focusRoot),
+              snake.reward === null
+                ? null
+                : h(
+                    'div',
+                    { key: `reward-${snake.reward.id}`, className: 'wb-reward', 'aria-hidden': true },
+                    t('game.reward', { amount: snake.reward.amount }),
+                  ),
+              snake.notice === null
+                ? null
+                : h(
+                    'div',
+                    { key: `notice-${snake.notice.id}`, className: 'wb-notice', role: 'status' },
+                    t(`game.notice.${snake.notice.kind}`),
+                  ),
             )
           : h(
               'div',
-              { className: 'wb-boardWrap wb-squareBoard', tabIndex: 0 },
+              { className: 'wb-boardWrap wb-squareBoard', tabIndex: 0, ref: boardRef },
               h('canvas', {
-                ref: attachGomokuCanvas,
+                ref: gomokuCanvasRef,
                 className: 'wb-board',
                 role: 'img',
                 'aria-label': t('gomoku.canvasLabel', { moves: gomoku.moves }),
                 onClick: (event) => {
-                  if (gomokuCanvas === null) return
-                  const index = gomokuPointAt(gomokuCanvas, event.clientX, event.clientY)
+                  if (gomokuCanvasRef.current === null) return
+                  const index = gomokuPointAt(gomokuCanvasRef.current, event.clientX, event.clientY)
                   if (index >= 0) gomokuStore.place(index, settingsStore.getSnapshot().level)
                 },
               }),
-              gomokuOverlay(t, gomoku),
+              gomokuOverlay(t, gomoku, focusRoot),
             )
 
       const controls =
@@ -1334,7 +1854,10 @@ window.__ModuleLoader__.load({
                   {
                     type: 'button',
                     className: 'wb-btn',
-                    disabled: snake.status === 'idle' || snake.status === 'over',
+                    disabled:
+                      snake.status === 'idle' ||
+                      snake.status === 'over' ||
+                      snake.pauseReason === 'approval',
                     onClick: () => gameStore.togglePause(),
                   },
                   snake.status === 'running' ? t('game.pause') : t('game.resume'),
@@ -1427,17 +1950,17 @@ window.__ModuleLoader__.load({
     }
 
 const CSS = `
-.wb-root{box-sizing:border-box;width:100%;height:100%;overflow:auto;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px}
+.wb-root{box-sizing:border-box;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;container-type:inline-size;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px}
 .wb-root:focus{outline:none}
 .wb-root:focus-visible .wb-boardWrap,.wb-boardWrap:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .wb-boardWrap:focus{outline:none}
-.wb-inner{box-sizing:border-box;width:100%;height:100%;min-height:0;padding:20px 24px 24px;display:flex;flex-direction:column;gap:16px}
-.wb-alert{display:flex;align-items:center;gap:8px;border:1px solid var(--dsw-alias-state-warn-primary);border-radius:10px;padding:8px 12px;background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,var(--dsw-alias-bg-base))}
-.wb-alert[data-kind="failed"]{border-color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 12%,var(--dsw-alias-bg-base))}
-.wb-alertTitle{flex:none;font-size:13px;font-weight:600;white-space:nowrap}
+.wb-inner{box-sizing:border-box;width:100%;flex:1 1 auto;min-height:0;overflow:auto;padding:10px 24px 56px;display:flex;flex-direction:column;gap:16px}
+.wb-alert{flex:none;margin:12px 24px 0;display:flex;align-items:center;gap:8px;border:1px solid var(--dsw-alias-state-warn-primary);border-radius:10px;padding:8px 12px;background:var(--dsw-alias-bg-base);flex-wrap:wrap}
+.wb-alert[data-kind="failed"]{border-color:var(--dsw-alias-state-error-primary);background:var(--dsw-alias-bg-base)}
+.wb-alertTitle{flex:1 1 auto;min-width:0;font-size:13px;font-weight:600;white-space:normal;overflow-wrap:anywhere}
 .wb-alertMeta{flex:1;min-width:0;font-size:11px;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wb-top{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.wb-status{flex:0 1 auto;min-width:260px;display:flex;flex-direction:column;gap:6px}
+.wb-status{flex:0 1 auto;min-width:min(260px,100%);display:flex;flex-direction:column;gap:6px}
 .wb-statusRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .wb-dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}
 .wb-dot[data-state="running"]{background:var(--dsw-alias-state-success-primary)}
@@ -1445,6 +1968,7 @@ const CSS = `
 .wb-dot[data-state="success"]{background:var(--dsw-alias-state-success-primary)}
 .wb-dot[data-state="failed"]{background:var(--dsw-alias-state-error-primary)}
 .wb-dot[data-state="aborted"]{background:var(--dsw-alias-state-idle-primary)}
+.wb-dot[data-health="degraded"]:not([data-state="pending_approval"]):not([data-state="failed"]),.wb-dot[data-health="stale"]:not([data-state="pending_approval"]):not([data-state="failed"]){background:var(--dsw-alias-state-warn-primary)}
 .wb-statusText{flex:0 1 auto;min-width:0;font-size:15px;font-weight:600;line-height:22px}
 .wb-meta{flex:none;font-size:11px;line-height:18px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
 .wb-disclaimer{font-size:10px;line-height:14px;color:var(--dsw-alias-label-secondary)}
@@ -1459,9 +1983,13 @@ const CSS = `
 .wb-game{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px}
 .wb-boardWrap{position:relative;flex:1 1 auto;width:100%;height:min(46vh,480px);min-height:200px;max-height:520px;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;overflow:hidden;background:#0d1624}
 .wb-board{display:block;width:100%;height:100%}
-.wb-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;text-align:center;background:color-mix(in srgb,#0d1624 72%,transparent);color:#e6f2ff}
+.wb-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;text-align:center;background:color-mix(in srgb,#0d1624 48%,transparent);color:#e6f2ff}
 .wb-overlayTitle{font-size:15px;font-weight:600}
 .wb-overlayBody{font-size:11px;line-height:16px;color:rgba(230,242,255,.76)}
+.wb-reward{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-size:20px;font-weight:700;color:#8ef7b0;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.45);animation:wb-float 1.2s ease-out forwards}
+@keyframes wb-float{0%{opacity:0;transform:translate(-50%,-20%)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-130%)}}
+.wb-notice{position:absolute;left:50%;top:12px;transform:translateX(-50%);max-width:90%;padding:6px 12px;border-radius:999px;background:rgba(6,36,15,.9);color:#e6f2ff;font-size:12px;line-height:18px;text-align:center;pointer-events:none;animation:wb-toast 4s ease forwards}
+@keyframes wb-toast{0%{opacity:0;transform:translate(-50%,-6px)}10%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-6px)}}
 .wb-gameFoot{display:flex;align-items:center;gap:18px;flex-wrap:wrap;min-width:0}
 .wb-chatBtn{flex:none}
 .wb-seg{display:inline-flex;align-items:stretch;flex:none;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;overflow:hidden}
@@ -1479,15 +2007,19 @@ const CSS = `
 .wb-hint{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .wb-setting{display:flex;align-items:center;gap:8px;flex:none}
 .wb-settingLabel{margin-right:2px;font-size:12px;line-height:20px;color:var(--dsw-alias-label-secondary)}
-.wb-squareBoard{flex:1 1 auto;width:100%;height:min(46vh,480px);min-height:200px;max-height:520px;border:0;background:transparent;align-self:center}
+.wb-squareBoard{flex:0 1 auto;width:min(100%,max(200px,min(46vh,520px)));max-width:100%;height:auto;min-height:0;max-height:520px;aspect-ratio:1/1;border:0;background:transparent;align-self:center;margin:0 auto}
+@container (max-width:480px){.wb-inner{padding:8px 12px 56px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
 `
 
     /** WaitBuddy status board (M1: monitoring only, no game). */
-    function useMonitorState(sessionId) {
-      const [state, setState] = React.useState(() => ({ ...EMPTY_STATE }))
+    function useMonitorState(sessionId, initialState) {
+      const [state, setState] = React.useState(() =>
+        initialState === undefined ? { ...EMPTY_STATE } : initialState,
+      )
       React.useEffect(() => {
+        if (initialState !== undefined) return undefined
         if (clientCtx === null) return undefined
-        const source = createMonitorSource(clientCtx, sessionId)
+        const source = createMonitorSource(clientCtx, sessionId, signalHub)
         const sync = () => setState(source.getSnapshot())
         sync()
         return source.subscribe(sync)
@@ -1497,7 +2029,42 @@ const CSS = `
 
     function WaitBuddyView(props) {
       const t = typeof props.t === 'function' ? props.t : boundT
-      const state = useMonitorState(props.sessionId)
+      const rootRef = React.useRef(null)
+      const innerRef = React.useRef(null)
+      React.useEffect(() => {
+        const scrollTop = () => {
+          if (innerRef.current !== null) innerRef.current.scrollTop = 0
+        }
+        scrollTop()
+        const root = rootRef.current
+        let visible = true
+        let observer
+        if (root !== null && typeof IntersectionObserver === 'function') {
+          observer = new IntersectionObserver(
+            (entries) => {
+              const next = entries[0] !== undefined && entries[0].isIntersecting
+              if (next && !visible) scrollTop()
+              visible = next
+            },
+            { threshold: 0.01 },
+          )
+          observer.observe(root)
+        }
+        const onVisibility = () => {
+          if (!document.hidden) scrollTop()
+        }
+        document.addEventListener('visibilitychange', onVisibility)
+        return () => {
+          if (observer !== undefined) observer.disconnect()
+          document.removeEventListener('visibilitychange', onVisibility)
+        }
+      }, [props.sessionId])
+      const focusRoot = () => {
+        if (rootRef.current !== null && typeof rootRef.current.focus === 'function') {
+          rootRef.current.focus({ preventScroll: true })
+        }
+      }
+      const state = useMonitorState(props.sessionId, props.__state)
       const status = state.status
       const meta = metaText(t, state)
       const canOpenChat = typeof props.openView === 'function'
@@ -1515,15 +2082,20 @@ const CSS = `
         {
           className: 'wb-root',
           'data-waitbuddy': status,
+          'data-waitbuddy-health': state.health,
           tabIndex: 0,
-          ref: attachRoot,
+          ref: rootRef,
           onKeyDown: onGameKeyDown,
         },
         h('style', { key: 'wb-style' }, CSS),
+        h(AlertBanner, {
+          key: state.pendingKey === '' ? `${state.status}:${state.updatedAt}` : state.pendingKey,
+          t,
+          state,
+        }),
         h(
           'div',
-          { className: 'wb-inner' },
-          h(AlertBanner, { t, state }),
+          { className: 'wb-inner', ref: innerRef },
           h(
             'div',
             { className: 'wb-top' },
@@ -1533,10 +2105,19 @@ const CSS = `
               h(
                 'div',
                 { className: 'wb-statusRow' },
-                h('span', { className: 'wb-dot', 'data-state': status, 'aria-hidden': true }),
+                h('span', {
+                  className: 'wb-dot',
+                  'data-state': status,
+                  'data-health': state.health,
+                  'aria-hidden': true,
+                }),
                 h(
                   'span',
-                  { className: 'wb-statusText', 'aria-live': 'polite' },
+                  {
+                    className: 'wb-statusText',
+                    'aria-live': 'polite',
+                    title: state.errorMessage === '' ? undefined : state.errorMessage,
+                  },
                   statusText(t, state),
                 ),
                 meta === '' ? null : h('span', { className: 'wb-meta' }, meta),
@@ -1548,7 +2129,7 @@ const CSS = `
                     )
                   : null,
               ),
-              status === 'running'
+              status === 'running' && state.health === 'ready'
                 ? h(
                     'div',
                     { className: 'wb-pulse', 'aria-hidden': true },
@@ -1576,7 +2157,7 @@ const CSS = `
                   ),
             ),
           ),
-          h(GameArea, { t }),
+          h(GameArea, { t, sessionId: props.sessionId, focusRoot }),
         ),
       )
     }
@@ -1585,7 +2166,13 @@ const CSS = `
       inject: ['slots', 'sessions', 'locale'],
       apply(ctx) {
         clientCtx = ctx
-        ctx.effect(() => () => gameStore.dispose(), 'wait-buddy: snake loop')
+        ctx.effect(() => {
+          const stopSignals = signalHub.subscribe((signal) => gameStore.handleSignal(signal))
+          return () => {
+            stopSignals()
+            gameStore.dispose()
+          }
+        }, 'wait-buddy: game runtime')
         const t = ctx.locale.bind(NS)
         boundT = t
         ctx.effect(
@@ -1609,8 +2196,21 @@ const CSS = `
           ),
         )
       },
+      /** Pure monitor reconciliation, exported for unit testing. */
+      __monitor: { composeMonitor, sameMonitor, createMonitorSource },
+      /** Pure signal conversion, exported for unit testing. */
+      __signals: { createSignalHub, diffMonitorSignals },
+      /** Pure copy helpers, exported for unit testing. */
+      __ui: { statusText, metaText },
+      /** Static UI pieces + stylesheet, exported for component tests. */
+      __components: { AlertBanner, gameOverlay, gomokuOverlay },
+      __css: CSS,
+      /** Full view, exported for static layout tests only. */
+      __view: WaitBuddyView,
+      __gameStore: gameStore,
       /** Pure game transitions, exported for unit testing (not used at runtime). */
       __game: {
+        createGameStore,
         gridFor,
         SPEED_PRESETS,
         LEVEL_PRESETS,

@@ -5,7 +5,7 @@
  * committed session log into the monitoring state the view renders:
  *
  *   status       idle | running | success | failed | aborted
- *   activity     last N real activities (thinking / command / tool), newest first
+ *   activity     last N real activities (command / tool), newest first
  *   stepCount    completed steps of the current turn (kept for M3 scoring,
  *                never displayed: an agent loop has no reliable total)
  *
@@ -16,7 +16,7 @@
  *   session.task.failed           <- turn/end reason=error|max-tokens|blocked
  *   session.task.abort            <- turn/end reason=aborted|interrupted
  *   session.tool.pending_approval <- process-local, resolved on the Client
- *   activity feed                 <- assistant/message (reasoning) + tool/call
+ *   activity feed                 <- tool/call (command / tool name + argument hint)
  *
  * The projection is the only Host behaviour: it is read-only, never writes the
  * session log, and never touches approval flow.
@@ -24,7 +24,7 @@
 import { z } from 'zod'
 
 const STATUS = ['idle', 'running', 'success', 'failed', 'aborted']
-const ACTIVITY_KINDS = ['thinking', 'command', 'tool']
+const ACTIVITY_KINDS = ['command', 'tool']
 
 /** Newest-first feed length. */
 const ACTIVITY_LIMIT = 3
@@ -63,8 +63,6 @@ const HINT_FIELDS = [
   'pattern',
   'query',
   'url',
-  'objective',
-  'description',
   'name',
   'skill',
   'agent_id',
@@ -121,27 +119,6 @@ function pushActivity(activity, kind, text) {
   return next.length > ACTIVITY_LIMIT ? next.slice(0, ACTIVITY_LIMIT) : next
 }
 
-/** Last reasoning block of one assistant message, clipped. */
-function reasoningOf(message) {
-  const blocks =
-    message !== null && typeof message === 'object' && Array.isArray(message.content)
-      ? message.content
-      : []
-  for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    const block = blocks[index]
-    if (
-      block !== null &&
-      typeof block === 'object' &&
-      block.type === 'reasoning' &&
-      typeof block.text === 'string'
-    ) {
-      const text = clip(block.text)
-      if (text !== '') return text
-    }
-  }
-  return ''
-}
-
 /** Classify one tool call: a shell command when it carries `command`, else a tool. */
 function toolActivity(name, argsText) {
   const tool = clip(name)
@@ -150,11 +127,11 @@ function toolActivity(name, argsText) {
     return { kind: 'command', text: clip(args.command) }
   }
   const hint = hintOf(args)
-  return { kind: 'tool', text: hint === '' ? tool : `${tool} ${hint}` }
+  return { kind: 'tool', text: hint === '' ? tool : clip(`${tool} ${hint}`) }
 }
 
 /** Map one `turn/end` reason onto the baseline status vocabulary. */
-function endedWith(reason) {
+export function endedWith(reason) {
   const kind = reason !== null && typeof reason === 'object' ? reason.kind : undefined
   switch (kind) {
     case 'error':
@@ -173,9 +150,22 @@ function endedWith(reason) {
     case 'forked':
       return { status: 'idle', errorMessage: '' }
     case 'completed':
-    default:
       return { status: 'success', errorMessage: '' }
+    default:
+      // The baseline status enum has no "unknown" value. Map an unknown
+      // reason to the neutral terminal state and keep the raw kind as the
+      // human-readable reason; never report it as success.
+      return {
+        status: 'aborted',
+        errorMessage: `未知结束原因：${clip(kind === undefined || kind === '' ? 'unknown' : String(kind))}`,
+      }
   }
+}
+
+/** True when the event's `turn` is absent or belongs to the active turn. */
+function belongsToTurn(state, event) {
+  const turn = event.data === undefined ? undefined : event.data.turn
+  return turn === undefined || turn === state.turn
 }
 
 /**
@@ -183,7 +173,7 @@ function endedWith(reason) {
  * unit does not care about returns the same state reference (zero downstream
  * work); a state-carrying event returns a fresh whole state.
  */
-function fold(state, event) {
+export function fold(state, event) {
   switch (event.type) {
     case 'turn/start':
       if (state.status === 'running' && state.turn === event.data.turn) return state
@@ -205,20 +195,21 @@ function fold(state, event) {
         revision: state.revision + 1,
       }
     }
-    case 'assistant/message': {
-      const reasoning = reasoningOf(event.data.message)
-      if (reasoning === '') return state
-      const activity = pushActivity(state.activity, 'thinking', reasoning)
-      if (activity === state.activity) return state
-      return { ...state, activity, updatedAt: event.time, revision: state.revision + 1 }
-    }
     case 'tool/call': {
+      if (state.status !== 'running' || !belongsToTurn(state, event)) return state
       const entry = toolActivity(event.data.name, event.data.arguments)
       const activity = pushActivity(state.activity, entry.kind, entry.text)
       if (activity === state.activity) return state
       return { ...state, activity, updatedAt: event.time, revision: state.revision + 1 }
     }
     case 'turn/end': {
+      const turn = event.data === undefined ? undefined : event.data.turn
+      // Late/duplicate ends for an older turn must not overwrite the current
+      // turn. A missing turn on the wire is accepted for forward compatibility.
+      if (turn !== undefined) {
+        if (state.status === 'running' && turn !== state.turn) return state
+        if (state.status !== 'running' && turn <= state.turn) return state
+      }
       const ended = endedWith(event.data.reason)
       return {
         ...state,
@@ -260,7 +251,7 @@ export function apply(ctx) {
   ctx.sessionProjections.register({
     key: 'waitbuddy',
     stateSchema,
-    stateVersion: 2,
+    stateVersion: 4,
     init: () => initial(),
     apply: fold,
     wire: {

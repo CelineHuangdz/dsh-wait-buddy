@@ -1,6 +1,6 @@
 {
   "name": "dsh-wait-buddy",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "WaitBuddy: a DSH session view that monitors the current session's long-running Agent task (status, steps, latest action, alerts).",
   "type": "module",
   "exports": {
@@ -16,7 +16,8 @@
     "locale/*.json",
     "icon.svg",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "zod": "4.4.3"
@@ -47,5 +48,15 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:visual": "node tools/visual-layout.mjs",
+    "test:all": "npm test && npm run test:visual"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   }
 }
