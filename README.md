@@ -5,14 +5,14 @@
 </p>
 
 <p align="center">
-  <strong>DSH 会话视图里的 Agent 长任务监控面板 + 轻量小游戏</strong><br />
-  监控优先、游戏为辅 · 只读 · Agent → 游戏单向联动
+  <strong>An Agent long-task monitor for the DSH session view, with lightweight games</strong><br />
+  Monitoring first · read-only · one-way Agent → game signals
 </p>
 
 <p align="center">
-  <a href="README.en.md">English</a> ·
+  <a href="README_CN.md">中文</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="docs/acceptance-runbook.md">验收 Runbook</a> ·
+  <a href="docs/acceptance-runbook.md">Acceptance Runbook</a> ·
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
@@ -21,103 +21,103 @@
 ![Tests](https://img.shields.io/badge/tests-59%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 当前版本 **0.4.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 核心单向联动。已在 DSH `0.2.1-rc.5` 上测试。
+> Current version **0.4.0**: M1 status board + M2 games + M3 core one-way signals. Tested on DSH `0.2.1-rc.5`.
 
-## 目录
+## Table of Contents
 
-- [这是什么](#这是什么)
-- [特性](#特性)
-- [快速开始](#快速开始)
-- [使用](#使用)
-- [配置](#配置)
-- [架构](#架构)
-- [兼容性与已知偏离](#兼容性与已知偏离)
-- [开发](#开发)
-- [项目结构](#项目结构)
-- [文档](#文档)
-- [路线图](#路线图)
-- [安全与隐私](#安全与隐私)
-- [贡献](#贡献)
+- [What is this](#what-is-this)
+- [Features](#features)
+- [Quick start](#quick-start)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Compatibility and known deviations](#compatibility-and-known-deviations)
+- [Development](#development)
+- [Project layout](#project-layout)
+- [Documentation](#documentation)
+- [Roadmap](#roadmap)
+- [Security and privacy](#security-and-privacy)
+- [Contributing](#contributing)
 - [License](#license)
 
-## 这是什么
+## What is this
 
-WaitBuddy 是 DSH 桌面版的一个**会话视图插件**。它在当前会话的 Chat / Trajectory 旁边增加一个 **WaitBuddy** 标签，用来：
+WaitBuddy is a **session-view plugin for DSH Desktop**. It adds a **WaitBuddy** tab next to Chat / Trajectory in the current session and lets you:
 
-- 看 Agent 当前在做什么：状态、已完成步数、最近命令/工具调用；
-- 在等待审批、任务失败时给出醒目的辅助提醒；
-- 在长任务等待期间提供贪吃蛇/五子棋，消磨时间；
-- 在 M3 中让 Agent 事件**单向驱动**游戏：审批暂停、step +5、success +50。
+- see what the Agent is doing: status, completed steps, latest commands/tool calls;
+- get a visible secondary reminder for pending approvals and task failures;
+- play Snake or Gomoku while waiting for a long task;
+- in M3, let Agent events **one-way drive** the game: pause on approval, +5 per step, +50 on success.
 
-它不控制 Agent，不拦截原生审批，不写会话日志。
+It never controls the Agent, never intercepts the native approval dialog, and never writes to the session log.
 
-## 特性
+## Features
 
-### 监控
+### Monitoring
 
-- **Session View**：注册到 `conversation.view`，与 Chat / Trajectory 并列。
-- **状态真实性**：区分 loading / ready / degraded / stale；不把投影失败伪装成“空闲”。
-- **真实步数**：显示「已完成 N 步」，不显示总步数、不显示百分比。
-- **活动流**：只显示 `tool/call` 的命令/工具条目，最多 3 条；**不展示模型推理原文**（D27）。
-- **独立告警区**：审批/失败告警在滚动容器外，不会被棋盘滚走。
+- **Session view**: registered on `conversation.view`, next to Chat / Trajectory.
+- **Honest status**: loading / ready / degraded / stale; a missing projection is never shown as “idle”.
+- **Real step count**: “N steps completed”; no total steps, no fake percentage.
+- **Activity feed**: only `tool/call` command/tool entries (max 3); **no raw model reasoning** (D27).
+- **Dedicated alert rail**: approval/failure alerts live outside the scrolling content and stay visible.
 
-### 游戏
+### Games
 
-- **贪吃蛇**：Canvas、无外部资源、键盘方向键；方向队列、暂停/重置、速度档位。
-- **五子棋**：15×15，人执黑 vs 启发式电脑；难度档位；窗口缩放重绘。
-- 两局独立保留；切换会话/视图时暂停，不重置进度。
+- **Snake**: Canvas, no external assets, keyboard arrows; direction queue, pause/reset, speed presets.
+- **Gomoku**: 15×15, human black vs heuristic AI; difficulty presets; redraws on resize.
+- Both games keep their own state; switching view/session pauses but does not reset.
 
-### 单向联动（M3）
+### One-way signals (M3)
 
-- 审批出现：游戏自动暂停，显示「等待审批」。
-- 审批处理完：**不自动恢复**，提示「已处理，按空格或点击继续」，由用户手动继续。
-- step +5、success +50、failed/abort 只提示，不重置本局。
-- 信号按 `agent:*` 广播，游戏只消费信号；监控层不定义奖励。
+- Approval appears → the game pauses automatically with “Waiting for approval”.
+- Approval is resolved → **no auto-resume**; the overlay shows “Handled — press Space or click Resume”.
+- step +5, success +50, failed/abort only show a notice; the current round is not reset.
+- Signals are published as `agent:*`; the game only consumes them. The monitor layer defines no rewards.
 
-## 快速开始
+## Quick start
 
-### 环境要求
+### Requirements
 
-- DSH 桌面版 `0.2.1-rc.5`（当前唯一验证版本）
-- 本地开发需要 Node.js 22+ 与 pnpm
+- DSH Desktop `0.2.1-rc.5` (the only tested version)
+- Node.js 22+ and pnpm for local development
 
-### 安装
+### Install
 
-DSH 侧边栏 → **Plugins** → **Add plugin**，任选一种：
+In DSH: sidebar → **Plugins** → **Add plugin**, then use one of:
 
-| 方式 | 填入 | 说明 |
+| Method | Value | Notes |
 |---|---|---|
-| Git（推荐，含 0.4.0） | `github:CelineHuangdz/dsh-wait-buddy` | 跟随仓库最新提交 |
-| 本地目录 | `/abs/path/to/dsh-wait-buddy` | 开发调试用，需先 `pnpm install` |
-| tarball | `dist/dsh-wait-buddy-0.4.0.tgz` 的绝对路径 | `npm pack --pack-destination dist` 生成 |
-| npm | `dsh-wait-buddy` | npm 上的版本可能落后于本仓库 |
+| Git (recommended, includes 0.4.0) | `github:CelineHuangdz/dsh-wait-buddy` | Follows the latest commit |
+| Local directory | `/abs/path/to/dsh-wait-buddy` | For development; run `pnpm install` first |
+| Tarball | absolute path to `dist/dsh-wait-buddy-0.4.0.tgz` | Create with `npm pack --pack-destination dist` |
+| npm | `dsh-wait-buddy` | The npm version may lag behind this repository |
 
-安装后启用插件并刷新页面，在会话视图标签栏选择 **WaitBuddy**。
+After installing, enable the plugin and refresh the page, then select **WaitBuddy** in the session view tabs.
 
-> 本地目录安装前先执行 `pnpm install`（Host 半使用 `zod` 做投影 schema 校验）。
+> For a local directory, run `pnpm install` first (the Host half uses `zod` for projection schema validation).
 
-## 使用
+## Usage
 
-1. 打开一个会话，切到 **WaitBuddy**。
-2. 发一个任务：状态、步数、活动流会随 `turn/start` / `step/end` / `tool/call` 更新。
-3. 点「开始游戏」玩贪吃蛇；方向键需要焦点在视图内（点一下棋盘）。
-4. 审批出现：游戏自动暂停，在原生审批面板处理；处理后手动继续。
-5. 任务完成：+50 分提示；切视图不会重复播放。
+1. Open a session and switch to **WaitBuddy**.
+2. Send a task: status, steps and activity update from `turn/start` / `step/end` / `tool/call`.
+3. Click **Start game** to play Snake; arrow keys require focus inside the view (click the board once).
+4. When approval appears, the game pauses; handle it in the native approval panel, then resume manually.
+5. On success, +50 points; switching views does not replay the toast.
 
-> 方向键只在视图内生效，不会抢输入框的按键。触屏/纯鼠标设备无法控制方向（D7，已批准偏离）。
+> Arrow keys only act inside the view and never steal composer keys. Touch/pointer-only devices cannot control direction (D7, approved deviation).
 
-## 配置
+## Configuration
 
-| 项 | 存储 | 可选值 |
+| Item | Storage | Values |
 |---|---|---|
-| 贪吃蛇速度 | `localStorage` → `dsh-wait-buddy.settings.v1` | 慢 / 标准 / 快 |
-| 五子棋难度 | 同上 | 初级 / 中级 / 高级 |
+| Snake speed | `localStorage` → `dsh-wait-buddy.settings.v1` | Slow / Normal / Fast |
+| Gomoku difficulty | Same | Easy / Medium / Hard |
 
-- 设置只存本机，不上传、不跨设备同步。
-- 最高分/当前局仅存内存，不做持久化（M4 备选池）。
-- 没有环境变量、没有远程配置。
+- Settings are local only; no upload, no cross-device sync.
+- Best score and the current round are in memory only (M4 candidate).
+- No environment variables or remote configuration.
 
-## 架构
+## Architecture
 
 ```text
 Host (index.js)
@@ -132,98 +132,98 @@ Client (client.js)                    ▼
                                                               gameStore (snake)
 ```
 
-- **Host**：注册 `waitbuddy` 会话投影，纯函数 fold，只读日志，不写日志。
-- **Client**：`conversation.view` 入口；合并 durable 投影与进程内 `running` / `pendingInteraction`。
-- **M3 信号层**：`task_start` / `step_advance` / `approval_enter` / `approval_leave` / `task_finish`。
-- **游戏层**：只消费信号，不直接读监控状态；没有反向控制接口。
+- **Host**: registers the `waitbuddy` session projection; pure fold, read-only, never writes logs.
+- **Client**: `conversation.view` entry; merges the durable projection with process-local `running` / `pendingInteraction`.
+- **M3 signal layer**: `task_start` / `step_advance` / `approval_enter` / `approval_leave` / `task_finish`.
+- **Game layer**: consumes signals only; no direct monitor reads, no reverse-control API.
 
-## 兼容性与已知偏离
+## Compatibility and known deviations
 
-| 能力 | 状态 |
+| Capability | Status |
 |---|---|
-| M1 状态看板 | ✅ |
-| M2 贪吃蛇 / 五子棋 | ✅ |
-| M3 信号 / 审批暂停 / +5/+50 | ✅ 核心；真机审批暂停/手动恢复已验证 |
-| D7 软按钮 | 已批准偏离：仅键盘方向键 |
-| D16/D17 五子棋/设置 | 已批准偏离：M4 范围提前实现 |
-| D28 question / plan-review | 暂不纳入基线，下一迭代评审 |
-| D22 unknown 终态 | 用 `aborted` + 原因文本，不新增枚举 |
+| M1 status board | ✅ |
+| M2 Snake / Gomoku | ✅ |
+| M3 signals / approval pause / +5/+50 | ✅ core; real approval pause + manual resume verified |
+| D7 soft buttons | Approved deviation: keyboard arrows only |
+| D16/D17 Gomoku/settings | Approved deviation: M4 scope shipped early |
+| D28 question / plan-review | Deferred; next iteration |
+| D22 unknown terminal | `aborted` + reason text; no new enum |
 
-- 已验证 DSH `0.2.1-rc.5`；未承诺其他版本。
-- 320px 通过视觉回归；双实例建议发布前再做一次真机 smoke。
-- 不覆盖真实 DSH Canvas 绘制与原生审批链路（自动化测试边界见 Runbook）。
+- Verified on DSH `0.2.1-rc.5`; other versions are not promised.
+- 320px is covered by visual regression; run a real double-instance smoke before release.
+- Real DSH Canvas drawing and the native approval chain are outside automated coverage (see the Runbook).
 
-## 开发
+## Development
 
 ```bash
 pnpm install
-npx playwright install chromium   # 首次运行视觉测试需要
+npx playwright install chromium   # required for visual tests the first time
 
-npm test             # 59 个纯逻辑/组件用例
-npm run test:visual  # 4 个无头布局场景（含宿主 tab bar / Todo dock / composer）
-npm run test:all     # 两者都跑
+npm test             # 59 unit/component cases
+npm run test:visual  # 4 headless layout scenarios (with host tabs / Todo dock / composer)
+npm run test:all     # both
 ```
 
-- CI：`.github/workflows/ci.yml`，push/PR 自动跑 `npm test` + `npm run test:visual`。
-- 测试文件：`test/*.test.js`；视觉脚本：`tools/visual-layout.mjs`。
-- 视觉测试用 React 服务端渲染真实视图 + Playwright/Chromium，检查间距、横向溢出、告警位置和暂停浮层文案。
+- CI: `.github/workflows/ci.yml` runs `npm test` + `npm run test:visual` on push/PR.
+- Tests: `test/*.test.js`; visual script: `tools/visual-layout.mjs`.
+- Visual tests render the real view with React server rendering and inspect spacing, horizontal overflow, alert position and pause copy in Chromium.
 
-### 变更流程
+### Change process
 
-1. 先改文档：界面/文案 → [docs/ui-spec.md](docs/ui-spec.md)；边界/取舍 → [docs/decisions.md](docs/decisions.md)。
-2. 再改代码，使实现与文档一致。
-3. M0 基线保持冻结；涉及基线语义的改动必须在 decisions 中显式标注。
+1. Update docs first: UI/copy → [docs/ui-spec.md](docs/ui-spec.md); boundaries/trade-offs → [docs/decisions.md](docs/decisions.md).
+2. Then change code so implementation matches docs.
+3. The M0 baseline is frozen; semantic changes must be recorded in decisions.
 
-## 项目结构
+## Project layout
 
 ```text
-index.js            Host 半：注册 waitbuddy 会话投影（纯 fold，只读日志）
-client.js           Client 半：conversation.view + 监控源 + 看板 + 游戏 + M3 信号消费
-cordis.patch.yml    Bundler 行：id = wait-buddy
-locale/*.json       插件管理页展示用标题/描述
-icon.svg            插件图标
-docs/               基线、界面规范、决策、评审、验收、发布文档
-test/               node:test 单元/组件测试
-test-support/       测试加载器（VM + 最小浏览器 stub）
-tools/              无头视觉布局检查
-CHANGELOG.md        版本变更
+index.js            Host half: waitbuddy session projection (pure fold, read-only)
+client.js           Client half: conversation.view + monitor + UI + games + M3 signal consumer
+cordis.patch.yml    Bundler entry: id = wait-buddy
+locale/*.json       Plugin manager title/description
+icon.svg            Plugin icon
+docs/               Baseline, UI spec, decisions, reviews, acceptance, release docs
+test/               node:test unit/component tests
+test-support/       Test loader (VM + minimal browser stubs)
+tools/              Headless visual layout checks
+CHANGELOG.md        Release notes
 ```
 
-## 文档
+## Documentation
 
-| 文档 | 内容 |
+| Document | Content |
 |---|---|
-| [M0 基线](docs/baseline-m0.md) | 冻结的产品基线 |
-| [M0 对照](docs/m0-compliance.md) | 实现 vs 基线的逐条对照与偏离 |
-| [M1 验收](docs/m1-acceptance.md) | M1 验收记录 |
-| [M3 实现](docs/m3-implementation.md) | 信号、暂停、奖励的实现记录 |
-| [界面规范](docs/ui-spec.md) | 布局、文案、交互规格 |
-| [决策记录](docs/decisions.md) | ADR-lite，D1–D28 |
-| [验收 Runbook](docs/acceptance-runbook.md) | 人工验收步骤与判定 |
-| [三方评审](docs/reviews/README.md) | 2026-11-05 评审原文与汇总 |
-| [迭代计划](docs/iteration-plan.md) | 问题总表与后续迭代 |
-| [发布 Runbook](docs/release.md) | 打包、npm、Git 分发 |
-| [CHANGELOG](CHANGELOG.md) | 版本变更 |
+| [M0 baseline](docs/baseline-m0.md) | Frozen product baseline |
+| [M0 compliance](docs/m0-compliance.md) | Implementation vs baseline, deviations |
+| [M1 acceptance](docs/m1-acceptance.md) | M1 acceptance record |
+| [M3 implementation](docs/m3-implementation.md) | Signals, pause, rewards |
+| [UI spec](docs/ui-spec.md) | Layout, copy, interaction spec |
+| [Decisions](docs/decisions.md) | ADR-lite, D1–D28 |
+| [Acceptance Runbook](docs/acceptance-runbook.md) | Manual checks and pass criteria |
+| [Reviews](docs/reviews/README.md) | 2026-11-05 review archive |
+| [Iteration plan](docs/iteration-plan.md) | Backlog and iteration plan |
+| [Release Runbook](docs/release.md) | Packaging, npm, Git distribution |
+| [CHANGELOG](CHANGELOG.md) | Version history |
 
-## 路线图
+## Roadmap
 
-- **0.4.x**：修复真机回归；补 DSH 真机 E2E（审批、双实例、Canvas）。
-- **下一迭代**：评估 D28 question/plan-review；M4 备选池（多游戏切换、分数持久化、等待统计/导出）。
-- **不做**：游戏内审批、自动审批、任何反向控制 Agent 的能力。
+- **0.4.x**: fix real-device regressions; add DSH end-to-end coverage (approval, two instances, Canvas).
+- **Next iteration**: evaluate D28 question/plan-review; M4 candidates (more games, score persistence, wait stats/export).
+- **Never**: in-game approval, auto-approval, or any reverse control over the Agent.
 
-## 安全与隐私
+## Security and privacy
 
-- 插件在 DSH 进程内以当前用户权限运行，**没有沙箱**。
-- 只读会话事件；不写会话日志；不发网络请求；无遥测。
-- 设置只存本机 `localStorage`。
-- 活动流会显示工具/命令参数，可能包含路径或查询词；D27 已移除模型推理原文。
-- 不注册、不替换、不拦截原生审批面板；审批仍由 DSH 处理。
+- The plugin runs inside the DSH process with the current user's permissions; **there is no sandbox**.
+- Read-only session events; no session-log writes; no network requests; no telemetry.
+- Settings are stored only in local `localStorage`.
+- The activity feed may show tool/command arguments (paths, queries); raw model reasoning was removed by D27.
+- The plugin never registers, replaces, or intercepts the native approval panel.
 
-## 贡献
+## Contributing
 
-- 先开 issue/讨论，再提 PR；涉及界面/行为变更先改文档。
-- 提交前跑 `npm run test:all`。
-- 不要引入反向控制 Agent、替换 composer、伪造进度等基线红线（见 [decisions.md](docs/decisions.md)）。
+- Open an issue/discussion first; for UI/behavior changes, update docs first.
+- Run `npm run test:all` before submitting a PR.
+- Do not add reverse control, composer replacement, or fake progress (see [decisions.md](docs/decisions.md)).
 
 ## License
 
