@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 — 2026-11-05
+
+### Fixed
+
+- 320px 下游戏控制行被宿主 composer 覆盖：窄窗棋盘固定 190px、底部留白 100px，确保开始/继续/重置可见。
+- 视觉回归新增 document / `.wb-root` / `.wb-inner` 三层横向溢出断言，并用长错误/长命令验证换行。
+- README 改为英文默认 + `README_CN.md` 中文版；GitHub About 与 `package.json` 描述改为英文。
+
 ## 0.4.0 — 2026-11-05
 
 ### Added

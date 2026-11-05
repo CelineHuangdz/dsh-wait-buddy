@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.1-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-59%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> Current version **0.4.0**: M1 status board + M2 games + M3 core one-way signals. Tested on DSH `0.2.1-rc.5`.
+> Current version **0.4.1**: M1 status board + M2 games + M3 core one-way signals. Tested on DSH `0.2.1-rc.5`.
 
 ## Table of Contents
 
@@ -87,9 +87,9 @@ In DSH: sidebar → **Plugins** → **Add plugin**, then use one of:
 
 | Method | Value | Notes |
 |---|---|---|
-| Git (recommended, includes 0.4.0) | `github:CelineHuangdz/dsh-wait-buddy` | Follows the latest commit |
+| Git (recommended, includes 0.4.1) | `github:CelineHuangdz/dsh-wait-buddy` | Follows the latest commit |
 | Local directory | `/abs/path/to/dsh-wait-buddy` | For development; run `pnpm install` first |
-| Tarball | absolute path to `dist/dsh-wait-buddy-0.4.0.tgz` | Create with `npm pack --pack-destination dist` |
+| Tarball | absolute path to `dist/dsh-wait-buddy-0.4.1.tgz` | Create with `npm pack --pack-destination dist` |
 | npm | `dsh-wait-buddy` | The npm version may lag behind this repository |
 
 After installing, enable the plugin and refresh the page, then select **WaitBuddy** in the session view tabs.

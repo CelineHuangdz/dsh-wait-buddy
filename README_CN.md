@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.1-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-59%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 当前版本 **0.4.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 核心单向联动。已在 DSH `0.2.1-rc.5` 上测试。
+> 当前版本 **0.4.1**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 核心单向联动。已在 DSH `0.2.1-rc.5` 上测试。
 
 ## 目录
 
@@ -87,9 +87,9 @@ DSH 侧边栏 → **Plugins** → **Add plugin**，任选一种：
 
 | 方式 | 填入 | 说明 |
 |---|---|---|
-| Git（推荐，含 0.4.0） | `github:CelineHuangdz/dsh-wait-buddy` | 跟随仓库最新提交 |
+| Git（推荐，含 0.4.1） | `github:CelineHuangdz/dsh-wait-buddy` | 跟随仓库最新提交 |
 | 本地目录 | `/abs/path/to/dsh-wait-buddy` | 开发调试用，需先 `pnpm install` |
-| tarball | `dist/dsh-wait-buddy-0.4.0.tgz` 的绝对路径 | `npm pack --pack-destination dist` 生成 |
+| tarball | `dist/dsh-wait-buddy-0.4.1.tgz` 的绝对路径 | `npm pack --pack-destination dist` 生成 |
 | npm | `dsh-wait-buddy` | npm 上的版本可能落后于本仓库 |
 
 安装后启用插件并刷新页面，在会话视图标签栏选择 **WaitBuddy**。
