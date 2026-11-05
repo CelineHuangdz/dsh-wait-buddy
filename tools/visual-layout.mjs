@@ -245,6 +245,7 @@ for (const entry of cases) {
       todo: rect(todo),
       status: rect(status),
       foot: rect(foot),
+      inner: rect(inner),
       innerScrollHeight: inner === null ? 0 : inner.scrollHeight,
       innerClientHeight: inner === null ? 0 : inner.clientHeight,
     }
@@ -280,6 +281,9 @@ for (const entry of cases) {
   } else if (metrics.innerScrollHeight <= metrics.innerClientHeight + 1) {
     const bottomGap = metrics.todo.top - metrics.foot.bottom
     if (bottomGap < 6) problems.push(`bottom gap=${bottomGap.toFixed(1)}px (todo dock overlays controls)`)
+    if (metrics.inner !== null && metrics.foot.bottom > metrics.inner.bottom + 1) {
+      problems.push('game controls below the visible view')
+    }
   }
   if (metrics.alertTop !== null && metrics.tabs !== null && metrics.alertTop < metrics.tabs.bottom) {
     problems.push('alert above the view top')

@@ -2008,7 +2008,7 @@ const CSS = `
 .wb-setting{display:flex;align-items:center;gap:8px;flex:none}
 .wb-settingLabel{margin-right:2px;font-size:12px;line-height:20px;color:var(--dsw-alias-label-secondary)}
 .wb-squareBoard{flex:0 1 auto;width:min(100%,max(200px,min(46vh,520px)));max-width:100%;height:auto;min-height:0;max-height:520px;aspect-ratio:1/1;border:0;background:transparent;align-self:center;margin:0 auto}
-@container (max-width:480px){.wb-inner{padding:8px 12px 56px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
+@container (max-width:480px){.wb-inner{padding:8px 12px 100px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:190px;min-height:190px;max-height:190px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
 `
 
     /** WaitBuddy status board (M1: monitoring only, no game). */
