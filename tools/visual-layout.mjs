@@ -165,7 +165,20 @@ const cases = [
     name: 'failed-320',
     width: 320,
     height: 700,
-    monitor: state({ status: 'failed', health: 'ready', isAlerting: true, errorMessage: 'network down' }),
+    monitor: state({
+      status: 'failed',
+      health: 'ready',
+      isAlerting: true,
+      errorMessage:
+        'upstream network unreachable while fetching https://example.com/very/long/path/that/should/wrap/inside/the/alert/without/horizontal/overflow?query=abcdefghijklmnopqrstuvwxyz0123456789',
+      activity: [
+        {
+          kind: 'command',
+          text: 'cd /Users/dzhuang/DeepSeekHarness/dsh-wait-buddy && node --input-type=module -e "console.log(\"long command that should wrap\")"',
+        },
+        { kind: 'tool', text: 'read_file docs/acceptance-runbook.md' },
+      ],
+    }),
     setup: (client) => {
       client.__gameStore.start('normal')
     },
@@ -220,6 +233,8 @@ for (const entry of cases) {
     const foot = document.querySelector('.wb-gameFoot')
     return {
       overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      rootOverflowX: root === null ? 0 : root.scrollWidth - root.clientWidth,
+      innerOverflowX: inner === null ? 0 : inner.scrollWidth - inner.clientWidth,
       rootDisplay: root === null ? '' : getComputedStyle(root).display,
       innerOverflow: inner === null ? '' : getComputedStyle(inner).overflowY,
       alertParent: alert === null ? '' : alert.parentElement?.className ?? '',
@@ -237,6 +252,8 @@ for (const entry of cases) {
   await page.screenshot({ path: `test-results/${entry.name}.png`, fullPage: true })
   const problems = []
   if (metrics.overflowX > 0) problems.push(`horizontal overflow ${metrics.overflowX}px`)
+  if (metrics.rootOverflowX > 0) problems.push(`root horizontal overflow ${metrics.rootOverflowX}px`)
+  if (metrics.innerOverflowX > 0) problems.push(`inner horizontal overflow ${metrics.innerOverflowX}px`)
   if (metrics.rootDisplay !== 'flex') problems.push(`root display=${metrics.rootDisplay}`)
   if (metrics.innerOverflow !== 'auto') problems.push(`inner overflow=${metrics.innerOverflow}`)
   if (entry.monitor.status === 'failed' && !metrics.alertParent.includes('wb-root')) {
