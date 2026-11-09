@@ -30,6 +30,9 @@ window.__ModuleLoader__.load({
       'status.runningStart': '任务开始，Agent 正在规划',
       'status.running': '正在执行任务',
       'status.approval': '【重要】等待你审批工具调用！',
+      'status.question': '【重要】Agent 有问题等你回答！',
+      'status.planReview': '【重要】Agent 的计划等你确认！',
+      'status.pending': '【重要】Agent 在等你处理请求！',
       'status.success': '任务执行成功 ✅',
       'status.failed': '任务执行失败',
       'status.aborted': '任务已中断',
@@ -45,19 +48,24 @@ window.__ModuleLoader__.load({
       'feed.empty': '等待 Agent 活动',
       'alert.approval.title': '【重要】等待你审批工具调用',
       'alert.approval.tool': '工具 {tool}',
+      'alert.question.title': '【重要】Agent 有问题等你回答',
+      'alert.planReview.title': '【重要】Agent 的计划等你确认',
+      'alert.pending.title': '【重要】Agent 在等你处理请求',
       'alert.failed.title': '任务执行失败',
-      'footer.line': '仅跟踪当前会话 · 游戏与任务独立 · 辅助提醒，不拦截原生审批弹窗',
+      'footer.line': '仅跟踪当前会话 · 游戏与任务独立 · 辅助提醒，不拦截原生弹窗',
       'game.title': '贪吃蛇',
       'game.score': '得分 {score}',
       'game.best': '最高 {best}',
-      'game.pause': '暂停',
-      'game.resume': '继续',
       'game.reset': '重置',
       'game.startBody': '方向键控制，吃到果实得分。',
       'game.start': '开始游戏',
       'game.pausedTitle': '已暂停',
       'game.approvalPausedTitle': '等待审批',
       'game.approvalPausedBody': 'Agent 等待审批，已自动暂停',
+      'game.questionPausedTitle': '等待你的回答',
+      'game.questionPausedBody': 'Agent 有问题等你回答，已自动暂停',
+      'game.planPausedTitle': '等待计划确认',
+      'game.planPausedBody': 'Agent 提交了计划等你确认，已自动暂停',
       'game.resumeReadyBody': '已处理，按空格或点击继续',
       'game.sessionPausedBody': '切换会话后已暂停，点击继续恢复',
       'game.manualPausedBody': '已手动暂停，点击继续恢复',
@@ -88,6 +96,33 @@ window.__ModuleLoader__.load({
       'gomoku.lost': '电脑赢了',
       'gomoku.draw': '平局',
       'gomoku.again': '再来一局',
+      // 低调模式（D29 / ui-spec §8）
+      'presence.steps': '{count} 步 · {elapsed}',
+      'presence.pendingApproval': '待审批',
+      'presence.pendingQuestion': '待回答',
+      'presence.pendingPlanReview': '待确认',
+      'presence.pendingGeneric': '待处理',
+      'presence.failed': '失败',
+      'notify.title': 'WaitBuddy',
+      'notify.approval': '会话 {session} 等待审批',
+      'notify.success': '会话 {session} 任务完成',
+      'notify.failed': '会话 {session} 任务失败',
+      'notify.aborted': '会话 {session} 任务已中断',
+      'game.hiddenPausedBody': '已一键隐藏（Ctrl+Shift+W），游戏保持暂停',
+      'game.hiddenResumeBody': '已从隐藏中恢复，按空格或点击继续',
+      'presence.mode': '存在感',
+      'presence.quiet': '后台',
+      'presence.pill': '胶囊',
+      'presence.idle': '空闲',
+      'presence.aborted': '已中断',
+      'presence.successSteps': '成功 · {count} 步',
+      'pill.expand': '展开浮动小窗',
+      'pill.collapse': '收起胶囊',
+      'pill.miniStart': '开始',
+      'pill.miniAgain': '再来一局',
+      'pill.miniPaused': '已暂停',
+      'pill.miniOver': '得分 {score}',
+      'pill.canvasLabel': '迷你贪吃蛇，得分 {score}',
     }
 
     /** English dictionary, complete against the Chinese key set. */
@@ -97,6 +132,9 @@ window.__ModuleLoader__.load({
       'status.runningStart': 'Task started, the agent is planning',
       'status.running': 'Running the task',
       'status.approval': 'Important: a tool call is waiting for your approval!',
+      'status.question': 'Important: the agent has a question for you!',
+      'status.planReview': 'Important: a plan is waiting for your review!',
+      'status.pending': 'Important: the agent is waiting for you!',
       'status.success': 'Task finished successfully ✅',
       'status.failed': 'Task failed',
       'status.aborted': 'Task was interrupted',
@@ -112,19 +150,24 @@ window.__ModuleLoader__.load({
       'feed.empty': 'Waiting for agent activity',
       'alert.approval.title': 'Important: a tool call is waiting for your approval',
       'alert.approval.tool': 'tool {tool}',
+      'alert.question.title': 'Important: the agent has a question for you',
+      'alert.planReview.title': 'Important: a plan is waiting for your review',
+      'alert.pending.title': 'Important: the agent is waiting for you',
       'alert.failed.title': 'Task failed',
-      'footer.line': 'This session only · the game is independent · a secondary reminder that never intercepts the native approval dialog',
+      'footer.line': 'This session only · the game is independent · a secondary reminder that never intercepts the native dialogs',
       'game.title': 'Snake',
       'game.score': 'Score {score}',
       'game.best': 'Best {best}',
-      'game.pause': 'Pause',
-      'game.resume': 'Resume',
       'game.reset': 'Reset',
       'game.startBody': 'Arrow keys only — eat the fruit to score.',
       'game.start': 'Start game',
       'game.pausedTitle': 'Paused',
       'game.approvalPausedTitle': 'Waiting for approval',
       'game.approvalPausedBody': 'The agent is waiting for approval; the game is paused.',
+      'game.questionPausedTitle': 'Waiting for your answer',
+      'game.questionPausedBody': 'The agent has a question for you; the game is paused.',
+      'game.planPausedTitle': 'Waiting for plan review',
+      'game.planPausedBody': 'The agent submitted a plan for your review; the game is paused.',
       'game.resumeReadyBody': 'Handled — press Space or click Resume to continue.',
       'game.sessionPausedBody': 'Session changed — the game is paused. Resume when ready.',
       'game.manualPausedBody': 'Paused manually. Resume when ready.',
@@ -155,6 +198,33 @@ window.__ModuleLoader__.load({
       'gomoku.lost': 'The AI wins',
       'gomoku.draw': 'Draw',
       'gomoku.again': 'Play again',
+      // Low-key presence (D29 / ui-spec §8)
+      'presence.steps': '{count} steps · {elapsed}',
+      'presence.pendingApproval': 'approval needed',
+      'presence.pendingQuestion': 'answer needed',
+      'presence.pendingPlanReview': 'review needed',
+      'presence.pendingGeneric': 'waiting for you',
+      'presence.failed': 'failed',
+      'notify.title': 'WaitBuddy',
+      'notify.approval': 'Session {session} is waiting for approval',
+      'notify.success': 'Session {session} finished successfully',
+      'notify.failed': 'Session {session} failed',
+      'notify.aborted': 'Session {session} was interrupted',
+      'game.hiddenPausedBody': 'Hidden by shortcut (Ctrl+Shift+W); the game stays paused',
+      'game.hiddenResumeBody': 'Restored from hidden — press Space or click Resume',
+      'presence.mode': 'Presence',
+      'presence.quiet': 'Background',
+      'presence.pill': 'Pill',
+      'presence.idle': 'Idle',
+      'presence.aborted': 'Interrupted',
+      'presence.successSteps': 'Done · {count} steps',
+      'pill.expand': 'Expand the floating panel',
+      'pill.collapse': 'Collapse the pill',
+      'pill.miniStart': 'Start',
+      'pill.miniAgain': 'Play again',
+      'pill.miniPaused': 'Paused',
+      'pill.miniOver': 'Score {score}',
+      'pill.canvasLabel': 'Mini snake, score {score}',
     }
 
     /** Neutral state before any projection arrives. */
@@ -173,6 +243,7 @@ window.__ModuleLoader__.load({
       approvalTool: '',
       pendingKind: '',
       pendingKey: '',
+      pendingDetail: '',
       health: 'loading',
       isAlerting: false,
       ready: false,
@@ -192,6 +263,7 @@ window.__ModuleLoader__.load({
         left.approvalTool === right.approvalTool &&
         left.pendingKind === right.pendingKind &&
         left.pendingKey === right.pendingKey &&
+        left.pendingDetail === right.pendingDetail &&
         left.health === right.health &&
         left.isAlerting === right.isAlerting &&
         left.ready === right.ready
@@ -206,9 +278,37 @@ window.__ModuleLoader__.load({
 
 
     /**
+     * Short human-readable detail for one pending interaction: the approval's
+     * tool name, or the first question's text (D28: question / plan-review).
+     */
+    function pendingDetailOf(pending) {
+      if (pending === undefined || pending === null) return ''
+      if (typeof pending.toolName === 'string' && pending.toolName.trim() !== '') {
+        return pending.toolName
+      }
+      const questions = Array.isArray(pending.questions) ? pending.questions : []
+      const first = questions[0]
+      if (first !== null && typeof first === 'object') {
+        for (const field of ['question', 'text', 'title', 'detail', 'prompt']) {
+          const value = first[field]
+          if (typeof value === 'string' && value.trim() !== '') {
+            return value.replace(/\s+/gu, ' ').trim().slice(0, 120)
+          }
+        }
+      } else if (typeof first === 'string' && first.trim() !== '') {
+        return first.replace(/\s+/gu, ' ').trim().slice(0, 120)
+      }
+      return ''
+    }
+
+    /**
      * Pure state reconciliation between the durable Host projection and the
      * process-local session status. `status` stays within the M0 six-value
      * enum; `health` / `pendingKind` / `pendingKey` are client-only metadata.
+     * D28: every blocking pending interaction (approval, question,
+     * plan-review, and unknown future kinds) claims the pending state — the
+     * host only exposes the single highest-priority request, so dropping
+     * non-approval kinds would hide a blocked agent entirely.
      */
     function composeMonitor(input) {
       const durable = input.durable
@@ -221,8 +321,14 @@ window.__ModuleLoader__.load({
       const projectionError = input.projectionError === true
       const ready = durable !== undefined
       const base = ready ? durable : EMPTY_STATE
-      const approval =
-        pending !== undefined && pending !== null && pending.kind === 'approval' ? pending : undefined
+      const pendingKind =
+        pending !== undefined &&
+        pending !== null &&
+        typeof pending.kind === 'string' &&
+        pending.kind !== ''
+          ? pending.kind
+          : ''
+      const blocked = pendingKind !== ''
       const liveRunning =
         live !== undefined && live.running !== undefined
           ? live.running
@@ -242,7 +348,7 @@ window.__ModuleLoader__.load({
       }
 
       let nextStatus = base.status
-      if (approval !== undefined) nextStatus = 'pending_approval'
+      if (blocked) nextStatus = 'pending_approval'
       else if (running) nextStatus = 'running'
 
       return {
@@ -256,10 +362,10 @@ window.__ModuleLoader__.load({
         updatedAt: base.updatedAt === undefined ? 0 : base.updatedAt,
         revision: base.revision === undefined ? 0 : base.revision,
         approvalTool:
-          approval !== undefined && typeof approval.toolName === 'string' ? approval.toolName : '',
-        pendingKind: approval === undefined ? '' : 'approval',
-        pendingKey:
-          approval !== undefined && typeof approval.key === 'string' ? approval.key : '',
+          pendingKind === 'approval' && typeof pending.toolName === 'string' ? pending.toolName : '',
+        pendingKind,
+        pendingKey: blocked && typeof pending.key === 'string' ? pending.key : '',
+        pendingDetail: blocked ? pendingDetailOf(pending) : '',
         isAlerting: nextStatus === 'pending_approval' || nextStatus === 'failed',
         ready,
       }
@@ -317,6 +423,7 @@ window.__ModuleLoader__.load({
       const approvalDetail = {
         kind: next.pendingKind,
         tool: next.approvalTool,
+        detail: next.pendingDetail,
       }
       if (baseline) {
         if (next.pendingKey === '') return []
@@ -562,6 +669,11 @@ window.__ModuleLoader__.load({
         case 'running':
           return state.activity.length > 0 ? t('status.running') : t('status.runningStart')
         case 'pending_approval':
+          // D28: copy follows the blocking kind; unknown future kinds get the
+          // generic "agent is waiting" line instead of an approval claim.
+          if (state.pendingKind === 'question') return t('status.question')
+          if (state.pendingKind === 'plan-review') return t('status.planReview')
+          if (state.pendingKind !== 'approval') return t('status.pending')
           return t('status.approval')
         case 'success':
           return t('status.success')
@@ -829,7 +941,9 @@ window.__ModuleLoader__.load({
           if (reason.startsWith('approval:')) return 'approval'
         }
         if (pauseReasons.has('hidden')) return 'hidden'
-        if (pauseReasons.has('view-inactive')) return 'view-inactive'
+        if (pauseReasons.has('view-inactive') || pauseReasons.has('page-hidden')) {
+          return 'view-inactive'
+        }
         return manualPaused ? 'manual' : ''
       }
 
@@ -860,7 +974,11 @@ window.__ModuleLoader__.load({
         if (!pauseReasons.has(reason)) return
         pauseReasons.delete(reason)
         if (pauseReasons.size === 0) resumeReady = state.status === 'paused' && !manualPaused
-        set({ ...state, pauseReason: reasonLabel(), resumeReason, resumeReady })
+        // Leaving the one-key hide state keeps the round paused (manual-resume
+        // semantics, ui-spec §8.6); the overlay swaps to the restored hint.
+        const hiddenResumed =
+          reason === 'hidden' && pauseReasons.size === 0 && state.status === 'paused'
+        set({ ...state, pauseReason: reasonLabel(), resumeReason, resumeReady, hiddenResumed })
       }
 
       const manualPause = () => {
@@ -895,7 +1013,7 @@ window.__ModuleLoader__.load({
         manualPaused = false
         resumeReady = false
         resumeReason = ''
-        set({ ...state, status: 'running', pauseReason: '', resumeReason: '', resumeReady: false })
+        set({ ...state, status: 'running', pauseReason: '', resumeReason: '', resumeReady: false, hiddenResumed: false })
       }
 
       const addScore = (amount) => {
@@ -933,8 +1051,11 @@ window.__ModuleLoader__.load({
       }
 
       const onVisibility = () => {
-        if (document.hidden) addPause('hidden', false)
-        else releasePause('hidden')
+        // D29 red line: this is the *page* going hidden — a distinct reason
+        // from the one-key hide (`hidden`), or returning to the tab would
+        // wrongly release a hide-pause (reason-key collision, fixed 2026-11-09).
+        if (document.hidden) addPause('page-hidden', false)
+        else releasePause('page-hidden')
       }
       document.addEventListener('visibilitychange', onVisibility)
 
@@ -982,6 +1103,11 @@ window.__ModuleLoader__.load({
         },
         pause: () => manualPause(),
         pauseWithHint: (reason) => pauseWithHint(reason),
+        /** D29 §8.6: one-key hide pauses via the `hidden` reason; releasing keeps the round paused. */
+        setHidden(hidden) {
+          if (hidden) addPause('hidden')
+          else releasePause('hidden')
+        },
         resume: () => manualResume(),
         turn: (dir) => set(turnGame(state, dir)),
         togglePause: () => {
@@ -1062,6 +1188,114 @@ window.__ModuleLoader__.load({
 
     /** Process-local signal hub; monitor sources publish, the game consumes. */
     const signalHub = createSignalHub()
+
+    /**
+     * One-key hide cycle (D29 §8.6, D31): normal ↔ quiet. Entering quiet
+     * pauses the game via the `hidden` reason; returning to normal releases it
+     * (the round stays paused, manual-resume).
+     */
+    function createPresenceStore(settings, game) {
+      let quiet = false
+      const listeners = new Set()
+      const notify = () => {
+        for (const listener of [...listeners]) listener()
+      }
+      const effective = () => (quiet ? 'quiet' : settings.getSnapshot().presence)
+      return {
+        getSnapshot: () => ({ stage: quiet ? 1 : 0, effective: effective(), base: settings.getSnapshot().presence }),
+        subscribe(listener) {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+        cycle() {
+          quiet = !quiet
+          game.setHidden(quiet)
+          notify()
+        },
+      }
+    }
+
+    /** `M:SS` (or `H:MM:SS`) elapsed label for the status dot. */
+    function formatElapsed(ms) {
+      const total = Math.max(0, Math.floor(ms / 1000))
+      const seconds = total % 60
+      const minutes = Math.floor(total / 60) % 60
+      const hours = Math.floor(total / 3600)
+      const mm = String(minutes).padStart(2, '0')
+      const ss = String(seconds).padStart(2, '0')
+      return hours > 0 ? `${hours}:${mm}:${ss}` : `${minutes}:${ss}`
+    }
+
+    /**
+     * Live elapsed-since-running label. Approximate from mount when the session
+     * is already running (the projection carries no start time); no timer
+     * while not running (low-key, §8.2).
+     */
+    function useRunningElapsed(status) {
+      const runningSince = React.useRef(null)
+      const [, tick] = React.useState(0)
+      React.useEffect(() => {
+        if (status !== 'running') {
+          runningSince.current = null
+          return undefined
+        }
+        if (runningSince.current === null) runningSince.current = Date.now()
+        const timer = setInterval(() => tick((n) => n + 1), 1000)
+        return () => clearInterval(timer)
+      }, [status])
+      return status === 'running'
+        ? formatElapsed(Date.now() - (runningSince.current ?? Date.now()))
+        : ''
+    }
+
+    /** Short pending label key for the dot, mirroring D28's pendingKind copy. */
+    function pendingLabelKey(kind) {
+      if (kind === 'question') return 'presence.pendingQuestion'
+      if (kind === 'plan-review') return 'presence.pendingPlanReview'
+      if (kind === '' || kind === 'approval') return 'presence.pendingApproval'
+      return 'presence.pendingGeneric'
+    }
+
+    /**
+     * System-notification consumer (D29 §8.5, L0). Only approval / success /
+     * failed / aborted, only while the window is unfocused, one notification
+     * per signal key, and never any command text (D27 privacy posture).
+     */
+    function createNotifier(deps) {
+      const seen = new Set()
+      const kindOf = (signal) => {
+        if (signal === undefined || signal === null) return null
+        if (signal.type === 'agent:approval_enter') return 'approval'
+        if (signal.type === 'agent:task_finish') {
+          const status = signal.detail === undefined ? '' : signal.detail.status
+          if (status === 'success' || status === 'aborted') return status
+          return 'failed'
+        }
+        return null
+      }
+      const onSignal = (signal) => {
+        const kind = kindOf(signal)
+        if (kind === null) return
+        const id = `${signal.type}:${signal.sessionId}:${signal.key}`
+        if (seen.has(id)) return
+        seen.add(id)
+        if (deps.getSettings().notify !== true) return
+        if (deps.hasFocus()) return
+        if (deps.permission() !== 'granted') return
+        deps.show({
+          title: deps.t('notify.title'),
+          body: deps.t(`notify.${kind}`, { session: deps.sessionTitle(signal.sessionId) }),
+        })
+      }
+      const stop = deps.subscribe(onSignal)
+      return {
+        dispose() {
+          stop()
+          seen.clear()
+        },
+      }
+    }
+
 
     /** Logical 324x324 board drawn into a 2x backing store for crisp edges. */
     function drawGame(canvas, state) {
@@ -1173,23 +1407,23 @@ window.__ModuleLoader__.load({
       gameStore.turn(dir)
     }
 
+    /** Per-kind copy for a blocking pause (approval / question / plan-review). */
+    function blockedPauseCopyKey(pendingKind, base) {
+      if (pendingKind === 'question') return `game.questionPaused${base}`
+      if (pendingKind === 'plan-review') return `game.planPaused${base}`
+      return `game.approvalPaused${base}`
+    }
+
     /** Centred overlay shown whenever the round is not running. */
-    function gameOverlay(t, state, focusRoot) {
+    function gameOverlay(t, state, focusRoot, pendingKind) {
       if (state.pauseReason === 'approval') {
+        // D35: no disabled Resume button — the copy explains the wait; resume
+        // stays keyboard/click-gated and is blocked while approval pends.
         return h(
           'div',
           { className: 'wb-overlay' },
-          h('div', { className: 'wb-overlayTitle' }, t('game.approvalPausedTitle')),
-          h('div', { className: 'wb-overlayBody' }, t('game.approvalPausedBody')),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'wb-btn wb-btnPrimary',
-              disabled: true,
-            },
-            t('game.resume'),
-          ),
+          h('div', { className: 'wb-overlayTitle' }, t(blockedPauseCopyKey(pendingKind, 'Title'))),
+          h('div', { className: 'wb-overlayBody' }, t(blockedPauseCopyKey(pendingKind, 'Body'))),
         )
       }
       if (state.status === 'idle') {
@@ -1215,34 +1449,34 @@ window.__ModuleLoader__.load({
         const waiting = state.pauseReason === 'approval'
         const body =
           state.pauseReason === 'approval'
-            ? t('game.approvalPausedBody')
+            ? t(blockedPauseCopyKey(pendingKind, 'Body'))
             : state.pauseReason === 'session-switch'
               ? t('game.sessionPausedBody')
               : state.pauseReason === 'view-inactive'
                 ? t('game.viewPausedBody')
                 : state.pauseReason === 'manual'
                   ? t('game.manualPausedBody')
-                  : state.resumeReason === 'approval' && state.resumeReady
+                  : state.pauseReason === 'hidden'
+                    ? t('game.hiddenPausedBody')
+                    : state.hiddenResumed === true
+                      ? t('game.hiddenResumeBody')
+                      : state.resumeReason === 'approval' && state.resumeReady
                     ? t('game.resumeReadyBody')
                     : null
+        // D35: the paused overlay carries no button — Space or clicking the
+        // overlay/board resumes (approval-wait pauses never resume on click).
         return h(
           'div',
-          { className: 'wb-overlay' },
+          {
+            className: 'wb-overlay',
+            onClick: () => {
+              if (waiting) return
+              gameStore.togglePause()
+              focusRoot()
+            },
+          },
           h('div', { className: 'wb-overlayTitle' }, waiting ? t('game.approvalPausedTitle') : t('game.pausedTitle')),
           body === null ? null : h('div', { className: 'wb-overlayBody' }, body),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'wb-btn wb-btnPrimary',
-              disabled: waiting,
-              onClick: () => {
-                gameStore.togglePause()
-                focusRoot()
-              },
-            },
-            t('game.resume'),
-          ),
         )
       }
       if (state.status === 'over') {
@@ -1486,7 +1720,18 @@ window.__ModuleLoader__.load({
     const gomokuStore = createGomokuStore()
 
     const SETTINGS_KEY = 'dsh-wait-buddy.settings.v1'
-    const DEFAULT_SETTINGS = { speed: 'normal', level: 'medium' }
+    const DEFAULT_SETTINGS = {
+      speed: 'normal',
+      level: 'medium',
+      // 低调模式（D29 §8.7 / D31）：默认胶囊 + 系统通知开。
+      presence: 'pill',
+      notify: true,
+      pillCorner: 'top-right',
+      // Floating-panel position {x,y} (D30); null = use the corner origin.
+      pillPos: null,
+    }
+    const PRESENCE_MODES = ['quiet', 'pill']
+    const PILL_CORNERS = ['top-right', 'bottom-right', 'top-left']
     const SPEED_LABEL = { slow: 'speed.slow', normal: 'speed.normal', fast: 'speed.fast' }
     const LEVEL_LABEL = { easy: 'level.easy', medium: 'level.medium', hard: 'level.hard' }
 
@@ -1499,6 +1744,18 @@ window.__ModuleLoader__.load({
         return {
           speed: SPEED_PRESETS[parsed.speed] === undefined ? DEFAULT_SETTINGS.speed : parsed.speed,
           level: LEVEL_PRESETS[parsed.level] === undefined ? DEFAULT_SETTINGS.level : parsed.level,
+          presence: PRESENCE_MODES.includes(parsed.presence) ? parsed.presence : DEFAULT_SETTINGS.presence,
+          notify: typeof parsed.notify === 'boolean' ? parsed.notify : DEFAULT_SETTINGS.notify,
+          pillCorner: PILL_CORNERS.includes(parsed.pillCorner)
+            ? parsed.pillCorner
+            : DEFAULT_SETTINGS.pillCorner,
+          pillPos:
+            parsed.pillPos !== null &&
+            typeof parsed.pillPos === 'object' &&
+            typeof parsed.pillPos.x === 'number' &&
+            typeof parsed.pillPos.y === 'number'
+              ? { x: parsed.pillPos.x, y: parsed.pillPos.y }
+              : null,
         }
       } catch (error) {
         return { ...DEFAULT_SETTINGS }
@@ -1531,10 +1788,32 @@ window.__ModuleLoader__.load({
           if (LEVEL_PRESETS[id] === undefined || state.level === id) return
           publish({ ...state, level: id })
         },
+        setPresence(id) {
+          if (!PRESENCE_MODES.includes(id) || state.presence === id) return
+          publish({ ...state, presence: id })
+        },
+        setNotify(enabled) {
+          if (typeof enabled !== 'boolean' || state.notify === enabled) return
+          publish({ ...state, notify: enabled })
+        },
+        setPillCorner(id) {
+          if (!PILL_CORNERS.includes(id) || state.pillCorner === id) return
+          publish({ ...state, pillCorner: id })
+        },
+        setPillPos(pos) {
+          if (
+            pos === null ||
+            (typeof pos === 'object' && typeof pos.x === 'number' && typeof pos.y === 'number')
+          ) {
+            publish({ ...state, pillPos: pos })
+          }
+        },
       }
     }
 
     const settingsStore = createSettingsStore()
+
+    const presenceStore = createPresenceStore(settingsStore, gameStore)
 
     /** Selected mini-game; both rounds survive a switch. */
     function createModeStore() {
@@ -1674,7 +1953,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Game area: mode switch, one board, one control row. */
-    function GameArea({ t, sessionId, focusRoot }) {
+    function GameArea({ t, sessionId, focusRoot, pendingKind }) {
       const canvasRef = React.useRef(null)
       const boardRef = React.useRef(null)
       const gomokuCanvasRef = React.useRef(null)
@@ -1803,7 +2082,7 @@ window.__ModuleLoader__.load({
                 role: 'img',
                 'aria-label': t('game.canvasLabel', { score: snake.score }),
               }),
-              gameOverlay(t, snake, focusRoot),
+              gameOverlay(t, snake, focusRoot, pendingKind),
               snake.reward === null
                 ? null
                 : h(
@@ -1849,19 +2128,8 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 { className: 'wb-gameActions' },
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-btn',
-                    disabled:
-                      snake.status === 'idle' ||
-                      snake.status === 'over' ||
-                      snake.pauseReason === 'approval',
-                    onClick: () => gameStore.togglePause(),
-                  },
-                  snake.status === 'running' ? t('game.pause') : t('game.resume'),
-                ),
+                // D35: no Pause/Resume button — Space toggles, clicking the
+                // paused overlay resumes.
                 h(
                   'button',
                   {
@@ -1901,6 +2169,23 @@ window.__ModuleLoader__.load({
               h('div', { className: 'wb-hint' }, t('gomoku.hint')),
             )
 
+      // Presence mode control (D29 §8.7 / D31): quiet / pill.
+      const presenceSetting = h(
+        'div',
+        { className: 'wb-setting' },
+        h('span', { className: 'wb-settingLabel' }, t('presence.mode')),
+        h(
+          'div',
+          { className: 'wb-seg' },
+          segButton(t('presence.quiet'), 'quiet', settings.presence === 'quiet', () =>
+            settingsStore.setPresence('quiet'),
+          ),
+          segButton(t('presence.pill'), 'pill', settings.presence === 'pill', () =>
+            settingsStore.setPresence('pill'),
+          ),
+        ),
+      )
+
       return h(
         'section',
         { className: 'wb-game' },
@@ -1915,25 +2200,46 @@ window.__ModuleLoader__.load({
             segButton(t('gomoku.title'), 'gomoku', mode === 'gomoku', () => switchMode('gomoku')),
           ),
           setting,
+          presenceSetting,
           controls,
         ),
       )
     }
 
-    /** One alert banner; the native approval dialog always keeps precedence. */    /** One alert banner; the native approval dialog always keeps precedence. */
+    /** One alert banner; the native dialog always keeps precedence. */
     function AlertBanner({ t, state }) {
       if (state.status === 'pending_approval') {
+        // D28: every blocking pending interaction alerts, with per-kind copy.
+        const kind = state.pendingKind
+        const titleKey =
+          kind === 'question'
+            ? 'alert.question.title'
+            : kind === 'plan-review'
+              ? 'alert.planReview.title'
+              : kind === 'approval'
+                ? 'alert.approval.title'
+                : 'alert.pending.title'
+        const meta =
+          kind === 'approval'
+            ? state.approvalTool === ''
+              ? null
+              : h(
+                  'span',
+                  { className: 'wb-alertMeta', title: state.approvalTool },
+                  t('alert.approval.tool', { tool: state.approvalTool }),
+                )
+            : state.pendingDetail === ''
+              ? null
+              : h(
+                  'span',
+                  { className: 'wb-alertMeta', title: state.pendingDetail },
+                  state.pendingDetail,
+                )
         return h(
           'div',
-          { className: 'wb-alert', 'data-kind': 'approval', role: 'alert' },
-          h('span', { className: 'wb-alertTitle' }, t('alert.approval.title')),
-          state.approvalTool === ''
-            ? null
-            : h(
-                'span',
-                { className: 'wb-alertMeta', title: state.approvalTool },
-                t('alert.approval.tool', { tool: state.approvalTool }),
-              ),
+          { className: 'wb-alert', 'data-kind': kind === '' ? 'approval' : kind, role: 'alert' },
+          h('span', { className: 'wb-alertTitle' }, t(titleKey)),
+          meta,
         )
       }
       if (state.status === 'failed') {
@@ -2019,12 +2325,567 @@ const CSS = `
       React.useEffect(() => {
         if (initialState !== undefined) return undefined
         if (clientCtx === null) return undefined
+        // A null sessionId (global overlay before any session is followed)
+        // renders the empty state without creating a session binding.
+        if (sessionId === null || sessionId === undefined) return undefined
         const source = createMonitorSource(clientCtx, sessionId, signalHub)
         const sync = () => setState(source.getSnapshot())
         sync()
         return source.subscribe(sync)
       }, [sessionId])
       return state
+    }
+
+
+    /**
+     * L1 status dot for the session header (D29 §8.2). The utilities slot
+     * provides `sessionId`; `openView` is unavailable there by contract, so
+     * "open the panel" is delegated to `ctx.sidebarRight.openTab` when present.
+     */
+    /** The session currently shown in the main view; the pill follows it (§8.4). */
+    function pickMainViewSession(snapshot) {
+      const byId = snapshot === undefined || snapshot === null ? undefined : snapshot.byId
+      if (byId === undefined || byId === null) return null
+      for (const [id, row] of Object.entries(byId)) {
+        const retained = row === undefined || row === null ? undefined : row.retainedBy
+        const weight = retained === undefined || retained === null ? 0 : retained.mainView
+        if (typeof weight === 'number' && weight > 0) return id
+      }
+      return null
+    }
+
+    /** Stylesheet for the presence pill + floating panel (D30 §8.4). */
+    const PILL_CSS = `
+.wb-pill{position:fixed;z-index:60;display:flex;flex-direction:column;gap:0;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2);box-shadow:0 4px 16px rgba(0,0,0,0.18);font:12px/1.4 inherit;color:var(--dsw-alias-label-primary);pointer-events:auto}
+.wb-pill[data-corner="top-right"]{top:14px;right:16px}
+.wb-pill[data-corner="top-left"]{top:14px;left:16px}
+.wb-pill[data-corner="bottom-right"]{bottom:14px;right:16px}
+.wb-pill[data-expanded="true"]{width:300px}
+.wb-pillBar{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:grab;user-select:none}
+.wb-pillBar:focus-visible{outline:1px solid var(--dsw-alias-border-l2)}
+.wb-pillBar:active{cursor:grabbing}
+.wb-pillDrag{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:2px 8px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.wb-pillDot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}
+.wb-pillDot[data-state="running"]{background:var(--dsw-alias-label-secondary)}
+.wb-pillDot[data-state="pending_approval"]{background:var(--dsw-alias-state-warn-primary)}
+.wb-pillDot[data-state="success"]{background:var(--dsw-alias-state-success-primary)}
+.wb-pillDot[data-state="failed"]{background:var(--dsw-alias-state-error-primary)}
+.wb-pillText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;flex:1 1 auto;min-width:0;text-align:left}
+.wb-pillToggle{flex:none;border:none;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;padding:2px 4px;font-size:11px}
+.wb-pillBody{display:flex;flex-direction:column;gap:6px;padding:6px 10px 10px;border-top:1px solid var(--dsw-alias-border-l1)}
+.wb-pillAct{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wb-pillMini{width:100%;height:112px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden;position:relative;outline:none}
+.wb-pillMini canvas{width:100%;height:100%;display:block}
+.wb-pillMiniOverlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:rgba(13,22,36,0.55)}
+.wb-pillMiniBtn{border:none;border-radius:8px;padding:3px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#7bd4a8;color:#0d1624}
+.wb-pillMiniScore{font-size:11px;color:var(--dsw-alias-label-secondary)}
+.wb-pillCtl{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.wb-pillCtlBtn{border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-primary);border-radius:6px;cursor:pointer;font-size:11px;padding:1px 8px}
+.wb-pillCtlBtn:disabled{opacity:0.5;cursor:default}
+.wb-pillTabs{display:flex;gap:4px;align-items:center}
+.wb-pillTabBtn{border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;font-size:11px;padding:1px 10px}
+.wb-pillTabBtn[data-active="true"]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.wb-pillGomoku{position:relative;width:184px;height:184px;margin:0 auto;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden}
+.wb-pillGomoku canvas{width:100%;height:100%;display:block;cursor:pointer}
+`
+
+    /** Panel width (px) for the expanded floating window (D30). */
+    const PILL_PANEL_W = 300
+    /** Rough expanded height used for viewport clamping while dragging. */
+    const PILL_PANEL_H = 280
+
+    /**
+     * Clamp a floating-panel position so the panel stays inside the viewport.
+     * Pure; exported for unit tests.
+     */
+    function clampToViewport(x, y, width, height, viewportW, viewportH) {
+        const maxX = Math.max(0, viewportW - width)
+        const maxY = Math.max(0, viewportH - height)
+        return { x: Math.min(Math.max(0, x), maxX), y: Math.min(Math.max(0, y), maxY) }
+    }
+
+    /**
+     * The floating panel's game (D30 §8.4): an independent lightweight snake —
+     * fixed 32×12 grid, no settings, no persistence, no signal consumption
+     * (the M3 link stays with the main round only). The store comes from the
+     * host panel so mouse-leave pausing can act on the same round.
+     */
+    const MINI_COLS = 32
+    const MINI_ROWS = 12
+
+    function FloatGame({ t, store }) {
+      const [state, setState] = React.useState(() => store.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setState(store.getSnapshot())
+        sync()
+        return store.subscribe(sync)
+      }, [store])
+      const canvasRef = React.useRef(null)
+      const boardRef = React.useRef(null)
+      React.useEffect(() => {
+        drawGame(canvasRef.current, state)
+      }, [state])
+      const focusBoard = () => {
+        if (boardRef.current !== null && typeof boardRef.current.focus === 'function') {
+          boardRef.current.focus({ preventScroll: true })
+        }
+      }
+      const ensureGrid = () => store.setGrid(MINI_COLS, MINI_ROWS)
+      const onKeyDown = (event) => {
+        const moves = {
+          ArrowUp: 'up',
+          ArrowDown: 'down',
+          ArrowLeft: 'left',
+          ArrowRight: 'right',
+        }
+        if (moves[event.key] !== undefined) {
+          event.preventDefault()
+          store.turn(moves[event.key])
+          return
+        }
+        if (event.key === ' ') {
+          event.preventDefault()
+          store.togglePause()
+        }
+      }
+      const overlay =
+        state.status === 'idle'
+          ? h(
+              'div',
+              { className: 'wb-pillMiniOverlay' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'wb-pillMiniBtn',
+                  onClick: () => {
+                    ensureGrid()
+                    store.start('normal')
+                    focusBoard()
+                  },
+                },
+                t('pill.miniStart'),
+              ),
+            )
+          : state.status === 'over'
+            ? h(
+                'div',
+                { className: 'wb-pillMiniOverlay' },
+                h('span', { className: 'wb-pillMiniScore' }, t('pill.miniOver', { score: state.score })),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'wb-pillMiniBtn',
+                    onClick: () => {
+                      ensureGrid()
+                      store.reset('normal')
+                      focusBoard()
+                    },
+                  },
+                  t('pill.miniAgain'),
+                ),
+              )
+            : state.status === 'paused'
+              ? h(
+                  'div',
+                  {
+                    className: 'wb-pillMiniOverlay',
+                    // D35: no Resume button — click the overlay or press Space.
+                    onClick: () => {
+                      store.resume()
+                      focusBoard()
+                    },
+                  },
+                  h('span', { className: 'wb-pillMiniScore' }, t('pill.miniPaused')),
+                )
+              : null
+      return h(
+        'div',
+        {
+          className: 'wb-pillMini',
+          tabIndex: 0,
+          role: 'img',
+          'aria-label': t('pill.canvasLabel', { score: state.score }),
+          ref: boardRef,
+          onKeyDown,
+        },
+        h('canvas', { ref: canvasRef }),
+        overlay,
+      )
+    }
+
+    /**
+     * L2 presence pill + floating panel on the global overlay (D29 §8.4,
+     * revised by D30). Collapsed: a corner pill following the main-view
+     * session; clicking the bar opens the L3 sidebar tab. Expanded: the whole
+     * WaitBuddy in a draggable panel (status + latest activity + snake);
+     * pointer leaving the panel auto-pauses the round, re-entering resumes it
+     * (only when that pause came from the leave — manual/approval/hidden
+     * pauses keep their manual-resume semantics). The overlay layer itself is
+     * click-through; only this element receives pointer events.
+     */
+    /**
+     * Pill gomoku (D33): an independent round on a square mini board (~184px).
+     * Turn-based — no tick, so mouse-leave pausing does not apply. Difficulty
+     * follows the global setting; placement clicks resolve through the same
+     * heuristic as the full view.
+     */
+    function FloatGomoku({ t, store }) {
+      const [state, setState] = React.useState(() => store.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setState(store.getSnapshot())
+        sync()
+        return store.subscribe(sync)
+      }, [store])
+      const canvasRef = React.useRef(null)
+      React.useEffect(() => {
+        drawGomoku(canvasRef.current, state)
+      }, [state])
+      const playing = state.status === 'playing'
+      const overlay = playing
+        ? null
+        : h(
+            'div',
+            { className: 'wb-pillMiniOverlay' },
+            h(
+              'span',
+              { className: 'wb-pillMiniScore' },
+              state.status === 'won'
+                ? t('gomoku.won')
+                : state.status === 'lost'
+                  ? t('gomoku.lost')
+                  : t('gomoku.draw'),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'wb-pillMiniBtn',
+                onClick: () => store.reset(),
+              },
+              t('gomoku.again'),
+            ),
+          )
+      return h(
+        'div',
+        { className: 'wb-pillGomoku' },
+        h('canvas', {
+          ref: canvasRef,
+          role: 'img',
+          'aria-label': t('gomoku.canvasLabel', { moves: state.moves }),
+          onClick: (event) => {
+            if (!playing || canvasRef.current === null) return
+            const index = gomokuPointAt(canvasRef.current, event.clientX, event.clientY)
+            if (index >= 0) store.place(index, settingsStore.getSnapshot().level)
+          },
+        }),
+        overlay,
+      )
+    }
+
+    function PresencePill() {
+      const t = boundT
+      const [settings, setSettings] = React.useState(() => settingsStore.getSnapshot())
+      const [presence, setPresence] = React.useState(() => presenceStore.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => {
+          setSettings(settingsStore.getSnapshot())
+          setPresence(presenceStore.getSnapshot())
+        }
+        const stopA = settingsStore.subscribe(sync)
+        const stopB = presenceStore.subscribe(sync)
+        sync()
+        return () => {
+          stopA()
+          stopB()
+        }
+      }, [])
+      const [sessionId, setSessionId] = React.useState(null)
+      React.useEffect(() => {
+        const list =
+          clientCtx !== null && clientCtx.sessions !== undefined ? clientCtx.sessions.list : undefined
+        if (list === undefined) return undefined
+        const sync = () => setSessionId(pickMainViewSession(list.getSnapshot()))
+        sync()
+        return typeof list.subscribe === 'function' ? list.subscribe(sync) : undefined
+      }, [])
+      const state = useMonitorState(sessionId)
+      const [expanded, setExpanded] = React.useState(false)
+      const status = state.status
+      // Hooks must all run before the early return below (React hook rules).
+      const elapsed = useRunningElapsed(status)
+      // D34: the pill plays the GLOBAL rounds — same snake/gomoku as the full
+      // view. `view-inactive` pausing is subscriber-count driven, so the round
+      // keeps running while any surface (pill or view) is rendering it.
+      const store = gameStore
+      const [game, setGame] = React.useState(() => store.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setGame(store.getSnapshot())
+        sync()
+        return store.subscribe(sync)
+      }, [])
+      const gomoku = gomokuStore
+      const [gomokuState, setGomokuState] = React.useState(() => gomoku.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setGomokuState(gomoku.getSnapshot())
+        sync()
+        return gomoku.subscribe(sync)
+      }, [])
+      const [pillMode, setPillMode] = React.useState('snake')
+      const cornerOrigin = () => {
+        if (typeof window === 'undefined') return { x: 16, y: 14 }
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+        const corner = settingsStore.getSnapshot().pillCorner
+        const pos =
+          corner === 'top-left'
+            ? { x: 16, y: 14 }
+            : corner === 'bottom-right'
+              ? { x: vw - PILL_PANEL_W - 16, y: vh - PILL_PANEL_H - 14 }
+              : { x: vw - PILL_PANEL_W - 16, y: 14 }
+        return clampToViewport(pos.x, pos.y, PILL_PANEL_W, PILL_PANEL_H, vw, vh)
+      }
+      const [pos, setPos] = React.useState(() => {
+        const saved = settingsStore.getSnapshot().pillPos
+        if (
+          saved !== null &&
+          typeof saved.x === 'number' &&
+          typeof saved.y === 'number' &&
+          typeof window !== 'undefined'
+        ) {
+          return clampToViewport(saved.x, saved.y, PILL_PANEL_W, PILL_PANEL_H, window.innerWidth, window.innerHeight)
+        }
+        return cornerOrigin()
+      })
+      const posRef = React.useRef(pos)
+      const rootRef = React.useRef(null)
+      const applyPos = (next) => {
+        // Keep the ref in sync immediately: the drag's mouseup handler may run
+        // in the same synchronous sequence as the last mousemove, before
+        // React re-renders the component.
+        posRef.current = next
+        setPos(next)
+      }
+      // Press-and-hold drag in both collapsed and expanded states; a move
+      // beyond DRAG_THRESHOLD px counts as a drag and suppresses the click.
+      const DRAG_THRESHOLD = 4
+      const dragState = React.useRef(null)
+      const suppressClick = React.useRef(false)
+      const startDrag = (event) => {
+        if (event.button !== 0 || typeof window === 'undefined') return
+        // Clamp against the pill's *measured* size: the collapsed pill is much
+        // narrower than the expanded panel, and clamping both at 300px made
+        // the rightmost strip of the viewport unreachable (D33).
+        const rect =
+          rootRef.current !== null && typeof rootRef.current.getBoundingClientRect === 'function'
+            ? rootRef.current.getBoundingClientRect()
+            : null
+        const sizeW = rect !== null && rect.width > 0 ? rect.width : PILL_PANEL_W
+        const sizeH = rect !== null && rect.height > 0 ? rect.height : PILL_PANEL_H
+        const drag = { originX: event.clientX, originY: event.clientY, base: posRef.current, moved: false, sizeW, sizeH }
+        dragState.current = drag
+        const onMove = (move) => {
+          if (dragState.current !== drag) return
+          const dx = move.clientX - drag.originX
+          const dy = move.clientY - drag.originY
+          if (!drag.moved && Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return
+          drag.moved = true
+          applyPos(
+            clampToViewport(
+              drag.base.x + dx,
+              drag.base.y + dy,
+              drag.sizeW,
+              drag.sizeH,
+              window.innerWidth,
+              window.innerHeight,
+            ),
+          )
+        }
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove)
+          window.removeEventListener('mouseup', onUp)
+          if (dragState.current !== drag) return
+          if (drag.moved) settingsStore.setPillPos(posRef.current)
+          suppressClick.current = drag.moved
+          dragState.current = null
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+      }
+      const toggleExpanded = () => {
+        if (suppressClick.current) {
+          suppressClick.current = false
+          return
+        }
+        setExpanded((value) => !value)
+      }
+      // Expanding near a viewport edge re-clamps so the panel stays visible.
+      React.useEffect(() => {
+        if (!expanded || typeof window === 'undefined') return
+        applyPos(
+          clampToViewport(
+            posRef.current.x,
+            posRef.current.y,
+            PILL_PANEL_W,
+            PILL_PANEL_H,
+            window.innerWidth,
+            window.innerHeight,
+          ),
+        )
+      }, [expanded])
+      // D30: pointer leaving the panel pauses the round. Coming back does NOT
+      // resume it — space or the overlay's Resume button does (manual-resume
+      // semantics, aligned with M0 §9).
+      const onPanelLeave = () => {
+        if (store.getSnapshot().status === 'running') store.pause()
+      }
+      if (presence.effective !== 'pill') return null
+
+      const isPending = status === 'pending_approval'
+      // While an approval is pending the panel never expands a game (red line).
+      const showGame = expanded && !isPending
+      const summary =
+        status === 'running'
+          ? t('presence.steps', { count: state.stepCount, elapsed })
+          : isPending
+            ? t(pendingLabelKey(state.pendingKind))
+            : status === 'success'
+              ? t('presence.successSteps', { count: state.stepCount })
+              : status === 'failed'
+                ? t('presence.failed')
+                : status === 'aborted'
+                  ? t('presence.aborted')
+                  : status === 'idle'
+                    ? t('presence.idle')
+                    : t('view.label')
+      const latest =
+        state.activity.length === 0
+          ? null
+          : `${t(FEED_LABEL[state.activity[0].kind] || FEED_LABEL.tool)} ${state.activity[0].text}`
+
+      return h(
+        'div',
+        {
+          className: 'wb-pill',
+          ref: rootRef,
+          'data-corner': settings.pillCorner,
+          'data-waitbuddy-pill': status,
+          'data-expanded': showGame ? 'true' : 'false',
+          style: { left: `${pos.x}px`, top: `${pos.y}px`, right: 'auto', bottom: 'auto' },
+          onMouseLeave: showGame ? onPanelLeave : undefined,
+        },
+        h('style', { key: 'wb-pill-style' }, PILL_CSS),
+        h(
+          'div',
+          {
+            className: 'wb-pillBar',
+            role: 'button',
+            tabIndex: 0,
+            onClick: toggleExpanded,
+            onKeyDown: (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return
+              event.preventDefault()
+              setExpanded((value) => !value)
+            },
+            onMouseDown: startDrag,
+            'aria-label': `${t('view.label')}: ${summary}`,
+            'aria-expanded': showGame ? 'true' : 'false',
+            title: showGame ? t('pill.collapse') : t('pill.expand'),
+          },
+          h('span', { className: 'wb-pillDot', 'data-state': status, 'aria-hidden': true }),
+          h('span', { className: 'wb-pillText' }, summary),
+          showGame ? h('span', { className: 'wb-pillDrag', 'aria-hidden': true }, '⠿') : null,
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-pillToggle',
+              'aria-expanded': showGame ? 'true' : 'false',
+              'aria-label': showGame ? t('pill.collapse') : t('pill.expand'),
+              disabled: isPending,
+              onClick: (event) => {
+                event.stopPropagation()
+                setExpanded((value) => !value)
+              },
+            },
+            showGame ? '▾' : '▸',
+          ),
+        ),
+        showGame
+          ? h(
+              'div',
+              { className: 'wb-pillBody' },
+              latest === null ? null : h('div', { className: 'wb-pillAct', title: latest }, latest),
+              h(
+                'div',
+                { className: 'wb-pillTabs' },
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'wb-pillTabBtn',
+                    'data-active': pillMode === 'snake' ? 'true' : 'false',
+                    onClick: () => setPillMode('snake'),
+                  },
+                  t('game.title'),
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'wb-pillTabBtn',
+                    'data-active': pillMode === 'gomoku' ? 'true' : 'false',
+                    onClick: () => {
+                      setPillMode('gomoku')
+                      // Same rule as the full view: switching to gomoku pauses
+                      // the (shared) snake round.
+                      store.pause()
+                    },
+                  },
+                  t('gomoku.title'),
+                ),
+              ),
+              pillMode === 'snake'
+                ? h(FloatGame, { t, store })
+                : h(FloatGomoku, { t, store: gomoku }),
+              pillMode === 'snake'
+                ? h(
+                    'div',
+                    { className: 'wb-pillCtl' },
+                    h('span', null, t('game.score', { score: game.score })),
+                    // D35: no Pause/Resume button — Space or clicking the
+                    // paused overlay handles both.
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'wb-pillCtlBtn',
+                        onClick: () => {
+                          store.setGrid(MINI_COLS, MINI_ROWS)
+                          store.reset('normal')
+                        },
+                      },
+                      t('game.reset'),
+                    ),
+                  )
+                : h(
+                    'div',
+                    { className: 'wb-pillCtl' },
+                    h('span', null, t('gomoku.moves', { you: Math.ceil(gomokuState.moves / 2), ai: Math.floor(gomokuState.moves / 2) })),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'wb-pillCtlBtn',
+                        onClick: () => gomoku.reset(),
+                      },
+                      t('gomoku.again'),
+                    ),
+                  ),
+            )
+          : null,
+      )
     }
 
     function WaitBuddyView(props) {
@@ -2034,16 +2895,39 @@ const CSS = `
       React.useEffect(() => {
         const scrollTop = () => {
           if (innerRef.current !== null) innerRef.current.scrollTop = 0
+          // The host conversation view scrolls an ancestor container (the
+          // session scroll body), not `.wb-inner`; on layouts where the panel
+          // grows past the viewport, a view switch must also reset that
+          // ancestor or the status row / alert area stay scrolled away (F6).
+          let el = innerRef.current === null ? null : innerRef.current.parentElement
+          for (let depth = 0; el !== null && el !== document.body && depth < 6; depth += 1) {
+            const style = window.getComputedStyle(el)
+            if (
+              el.scrollTop > 0 &&
+              (style.overflowY === 'auto' || style.overflowY === 'scroll')
+            ) {
+              el.scrollTop = 0
+            }
+            el = el.parentElement
+          }
         }
         scrollTop()
         const root = rootRef.current
         let visible = true
+        // Distinguishes "hidden by a view switch" (zero-sized, e.g. display:
+        // none) from "scrolled out of the viewport by the user": only the
+        // former re-resets the scroll position on re-entry.
+        let zeroSizedWhenHidden = false
         let observer
         if (root !== null && typeof IntersectionObserver === 'function') {
           observer = new IntersectionObserver(
             (entries) => {
               const next = entries[0] !== undefined && entries[0].isIntersecting
-              if (next && !visible) scrollTop()
+              if (!next) {
+                const rect = root.getBoundingClientRect()
+                zeroSizedWhenHidden = rect.width === 0 || rect.height === 0
+              }
+              if (next && !visible && zeroSizedWhenHidden) scrollTop()
               visible = next
             },
             { threshold: 0.01 },
@@ -2157,7 +3041,7 @@ const CSS = `
                   ),
             ),
           ),
-          h(GameArea, { t, sessionId: props.sessionId, focusRoot }),
+          h(GameArea, { t, sessionId: props.sessionId, focusRoot, pendingKind: state.pendingKind }),
         ),
       )
     }
@@ -2195,6 +3079,86 @@ const CSS = `
             WaitBuddyView,
           ),
         )
+        // L2: global presence pill on the shell overlay (D29 §8.4). The layer
+        // itself is click-through; the pill opts into pointer events. Hosts
+        // without the overlay slot skip this registration entirely.
+        try {
+          ctx.slots.inject('shell.overlay', () =>
+            ctx.slots.register(
+              {
+                name: 'shell.overlay',
+                id: 'waitbuddy',
+                order: 20,
+                locale: NS,
+              },
+              PresencePill,
+            ),
+          )
+        } catch (error) {
+          console.warn('[wait-buddy] shell overlay unavailable on this host', error)
+        }
+        // L0: system notifications, only while the window is unfocused (§8.5).
+        ctx.effect(() => {
+          if (typeof Notification === 'undefined') return () => {}
+          if (Notification.permission === 'default') {
+            try {
+              const request = Notification.requestPermission()
+              if (request !== undefined && typeof request.catch === 'function') {
+                request.catch(() => {})
+              }
+            } catch (error) {
+              console.warn('[wait-buddy] notification permission request failed', error)
+            }
+          }
+          const sessionTitleOf = (sessionId) => {
+            let title = ''
+            try {
+              const snapshot = ctx.sessions?.list?.getSnapshot?.()
+              const row = snapshot === undefined ? undefined : snapshot.byId?.[sessionId]
+              title = row?.title ?? row?.name ?? ''
+            } catch (error) {
+              title = ''
+            }
+            return title === '' ? String(sessionId).slice(0, 8) : title
+          }
+          const notifier = createNotifier({
+            subscribe: (listener) => signalHub.subscribe(listener),
+            getSettings: () => settingsStore.getSnapshot(),
+            hasFocus: () => typeof document !== 'undefined' && document.hasFocus(),
+            permission: () => (typeof Notification === 'undefined' ? 'denied' : Notification.permission),
+            show: ({ title: head, body }) => {
+              try {
+                new Notification(head, { body })
+              } catch (error) {
+                console.warn('[wait-buddy] notification failed', error)
+              }
+            },
+            t,
+            sessionTitle: sessionTitleOf,
+          })
+          return () => notifier.dispose()
+        }, 'wait-buddy: system notifications')
+        // One-key hide: Ctrl/Cmd+Shift+W cycles the presence stages (§8.6).
+        // Implemented as a window listener: the host shortcut catalog resolves
+        // command ids only, a binding contract plugins cannot rely on yet.
+        ctx.effect(() => {
+          if (typeof window === 'undefined') return () => {}
+          const onKeyDown = (event) => {
+            if (event.code !== 'KeyW') return
+            if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey) return
+            const target = event.target
+            if (target !== null && typeof target === 'object') {
+              const tag = target.tagName
+              if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
+                return
+              }
+            }
+            event.preventDefault()
+            presenceStore.cycle()
+          }
+          window.addEventListener('keydown', onKeyDown)
+          return () => window.removeEventListener('keydown', onKeyDown)
+        }, 'wait-buddy: hide shortcut')
       },
       /** Pure monitor reconciliation, exported for unit testing. */
       __monitor: { composeMonitor, sameMonitor, createMonitorSource },
@@ -2202,6 +3166,18 @@ const CSS = `
       __signals: { createSignalHub, diffMonitorSignals },
       /** Pure copy helpers, exported for unit testing. */
       __ui: { statusText, metaText },
+      /** Low-key presence (D29): store, notifier and pure helpers for tests. */
+      __presence: {
+        presenceStore,
+        settingsStore,
+        createPresenceStore,
+        createNotifier,
+        formatElapsed,
+        pendingLabelKey,
+        PresencePill,
+        pickMainViewSession,
+        clampToViewport,
+      },
       /** Static UI pieces + stylesheet, exported for component tests. */
       __components: { AlertBanner, gameOverlay, gomokuOverlay },
       __css: CSS,

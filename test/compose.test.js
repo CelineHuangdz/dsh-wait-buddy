@@ -88,14 +88,54 @@ test('approval is visible even without a projection and carries its key', () => 
   assert.equal(state.isAlerting, true)
 })
 
-test('non-approval pending interactions do not claim the baseline approval state', () => {
-  const state = compose(
-    input({ pending: { kind: 'question', key: 'question:1' } }),
+test('question and plan-review blocks claim the pending state like approvals (D28)', () => {
+  const question = compose(
+    input({
+      pending: {
+        kind: 'question',
+        key: 'question:1',
+        questions: [{ question: '用哪个分支发布？' }],
+      },
+    }),
   )
-  assert.equal(state.status, 'running')
-  assert.equal(state.pendingKind, '')
-  assert.equal(state.pendingKey, '')
-  assert.equal(state.isAlerting, false)
+  assert.equal(question.status, 'pending_approval')
+  assert.equal(question.pendingKind, 'question')
+  assert.equal(question.pendingKey, 'question:1')
+  assert.equal(question.approvalTool, '')
+  assert.equal(question.pendingDetail, '用哪个分支发布？')
+  assert.equal(question.isAlerting, true)
+
+  const plan = compose(
+    input({ pending: { kind: 'plan-review', key: 'plan:1', questions: [{ detail: '计划正文' }] } }),
+  )
+  assert.equal(plan.status, 'pending_approval')
+  assert.equal(plan.pendingKind, 'plan-review')
+  assert.equal(plan.pendingDetail, '计划正文')
+
+  // Unknown future kinds stay visible with the generic copy path.
+  const unknown = compose(input({ pending: { kind: 'future-kind', key: 'x:1' } }))
+  assert.equal(unknown.status, 'pending_approval')
+  assert.equal(unknown.pendingKind, 'future-kind')
+
+  // A pending interaction without a usable kind stays invisible.
+  const blank = compose(input({ pending: { kind: '', key: 'x:2' } }))
+  assert.equal(blank.status, 'running')
+  assert.equal(blank.pendingKind, '')
+})
+
+test('approval keeps its tool name and never borrows question text', () => {
+  const state = compose(
+    input({
+      pending: {
+        kind: 'approval',
+        key: 'approval:9',
+        toolName: 'bash',
+        questions: [{ question: '不应出现' }],
+      },
+    }),
+  )
+  assert.equal(state.approvalTool, 'bash')
+  assert.equal(state.pendingDetail, 'bash')
 })
 
 test('failed is an alert and success is not', () => {

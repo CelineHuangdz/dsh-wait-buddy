@@ -61,9 +61,15 @@ It never controls the Agent, never intercepts the native approval dialog, and ne
 - **Activity feed**: only `tool/call` command/tool entries (max 3); **no raw model reasoning** (D27).
 - **Dedicated alert rail**: approval/failure alerts live outside the scrolling content and stay visible.
 
+### Low-key presence (v0.5.0)
+
+- Two surfaces: the **full view** (WaitBuddy tab) and the **pill** (default) — a small corner capsule that expands into a draggable floating panel (status + latest activity + games) **sharing the same rounds** as the full view. Moving the pointer out of the panel auto-pauses the snake; Space or clicking the overlay resumes.
+- `Ctrl/Cmd+Shift+W` toggles pill ↔ background (no UI, system notifications only). Notifications fire only while the window is unfocused, for approval/finish/failure, and never contain command text.
+- Presence is configured in the board footer like speed/difficulty and stored in localStorage.
+
 ### Games
 
-- **Snake**: Canvas, no external assets, keyboard arrows; direction queue, pause/reset, speed presets.
+- **Snake**: Canvas, no external assets, keyboard arrows; direction queue, Space pause/resume, reset, speed presets.
 - **Gomoku**: 15×15, human black vs heuristic AI; difficulty presets; redraws on resize.
 - Both games keep their own state; switching view/session pauses but does not reset.
 
@@ -146,7 +152,7 @@ Client (client.js)                    ▼
 | M3 signals / approval pause / +5/+50 | ✅ core; real approval pause + manual resume verified |
 | D7 soft buttons | Approved deviation: keyboard arrows only |
 | D16/D17 Gomoku/settings | Approved deviation: M4 scope shipped early |
-| D28 question / plan-review | Deferred; next iteration |
+| D28 question / plan-review | ✅ visible since 0.5.0: per-kind alert copy + game auto-pause |
 | D22 unknown terminal | `aborted` + reason text; no new enum |
 
 - Verified on DSH `0.2.1-rc.5`; other versions are not promised.
@@ -208,7 +214,7 @@ CHANGELOG.md        Release notes
 ## Roadmap
 
 - **0.4.x**: fix real-device regressions; add DSH end-to-end coverage (approval, two instances, Canvas).
-- **Next iteration**: evaluate D28 question/plan-review; M4 candidates (more games, score persistence, wait stats/export).
+- **Next**: M4 candidates (more games, score persistence, wait stats/export); real-device E2E for the question/plan-review chain.
 - **Never**: in-game approval, auto-approval, or any reverse control over the Agent.
 
 ## Security and privacy

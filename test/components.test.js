@@ -10,12 +10,19 @@ const { AlertBanner, gameOverlay } = client.__components
 const dict = {
   'alert.approval.title': '【重要】等待你审批工具调用',
   'alert.approval.tool': '工具 {tool}',
+  'alert.question.title': '【重要】Agent 有问题等你回答',
+  'alert.planReview.title': '【重要】Agent 的计划等你确认',
+  'alert.pending.title': '【重要】Agent 在等你处理请求',
   'alert.failed.title': '任务执行失败',
   'game.startBody': '方向键控制，吃到果实得分。',
   'game.start': '开始游戏',
   'game.pausedTitle': '已暂停',
   'game.approvalPausedTitle': '等待审批',
   'game.approvalPausedBody': 'Agent 等待审批，已自动暂停',
+  'game.questionPausedTitle': '等待你的回答',
+  'game.questionPausedBody': 'Agent 有问题等你回答，已自动暂停',
+  'game.planPausedTitle': '等待计划确认',
+  'game.planPausedBody': 'Agent 提交了计划等你确认，已自动暂停',
   'game.resumeReadyBody': '已处理，按空格或点击继续',
   'game.sessionPausedBody': '切换会话后已暂停，点击继续恢复',
   'game.manualPausedBody': '已手动暂停，点击继续恢复',
@@ -44,11 +51,12 @@ test('AlertBanner shows approval tool / failure reason', () => {
   const approval = render(
     React.createElement(AlertBanner, {
       t,
-      state: { status: 'pending_approval', approvalTool: 'bash', errorMessage: '' },
+      state: { status: 'pending_approval', pendingKind: 'approval', approvalTool: 'bash', errorMessage: '' },
     }),
   )
   assert.match(approval, /等待你审批/)
   assert.match(approval, /bash/)
+  assert.match(approval, /data-kind="approval"/)
 
   const failed = render(
     React.createElement(AlertBanner, {
@@ -60,11 +68,58 @@ test('AlertBanner shows approval tool / failure reason', () => {
   assert.match(failed, /network down/)
 })
 
-test('paused overlay explains approval pause and disables resume', () => {
-  const html = render(gameOverlay(t, paused({ pauseReason: 'approval' }), () => {}))
+test('AlertBanner distinguishes question and plan-review blocks (D28)', () => {
+  const question = render(
+    React.createElement(AlertBanner, {
+      t,
+      state: {
+        status: 'pending_approval',
+        pendingKind: 'question',
+        approvalTool: '',
+        pendingDetail: '用哪个分支发布？',
+        errorMessage: '',
+      },
+    }),
+  )
+  assert.match(question, /有问题等你回答/)
+  assert.match(question, /用哪个分支发布？/)
+  assert.doesNotMatch(question, /等待你审批/)
+  assert.match(question, /data-kind="question"/)
+
+  const plan = render(
+    React.createElement(AlertBanner, {
+      t,
+      state: { status: 'pending_approval', pendingKind: 'plan-review', pendingDetail: '', errorMessage: '' },
+    }),
+  )
+  assert.match(plan, /计划等你确认/)
+  assert.match(plan, /data-kind="plan-review"/)
+
+  const unknown = render(
+    React.createElement(AlertBanner, {
+      t,
+      state: { status: 'pending_approval', pendingKind: 'future-kind', pendingDetail: '', errorMessage: '' },
+    }),
+  )
+  assert.match(unknown, /Agent 在等你处理请求/)
+  assert.match(unknown, /data-kind="future-kind"/)
+})
+
+test('paused overlay explains approval pause and carries no resume button (D35)', () => {
+  const html = render(gameOverlay(t, paused({ pauseReason: 'approval' }), () => {}, 'approval'))
   assert.match(html, /等待审批/)
   assert.match(html, /已自动暂停/)
-  assert.match(html, /disabled/)
+  assert.doesNotMatch(html, /disabled/)
+  assert.doesNotMatch(html, /继续/)
+})
+
+test('paused overlay explains question and plan-review pauses (D28)', () => {
+  const question = render(gameOverlay(t, paused({ pauseReason: 'approval' }), () => {}, 'question'))
+  assert.match(question, /等待你的回答/)
+  assert.doesNotMatch(question, /等待审批/)
+
+  const plan = render(gameOverlay(t, paused({ pauseReason: 'approval' }), () => {}, 'plan-review'))
+  assert.match(plan, /等待计划确认/)
 })
 
 test('paused overlay explains session/view switches', () => {

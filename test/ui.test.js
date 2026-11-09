@@ -10,6 +10,9 @@ const dict = {
   'status.runningStart': 'running-start',
   'status.running': 'running',
   'status.approval': 'approval',
+  'status.question': 'question',
+  'status.planReview': 'plan-review',
+  'status.pending': 'pending-generic',
   'status.success': 'success',
   'status.failed': 'failed',
   'status.aborted': 'aborted',
@@ -41,8 +44,20 @@ test('health copy takes precedence over a running status', () => {
 })
 
 test('approval and failure are never hidden by health', () => {
-  assert.equal(statusText(t, state({ status: 'pending_approval', health: 'degraded' })), 'approval')
+  assert.equal(
+    statusText(t, state({ status: 'pending_approval', pendingKind: 'approval', health: 'degraded' })),
+    'approval',
+  )
   assert.equal(statusText(t, state({ status: 'failed', health: 'degraded' })), 'failed')
+})
+
+test('pending copy follows the blocking kind (D28)', () => {
+  const base = { status: 'pending_approval', health: 'degraded' }
+  assert.equal(statusText(t, state({ ...base, pendingKind: 'question' })), 'question')
+  assert.equal(statusText(t, state({ ...base, pendingKind: 'plan-review' })), 'plan-review')
+  // Unknown future kinds fall back to the generic copy, never to approval.
+  assert.equal(statusText(t, state({ ...base, pendingKind: 'future-kind' })), 'pending-generic')
+  assert.equal(statusText(t, state({ ...base, pendingKind: 'approval' })), 'approval')
 })
 
 test('aborted with a reason is shown as an unknown end, not a cancel', () => {
