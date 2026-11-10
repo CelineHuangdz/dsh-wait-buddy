@@ -26,6 +26,8 @@ window.__ModuleLoader__.load({
     /** Simplified Chinese dictionary — the key-set source of truth. */
     const zh = {
       'view.label': 'WaitBuddy',
+      'view.openLabel': 'Open the WaitBuddy board',
+      'view.openLabel': '打开 WaitBuddy 看板',
       'status.idle': '空闲 · 等待本会话任务',
       'status.runningStart': '任务开始，Agent 正在规划',
       'status.running': '正在执行任务',
@@ -79,7 +81,7 @@ window.__ModuleLoader__.load({
       'game.overBody': '本局得分 {score}',
       'game.again': '再来一局',
       'game.canvasLabel': '贪吃蛇游戏区域，当前得分 {score}',
-      'game.hint': '方向键控制，点棋盘后生效',
+      'game.hint': '方向键控制，点棋盘后生效；空格 开始/暂停/继续',
       'gomoku.title': '五子棋',
       'game.speed': '速度',
       'speed.slow': '慢',
@@ -116,6 +118,7 @@ window.__ModuleLoader__.load({
       'presence.idle': '空闲',
       'presence.aborted': '已中断',
       'presence.successSteps': '成功 · {count} 步',
+      'pill.background': '切到后台并打开看板',
       'pill.expand': '展开浮动小窗',
       'pill.collapse': '收起胶囊',
       'pill.miniStart': '开始',
@@ -181,7 +184,7 @@ window.__ModuleLoader__.load({
       'game.overBody': 'Score {score}',
       'game.again': 'Play again',
       'game.canvasLabel': 'Snake board, current score {score}',
-      'game.hint': 'Arrow keys only — click the board once to enable',
+      'game.hint': 'Arrow keys steer (click the board first); Space starts, pauses and resumes',
       'gomoku.title': 'Gomoku',
       'game.speed': 'Speed',
       'speed.slow': 'Slow',
@@ -218,6 +221,7 @@ window.__ModuleLoader__.load({
       'presence.idle': 'Idle',
       'presence.aborted': 'Interrupted',
       'presence.successSteps': 'Done · {count} steps',
+      'pill.background': 'Switch to background & open the board',
       'pill.expand': 'Expand the floating panel',
       'pill.collapse': 'Collapse the pill',
       'pill.miniStart': 'Start',
@@ -1376,6 +1380,20 @@ window.__ModuleLoader__.load({
     }
 
     /** Arrow keys act only while focus is inside this view, so the composer keeps its keys. */
+    /**
+     * D36: Space is the single control for every snake state — idle starts,
+     * running pauses, paused resumes, over restarts. Approval pauses stay
+     * immune (manualResume already refuses while approval reasons exist).
+     */
+    function snakeSpaceAction(store, speedId) {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status === 'idle' || snapshot.status === 'over') {
+        store.start(speedId)
+        return
+      }
+      store.togglePause()
+    }
+
     function onGameKeyDown(event) {
       if (modeStore.getSnapshot() !== 'snake') return
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
@@ -1398,13 +1416,17 @@ window.__ModuleLoader__.load({
           return
         }
         event.preventDefault()
-        gameStore.togglePause()
+        snakeSpace()
         return
       }
       const dir = ARROW_DIRECTIONS[event.key]
       if (dir === undefined) return
       event.preventDefault()
       gameStore.turn(dir)
+    }
+
+    function snakeSpace() {
+      snakeSpaceAction(gameStore, settingsStore.getSnapshot().speed)
     }
 
     /** Per-kind copy for a blocking pause (approval / question / plan-review). */
@@ -2385,6 +2407,7 @@ const CSS = `
 .wb-pillTabs{display:flex;gap:4px;align-items:center}
 .wb-pillTabBtn{border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;font-size:11px;padding:1px 10px}
 .wb-pillTabBtn[data-active="true"]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.wb-hdMenuBtn{border:none;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:6px 10px;width:100%;text-align:left}
 .wb-pillGomoku{position:relative;width:184px;height:184px;margin:0 auto;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden}
 .wb-pillGomoku canvas{width:100%;height:100%;display:block;cursor:pointer}
 `
@@ -2445,7 +2468,8 @@ const CSS = `
         }
         if (event.key === ' ') {
           event.preventDefault()
-          store.togglePause()
+          // D36: Space starts from idle/over too (see snakeSpaceAction).
+          snakeSpaceAction(store, 'normal')
         }
       }
       const overlay =
@@ -2581,6 +2605,40 @@ const CSS = `
           },
         }),
         overlay,
+      )
+    }
+
+    /**
+     * D36: capture the host's view-switch capability. The views-actions menu
+     * entry is mounted per session and receives `onOpen`; while mounted it
+     * publishes the opener here so the pill's background button can jump to
+     * the WaitBuddy view. No public global view-switch service exists (D15,
+     * re-verified on 0.2.1-rc.5).
+     */
+    let viewOpener = null
+
+    function ViewMenuEntry(props) {
+      const t = typeof props.t === 'function' ? props.t : boundT
+      React.useEffect(() => {
+        viewOpener = typeof props.onOpen === 'function' ? props.onOpen : null
+        return () => {
+          if (viewOpener === props.onOpen) viewOpener = null
+        }
+      }, [props.onOpen])
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: 'wb-hdMenuBtn',
+          onClick: () => {
+            try {
+              props.onOpen('waitbuddy')
+            } catch (error) {
+              console.warn('[wait-buddy] open view failed', error)
+            }
+          },
+        },
+        t('view.openLabel'),
       )
     }
 
@@ -2720,6 +2778,15 @@ const CSS = `
         }
         setExpanded((value) => !value)
       }
+      // D36: hide all UI (notifications only) and jump to the full view.
+      const goBackground = () => {
+        settingsStore.setPresence('quiet')
+        try {
+          if (viewOpener !== null) viewOpener('waitbuddy')
+        } catch (error) {
+          console.warn('[wait-buddy] open view failed', error)
+        }
+      }
       // Expanding near a viewport edge re-clamps so the panel stays visible.
       React.useEffect(() => {
         if (!expanded || typeof window === 'undefined') return
@@ -2796,6 +2863,20 @@ const CSS = `
           h('span', { className: 'wb-pillDot', 'data-state': status, 'aria-hidden': true }),
           h('span', { className: 'wb-pillText' }, summary),
           showGame ? h('span', { className: 'wb-pillDrag', 'aria-hidden': true }, '⠿') : null,
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-pillToggle',
+              'aria-label': t('pill.background'),
+              title: t('pill.background'),
+              onClick: (event) => {
+                event.stopPropagation()
+                goBackground()
+              },
+            },
+            '⏻',
+          ),
           h(
             'button',
             {
@@ -3096,6 +3177,23 @@ const CSS = `
           )
         } catch (error) {
           console.warn('[wait-buddy] shell overlay unavailable on this host', error)
+        }
+        // D36: views-actions menu entry — a visible "open the board" row, and
+        // the mounted entry's `onOpen` powers the pill's background button.
+        try {
+          ctx.slots.inject('conversation.session.header.views.actions', () =>
+            ctx.slots.register(
+              {
+                name: 'conversation.session.header.views.actions',
+                id: 'waitbuddy-open',
+                order: 20,
+                locale: NS,
+              },
+              ViewMenuEntry,
+            ),
+          )
+        } catch (error) {
+          console.warn('[wait-buddy] views actions slot unavailable on this host', error)
         }
         // L0: system notifications, only while the window is unfocused (§8.5).
         ctx.effect(() => {
