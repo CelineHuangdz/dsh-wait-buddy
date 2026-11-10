@@ -119,6 +119,7 @@ window.__ModuleLoader__.load({
       'presence.aborted': '已中断',
       'presence.successSteps': '成功 · {count} 步',
       'pill.background': '切到后台并打开看板',
+      'pill.backgroundShort': '后台',
       'pill.expand': '展开浮动小窗',
       'pill.collapse': '收起胶囊',
       'pill.miniStart': '开始',
@@ -222,6 +223,7 @@ window.__ModuleLoader__.load({
       'presence.aborted': 'Interrupted',
       'presence.successSteps': 'Done · {count} steps',
       'pill.background': 'Switch to background & open the board',
+      'pill.backgroundShort': 'Background',
       'pill.expand': 'Expand the floating panel',
       'pill.collapse': 'Collapse the pill',
       'pill.miniStart': 'Start',
@@ -2393,7 +2395,7 @@ const CSS = `
 .wb-pillDot[data-state="success"]{background:var(--dsw-alias-state-success-primary)}
 .wb-pillDot[data-state="failed"]{background:var(--dsw-alias-state-error-primary)}
 .wb-pillText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;flex:1 1 auto;min-width:0;text-align:left}
-.wb-pillToggle{flex:none;border:none;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;padding:2px 4px;font-size:11px}
+.wb-pillToggle{flex:none;border:none;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;padding:3px 6px;font-size:13px}
 .wb-pillBody{display:flex;flex-direction:column;gap:6px;padding:6px 10px 10px;border-top:1px solid var(--dsw-alias-border-l1)}
 .wb-pillAct{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wb-pillMini{width:100%;height:112px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden;position:relative;outline:none}
@@ -2891,20 +2893,22 @@ const CSS = `
           },
           h('span', { className: 'wb-pillDot', 'data-state': status, 'aria-hidden': true }),
           h('span', { className: 'wb-pillText' }, summary),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'wb-pillToggle',
-              'aria-label': t('pill.background'),
-              title: t('pill.background'),
-              onClick: (event) => {
-                event.stopPropagation()
-                goBackground()
-              },
-            },
-            '⏻',
-          ),
+          showGame
+            ? null
+            : h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'wb-pillToggle',
+                  'aria-label': t('pill.background'),
+                  title: t('pill.background'),
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    goBackground()
+                  },
+                },
+                '⏻',
+              ),
         ),
         showGame
           ? h(
@@ -2962,6 +2966,16 @@ const CSS = `
                       },
                       t('game.reset'),
                     ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'wb-pillCtlBtn',
+                        'aria-label': t('pill.background'),
+                        onClick: goBackground,
+                      },
+                      t('pill.backgroundShort'),
+                    ),
                   )
                 : h(
                     'div',
@@ -2975,6 +2989,16 @@ const CSS = `
                         onClick: () => gomoku.reset(),
                       },
                       t('gomoku.again'),
+                    ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'wb-pillCtlBtn',
+                        'aria-label': t('pill.background'),
+                        onClick: goBackground,
+                      },
+                      t('pill.backgroundShort'),
                     ),
                   ),
             )
