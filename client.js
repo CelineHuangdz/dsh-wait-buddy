@@ -2608,14 +2608,47 @@ const CSS = `
       )
     }
 
-    /**
-     * D36: capture the host's view-switch capability. The views-actions menu
-     * entry is mounted per session and receives `onOpen`; while mounted it
-     * publishes the opener here so the pill's background button can jump to
-     * the WaitBuddy view. No public global view-switch service exists (D15,
-     * re-verified on 0.2.1-rc.5).
-     */
     let viewOpener = null
+
+    /**
+     * D36: open the WaitBuddy conversation view. No public service exists
+     * (activateView depends on host-internal store actions), so this drives
+     * the same UI a user would: the WaitBuddy tab in the session header, or
+     * the More-views menu entry when the tab is collapsed into it.
+     */
+    async function openFullView() {
+      if (viewOpener !== null) {
+        // Preferred: a captured onOpen from the views-actions menu entry
+        // (available once that menu has been opened at least once).
+        try {
+          viewOpener('waitbuddy')
+          return true
+        } catch (error) {
+          console.warn('[wait-buddy] openView failed', error)
+        }
+      }
+      const findTab = () => {
+        const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
+        return tabs.find((el) => (el.textContent || '').trim().startsWith('WaitBuddy'))
+      }
+      const tab = findTab()
+      if (tab !== undefined) {
+        tab.click()
+        return true
+      }
+      const more = Array.from(document.querySelectorAll('button')).find((el) => {
+        const label = el.getAttribute('aria-label') || el.textContent || ''
+        return label.includes('更多会话视图') || label.includes('session views')
+      })
+      if (more === undefined) return false
+      more.click()
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      const items = Array.from(document.querySelectorAll('button, [role="menuitem"]'))
+      const item = items.find((el) => (el.textContent || '').trim().startsWith('WaitBuddy'))
+      if (item === undefined) return false
+      item.click()
+      return true
+    }
 
     function ViewMenuEntry(props) {
       const t = typeof props.t === 'function' ? props.t : boundT
@@ -2779,13 +2812,9 @@ const CSS = `
         setExpanded((value) => !value)
       }
       // D36: hide all UI (notifications only) and jump to the full view.
-      const goBackground = () => {
+      const goBackground = async () => {
         settingsStore.setPresence('quiet')
-        try {
-          if (viewOpener !== null) viewOpener('waitbuddy')
-        } catch (error) {
-          console.warn('[wait-buddy] open view failed', error)
-        }
+        await openFullView()
       }
       // Expanding near a viewport edge re-clamps so the panel stays visible.
       React.useEffect(() => {
