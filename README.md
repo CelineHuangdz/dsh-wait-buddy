@@ -155,7 +155,7 @@ Client (client.js)                    ▼
 | D28 question / plan-review | ✅ visible since 0.5.0: per-kind alert copy + game auto-pause |
 | D22 unknown terminal | `aborted` + reason text; no new enum |
 
-- Verified on DSH `0.2.1-rc.5`; other versions are not promised.
+- Verified on DSH `0.2.1-rc.5`; other versions are not promised. The full host API surface and the per-version checklist live in [docs/compat.md](docs/compat.md).
 - 320px is covered by visual regression; run a real double-instance smoke before release.
 - Real DSH Canvas drawing and the native approval chain are outside automated coverage (see the Runbook).
 
@@ -213,8 +213,8 @@ CHANGELOG.md        Release notes
 
 ## Roadmap
 
-- **0.4.x**: fix real-device regressions; add DSH end-to-end coverage (approval, two instances, Canvas).
-- **Next**: M4 candidates (more games, score persistence, wait stats/export); real-device E2E for the question/plan-review chain.
+- **0.4.x**: fix real-device regressions; add DSH end-to-end coverage (approval, two instances, Canvas). ✅ question/plan-review real-device chain verified 2026-11-10.
+- **Next**: DSH multi-version compatibility — host API contract + per-version checklist in [docs/compat.md](docs/compat.md); verify against new DSH releases as they ship. M4 wait stats/export is dropped (product decision 2026-11-10).
 - **Never**: in-game approval, auto-approval, or any reverse control over the Agent.
 
 ## Security and privacy

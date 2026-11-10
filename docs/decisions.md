@@ -422,3 +422,14 @@
 2. **空格全状态控制**：贪吃蛇在任何状态空格即正确动作——idle → 开始；running → 暂停；paused → 继续；over → 重开新局。审批等待期间空格无效（维持既有保护）。完整视图与小窗行为一致；方向键仍需焦点在棋盘内。
 
 **影响面**：`client.js`（菜单槽注册、viewOpener、胶囊按钮、空格分派、提示文案）、ui-spec §6.1/§8.4、CHANGELOG。
+
+## D37 兼容性契约与方向收敛（2026-11-10，已实现）
+
+**结论**：
+1. **question/plan-review 真机链路**：产品负责人确认已于 2026-11-10 真机验证通过（D28 的阻塞请求告警 / 游戏自动暂停在真实 Agent 会话下表现正确）；roadmap 中该待办关闭。
+2. **M4 等待统计/导出裁撤**：产品决策不做过路功能；M4 备选池中多游戏切换（D16）与分数持久化（D17）此前已提前实现，等待统计/导出就此移出备选池。
+3. **下一步收敛为 DSH 多版本兼容性**：新增 [compat.md](compat.md)——把插件依赖的全部宿主 API 面（Host 投影契约 / Client 三槽位 / bundle 契约 / Web 平台能力）列成契约表，标注必需性与缺失降级行为；新版本 DSH 发布后照 §3 核对流程验证，再更新 README 版本声明。继续不加 `engines.dsh`（release.md §7 结论）。
+
+**附带事实**：代码侧能力探测已基本就位——`shell.overlay` 与 `conversation.session.header.views.actions` 注册均有 try/catch 优雅降级；硬依赖仅 `sessionProjections`、`conversation.view` 槽位与三服务注入。
+
+**影响面**：`docs/compat.md`（新增）、README / README_CN（兼容声明与 roadmap）、无代码改动。
