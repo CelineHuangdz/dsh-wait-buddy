@@ -2891,7 +2891,6 @@ const CSS = `
           },
           h('span', { className: 'wb-pillDot', 'data-state': status, 'aria-hidden': true }),
           h('span', { className: 'wb-pillText' }, summary),
-          showGame ? h('span', { className: 'wb-pillDrag', 'aria-hidden': true }, '⠿') : null,
           h(
             'button',
             {
@@ -2905,21 +2904,6 @@ const CSS = `
               },
             },
             '⏻',
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'wb-pillToggle',
-              'aria-expanded': showGame ? 'true' : 'false',
-              'aria-label': showGame ? t('pill.collapse') : t('pill.expand'),
-              disabled: isPending,
-              onClick: (event) => {
-                event.stopPropagation()
-                setExpanded((value) => !value)
-              },
-            },
-            showGame ? '▾' : '▸',
           ),
         ),
         showGame
