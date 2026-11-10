@@ -450,3 +450,17 @@
 **结论**：`LEVEL_PRESETS.hard` 新增 `blockMajor: true`。AI 在"堵成五"之后、形状打分之前，扫描候选点：若对手在该点落子会形成 **成四（count≥4 且有一端开放）** 或 **同时制造 ≥2 个威胁（双三 / 三四）**（`gomokuIsMajorThreat`），则必须抢占该点；多个封堵点之间按既有攻防评分择优。中/初级不启用，保持原手感。`gomokuIsMajorThreat` 加入 `__game` 导出供测试。
 
 **影响面**：`client.js`（gomoku 分区）、`test/gomoku.test.js`（新增 7 用例，总 85 + 4 visual）、ui-spec §6.2、CHANGELOG。
+
+## D40 底部预留按 Todo dock 展开态重估（2026-11-10，已实现）
+
+**问题**：产品负责人真机截图发现——宿主 Todo dock 展开出用量/进度行后（约 150px 高），把游戏控制行（速度/重置/空格提示）整个盖住。根因：底部预留 56px（窄窗 100px）是按 dock **收起态**（38px，同 visual mock）估的；mock 与真实 dock 形态不符，导致测试一直绿灯、真机翻车。
+
+**结论**：
+1. `.wb-inner` 底部内边距 56px / 窄窗 100px **统一改为 176px**，按 dock 展开态 150px + 边距预留。
+2. 320px 窄窗内容因此放不下（flex 子元素溢出进 padding 区、`scrollHeight` 不变，无法滚动自救）：棋盘 190px → **140px**，并隐藏页脚免责声明行（信息重复，窄屏省行）。
+3. visual mock 的宿主 dock 从 38px 单行改为 **150px 双行（标题 + 进度条）**，断言从"静态不重叠"改为"**滚到底后控制行不被覆盖**"（先 `scrollTop = scrollHeight` 再量，符合用户真实可达状态）。
+4. harness 新增 `WB_DEBUG=1` 失败诊断输出（computed padding + 关键元素 rect）。
+
+**教训登记**：宿主 overlay 类 mock 必须按**最坏实测形态**建模，按收起态建模会让"测试通过"成为假阴性来源。
+
+**影响面**：`client.js`（CSS）、`tools/visual-layout.mjs`、ui-spec §4（布局间距）、CHANGELOG。

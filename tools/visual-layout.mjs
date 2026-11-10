@@ -13,7 +13,12 @@ html,body{margin:0;height:100%;background:#0b0e14;font-family:ui-sans-serif,syst
 .host-tabs .active{height:100%;display:flex;align-items:center;color:#f2f2f5;border-bottom:2px solid #6aa8ff}
 .host-body{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:#151517}
 .host-view{height:100%;min-height:0}
-.host-todo{position:absolute;left:24px;right:24px;bottom:8px;height:38px;z-index:5;box-sizing:border-box;display:flex;align-items:center;padding:0 14px;border:1px solid #34343a;border-radius:10px;background:#1d1d22;color:#d8d8de;font-size:13px}
+/* Mimic the real host Todo dock: a title row plus an expanded usage/progress
+ * row (~150px when expanded, observed on a real host 2026-11-10; the old 38px
+ * stub let the 56px reserve pass while the real dock covered the controls). */
+.host-todo{position:absolute;left:24px;right:24px;bottom:8px;height:150px;z-index:5;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:0 14px;border:1px solid #34343a;border-radius:10px;background:#1d1d22;color:#d8d8de;font-size:13px}
+.host-todo .row{display:flex;align-items:center;gap:10px;overflow:hidden;white-space:nowrap}
+.host-todo .bar{flex:1;height:4px;border-radius:2px;background:#34343a;overflow:hidden}
 .host-composer{height:96px;flex:none;box-sizing:border-box;padding:16px 24px;border-top:1px solid #2a2a2e;background:#151517;color:#6f6f78;font-size:13px}
 `
 const dict = {
@@ -137,7 +142,7 @@ function render(client, monitorState) {
 }
 
 function hostDocument(markup, title) {
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${HOST_CSS}</style></head><body><div class="host"><div class="host-tabs"><span>Chat</span><span>Trajectory</span><span class="active">WaitBuddy</span><span>${title}</span></div><div class="host-body"><div class="host-view">${markup}</div><div class="host-todo">任务 4 已完成</div></div><div class="host-composer">发消息或创建任务，/ 调用指令，@ 文件或会话</div></div></body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${HOST_CSS}</style></head><body><div class="host"><div class="host-tabs"><span>Chat</span><span>Trajectory</span><span class="active">WaitBuddy</span><span>${title}</span></div><div class="host-body"><div class="host-view">${markup}</div><div class="host-todo"><div class="row">任务 4 已完成</div><div class="row">5h 37% <span class="bar"></span> 周 83% <span class="bar"></span> 详情</div></div></div><div class="host-composer">发消息或创建任务，/ 调用指令，@ 文件或会话</div></div></body></html>`
 }
 
 const cases = [
@@ -216,6 +221,12 @@ for (const entry of cases) {
   const page = await browser.newPage({ viewport: { width: entry.width, height: entry.height } })
   await page.setContent(hostDocument(markup, entry.name))
   await page.waitForTimeout(50)
+  await page.evaluate(() => {
+    // Assert the fully-scrolled state: the user can always scroll the controls
+    // clear of the dock; the reserve (padding-bottom) must make that possible.
+    const inner = document.querySelector('.wb-inner')
+    if (inner) inner.scrollTop = inner.scrollHeight
+  })
   const metrics = await page.evaluate(() => {
     const root = document.querySelector('.wb-root')
     const inner = document.querySelector('.wb-inner')
@@ -290,6 +301,10 @@ for (const entry of cases) {
   }
   if (problems.length > 0) {
     failed = true
+    if (process.env.WB_DEBUG) {
+      const pad = await page.evaluate(() => getComputedStyle(document.querySelector('.wb-inner')).paddingBottom)
+      console.error(`   debug: inner pad-bottom=${pad} todo=${JSON.stringify(metrics.todo)} foot=${JSON.stringify(metrics.foot)} inner=${JSON.stringify(metrics.inner)} scrollH=${metrics.innerScrollHeight} clientH=${metrics.innerClientHeight}`)
+    }
     console.error(`✖ ${entry.name}: ${problems.join('; ')}`)
   } else {
     console.log(`✔ ${entry.name}: ${entry.width}x${entry.height}`)
