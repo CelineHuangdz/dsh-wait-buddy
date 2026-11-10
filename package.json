@@ -46,10 +46,6 @@
     "gomoku"
   ],
   "author": "dzhuang",
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "access": "public"
-  },
   "scripts": {
     "test": "node --test",
     "test:visual": "node tools/visual-layout.mjs",

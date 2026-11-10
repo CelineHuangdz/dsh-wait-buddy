@@ -433,3 +433,20 @@
 **附带事实**：代码侧能力探测已基本就位——`shell.overlay` 与 `conversation.session.header.views.actions` 注册均有 try/catch 优雅降级；硬依赖仅 `sessionProjections`、`conversation.view` 槽位与三服务注入。
 
 **影响面**：`docs/compat.md`（新增）、README / README_CN（兼容声明与 roadmap）、无代码改动。
+
+## D38 分发收敛 GitHub-only + 结构评估（2026-11-10，已实现）
+
+**结论**：
+1. **仅 GitHub 发布**（产品决策）：不发布 npm。`package.json` 移除 `publishConfig`；README / README_CN 安装表删去 npm 行（保留 git / 本地目录 / tarball）；[release.md](release.md) 顶部标注 npm 章节仅作参考，发布 = git push + tag。包名三处一致的要求不变（仍是 Client 模块 id）。
+2. **结构评估：不拆 `client.js`**。宿主按单文件加载插件客户端（D29 实验），拆分必须引入构建/拼接步骤；当前 3.3k 行分区清晰、测试按领域覆盖，未到拆分阈值。**预案**：超过 ~4500 行或加第三款游戏时，引入 `src/` 多文件 + 极简按序拼接脚本生成 `client.js`（产物不变），不引入打包器。
+3. 本轮落地轻量改进：`client.js` 文件头目录索引（§1–§10）+ 各分区横幅注释，纯注释无行为变化。
+
+**影响面**：`package.json`、README / README_CN、release.md、`client.js`（仅注释）、CHANGELOG。
+
+## D39 五子棋高级难度：主要威胁封堵（2026-11-10，已实现）
+
+**问题**：高级 AI 只堵"下一手直接成五"的点；对手做出**活三**后 AI 不抢防，等活四成型已无解——高级难度实际可被简单的活三打法击败。
+
+**结论**：`LEVEL_PRESETS.hard` 新增 `blockMajor: true`。AI 在"堵成五"之后、形状打分之前，扫描候选点：若对手在该点落子会形成 **成四（count≥4 且有一端开放）** 或 **同时制造 ≥2 个威胁（双三 / 三四）**（`gomokuIsMajorThreat`），则必须抢占该点；多个封堵点之间按既有攻防评分择优。中/初级不启用，保持原手感。`gomokuIsMajorThreat` 加入 `__game` 导出供测试。
+
+**影响面**：`client.js`（gomoku 分区）、`test/gomoku.test.js`（新增 7 用例，总 85 + 4 visual）、ui-spec §6.2、CHANGELOG。

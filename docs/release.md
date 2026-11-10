@@ -3,10 +3,12 @@
 > 目标：让别人能在自己的 DSH 里装上 WaitBuddy，并且能升级、卸载、排障。
 > 本文是发布 runbook；界面/行为规格见 [ui-spec.md](ui-spec.md)，决策见 [decisions.md](decisions.md)，变更见 [CHANGELOG](../CHANGELOG.md)。
 
+> **分发渠道（2026-11-10 产品决策）：仅 GitHub。** 不发布 npm——下文 npm 相关章节保留作参考，不再执行；发布 = git push + tag。安装方式见 README「Install」。
+
 ## 0. 本次发布决定（2026-11-05，v0.4.1）
 
-- 包名：**`dsh-wait-buddy`**（不带 scope）。2026-11-04 用 `npm view dsh-wait-buddy version` 确认 npm 上 404、名字可用。
-- 发布形态：公共 npm 包；`package.json` 已移除 `private`，`version` = `0.4.1`。
+- 包名：**`dsh-wait-buddy`**（不带 scope）。包名仍是 Client 模块 id，必须与 `cordis.patch.yml` / `client.js` 三处一致。
+- ~~发布形态：公共 npm 包~~（2026-11-10 起裁撤，仅 GitHub）。
 - 三处标识一致：`package.json` / `cordis.patch.yml` / `client.js` 均为 `dsh-wait-buddy`。
 
 ## 1. 先选分发形态

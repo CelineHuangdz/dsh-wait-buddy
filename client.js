@@ -13,6 +13,26 @@
  *
  * The panel is strictly read-only: it never answers an approval, never cancels
  * or steers a turn, and never blocks the native approval dialog.
+ *
+ * Layout (search anchors, top to bottom inside the factory):
+ *   §1  Dictionaries (zh / en)            — `Simplified Chinese dictionary`
+ *   §2  Monitor projection & signals      — `EMPTY_ACTIVITY`, `composeMonitor`,
+ *                                           `createSignalHub`, `createMonitorSource`
+ *   §3  Status copy & formatting          — `FEED_LABEL`, `statusText`, `clockOf`
+ *   §4  Snake game core (M2)              — banner `M2: embedded Snake game`
+ *   §5  Presence, settings, notifier      — `createPresenceStore`, `createNotifier`
+ *   §6  Canvas drawing (snake + gomoku)   — `drawGame`
+ *   §7  Input & game overlays             — `snakeSpaceAction`, `gameOverlay`
+ *   §8  Gomoku (board + heuristic AI)     — banner `Gomoku (五子棋)`
+ *   §9  Shared stores & UI components     — `GameArea`, `FloatGame`,
+ *                                           `ViewMenuEntry`, `PresencePill`,
+ *                                           `WaitBuddyView`
+ *   §10 Module registration               — `inject: ['slots', 'sessions', 'locale']`
+ *
+ * Single-file note: the host loads exactly one client.js per plugin, so this
+ * file intentionally stays one module. If it grows past ~4.5k lines or gains a
+ * third game, introduce src/ + a concat build (see decisions D38) — not a
+ * bundler.
  */
 window.__ModuleLoader__.load({
   id: 'dsh-wait-buddy',
@@ -23,6 +43,9 @@ window.__ModuleLoader__.load({
     /** Locale namespace owned by this plugin. */
     const NS = 'waitBuddy'
 
+    // ---------------------------------------------------------------------
+    // §1 Dictionaries. The zh key set is the source of truth; en must match.
+    // ---------------------------------------------------------------------
     /** Simplified Chinese dictionary — the key-set source of truth. */
     const zh = {
       'view.label': 'WaitBuddy',
@@ -235,6 +258,10 @@ window.__ModuleLoader__.load({
 
     /** Neutral state before any projection arrives. */
     /** Stable empty feed so unchanged snapshots keep the same reference. */
+    // ---------------------------------------------------------------------
+    // §2 Monitor projection fold. Pure logic: log events -> snapshot state.
+    // Tested via test/fold.test.js through the __monitor export.
+    // ---------------------------------------------------------------------
     const EMPTY_ACTIVITY = []
 
     const EMPTY_STATE = {
@@ -657,6 +684,9 @@ window.__ModuleLoader__.load({
       }
     }
 
+    // ---------------------------------------------------------------------
+    // §3 Status copy & formatting. Pure functions over the snapshot state.
+    // ---------------------------------------------------------------------
     /** Locale keys for the activity kinds (kept literal so doc/code checks can see them). */
     const FEED_LABEL = {
       command: 'feed.command',
@@ -1200,6 +1230,9 @@ window.__ModuleLoader__.load({
      * pauses the game via the `hidden` reason; returning to normal releases it
      * (the round stays paused, manual-resume).
      */
+    // ---------------------------------------------------------------------
+    // §5 Presence (pill / quiet), settings persistence, system notifications.
+    // ---------------------------------------------------------------------
     function createPresenceStore(settings, game) {
       let quiet = false
       const listeners = new Set()
@@ -1304,6 +1337,10 @@ window.__ModuleLoader__.load({
 
 
     /** Logical 324x324 board drawn into a 2x backing store for crisp edges. */
+    // ---------------------------------------------------------------------
+    // §6 Canvas drawing. Imperative painting shared by the full view and the
+    // floating panel; never holds module-level DOM refs (D8).
+    // ---------------------------------------------------------------------
     function drawGame(canvas, state) {
       if (canvas === null || canvas === undefined) return
       const width = canvas.clientWidth
@@ -1543,7 +1580,7 @@ window.__ModuleLoader__.load({
     const LEVEL_PRESETS = {
       easy: { radius: 1, defense: 0.35, top: 3 },
       medium: { radius: 2, defense: 0.9, top: 1 },
-      hard: { radius: 3, defense: 1.15, top: 1, doubleBonus: 800 },
+      hard: { radius: 3, defense: 1.15, top: 1, doubleBonus: 800, blockMajor: true },
     }
 
     const gomokuIndex = (x, y) => y * GOMOKU_SIZE + x
@@ -1659,7 +1696,35 @@ window.__ModuleLoader__.load({
       return threats
     }
 
-    /** Win now, usually block now, otherwise the best weighted point for the level. */
+    /** A placed stone threatens a forced win soon: a live/closed four, or two
+     * simultaneous threats (double three / three-plus-four). Blocking such a
+     * point cannot wait for the shape-score pass. */
+    function gomokuIsMajorThreat(board, index, color) {
+      const x = index % GOMOKU_SIZE
+      const y = Math.floor(index / GOMOKU_SIZE)
+      let threats = 0
+      for (const [dx, dy] of GOMOKU_DIRS) {
+        let count = 1
+        let open = 0
+        for (const sign of [1, -1]) {
+          let cx = x + dx * sign
+          let cy = y + dy * sign
+          while (inGomoku(cx, cy) && board[gomokuIndex(cx, cy)] === color) {
+            count += 1
+            cx += dx * sign
+            cy += dy * sign
+          }
+          if (inGomoku(cx, cy) && board[gomokuIndex(cx, cy)] === STONE_EMPTY) open += 1
+        }
+        if (count >= 4 && open >= 1) return true
+        if (count >= 3 && open >= 1) threats += 1
+      }
+      return threats >= 2
+    }
+
+    /** Win now, block now, then — on levels with `blockMajor` — block any
+     * point where the human would create a major threat (four / double three);
+     * otherwise the best weighted point for the level. */
     function gomokuAiMove(board, levelId, random) {
       const level = LEVEL_PRESETS[levelId] || LEVEL_PRESETS.medium
       const roll = typeof random === 'function' ? random : Math.random
@@ -1678,6 +1743,24 @@ window.__ModuleLoader__.load({
         const win = gomokuWins(board, index, STONE_HUMAN)
         board[index] = STONE_EMPTY
         if (win) return index
+      }
+      if (level.blockMajor) {
+        let bestBlock = -1
+        let bestBlockScore = -Infinity
+        for (const index of candidates) {
+          board[index] = STONE_HUMAN
+          const major = gomokuIsMajorThreat(board, index, STONE_HUMAN)
+          board[index] = STONE_EMPTY
+          if (!major) continue
+          const score =
+            gomokuShape(board, index, STONE_AI) +
+            gomokuShape(board, index, STONE_HUMAN) * level.defense
+          if (score > bestBlockScore) {
+            bestBlockScore = score
+            bestBlock = index
+          }
+        }
+        if (bestBlock >= 0) return bestBlock
       }
       const scored = candidates.map((index) => {
         let score =
@@ -2341,6 +2424,9 @@ const CSS = `
 @container (max-width:480px){.wb-inner{padding:8px 12px 100px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:190px;min-height:190px;max-height:190px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
 `
 
+    // ---------------------------------------------------------------------
+    // §9 Shared stores & UI components (full view, floating panel, pill).
+    // ---------------------------------------------------------------------
     /** WaitBuddy status board (M1: monitoring only, no game). */
     function useMonitorState(sessionId, initialState) {
       const [state, setState] = React.useState(() =>
@@ -3164,6 +3250,10 @@ const CSS = `
       )
     }
 
+    // ---------------------------------------------------------------------
+    // §10 Module registration. The host injects these three services before
+    // apply(); missing optional slots degrade per docs/compat.md.
+    // ---------------------------------------------------------------------
     return {
       inject: ['slots', 'sessions', 'locale'],
       apply(ctx) {
@@ -3330,6 +3420,7 @@ const CSS = `
         placeGomoku,
         gomokuWins,
         gomokuAiMove,
+        gomokuIsMajorThreat,
         GOMOKU_SIZE,
         createGameState,
         startGame,

@@ -93,10 +93,9 @@ In DSH: sidebar → **Plugins** → **Add plugin**, then use one of:
 
 | Method | Value | Notes |
 |---|---|---|
-| Git (recommended, includes 0.4.1) | `github:CelineHuangdz/dsh-wait-buddy` | Follows the latest commit |
+| Git (recommended) | `github:CelineHuangdz/dsh-wait-buddy` | Follows the latest commit; the only published channel |
 | Local directory | `/abs/path/to/dsh-wait-buddy` | For development; run `pnpm install` first |
-| Tarball | absolute path to `dist/dsh-wait-buddy-0.4.1.tgz` | Create with `npm pack --pack-destination dist` |
-| npm | `dsh-wait-buddy` | The npm version may lag behind this repository |
+| Tarball | absolute path to `dist/dsh-wait-buddy-x.y.z.tgz` | Create with `npm pack --pack-destination dist` |
 
 After installing, enable the plugin and refresh the page, then select **WaitBuddy** in the session view tabs.
 
