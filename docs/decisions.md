@@ -517,3 +517,20 @@
 4. 行为保持验证：92 单测 + 4 视觉全绿；新增 `test/games-registry.test.js` 锁定 adapter 契约面。**加第三款游戏 = 加一个 adapter 对象 + 一组组件**。
 
 **影响面**：`src/client/07/08/08b(新)/09/10`、`test/games-registry.test.js`、README、CHANGELOG。
+
+## D46 第三款游戏：扫雷（2026-11-11，已实现，0.9.0）
+
+**动机**：D45 GameAdapter 落地后，第三款游戏应是"加一个 adapter"的验证案例；产品上为等待场景补一款纯点击、随时中断的回合制游戏。
+
+**选型**：扫雷（Minesweeper）。理由：① 纯点击交互，完整视图与胶囊小窗**零差异**；② 回合制 → `pauseOnLeave: false`、`keyboard: false`，与现有 pause/键盘门控语义正交；③ 首次点击安全、洪水展开、胜负判定都是纯逻辑，易单测。否决 2048（胶囊需键盘）、俄罗斯方块（tick + 键盘密集，注意力需求高）。
+
+**规格**：
+1. 难度三档：初级 9×9×10 雷 / 中级 12×12×24 / 高级 16×16×40；全局设置 `msLevel`（默认初级），完整视图与胶囊共用。
+2. **首次点击安全**：雷在首次揭示后布设，排除首击格及其 8 邻域。
+3. 交互：左键/单击揭示；右键（contextmenu）或**旗子模式**下单击插旗（触屏友好）；旗子模式是 store 级状态，两个表面共享。
+4. 胜利：所有非雷格揭示 → 自动给剩余雷插旗；失败：揭示全部雷。
+5. adapter：`Board/Setting/Controls/Float/FloatCtl` 全套；绘制为 Canvas（格子 + 数字配色 + 旗 + 雷）。
+
+**红线不变**：游戏不接 Agent 信号（无奖励/暂停联动——回合制无 tick 可暂停，审批时照常可玩但不给分；与 M0 §8 的联动语义不冲突，联动仍只作用于贪吃蛇）。
+
+**影响面**：`src/client/08c-minesweeper.mjs`（新）、01 词典、08 设置、08b 注册表、10 运行时/导出、`test/minesweeper.test.js`、ui-spec §6.4、README/CHANGELOG。

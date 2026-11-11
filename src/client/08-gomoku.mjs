@@ -266,6 +266,8 @@
     const DEFAULT_SETTINGS = {
       speed: 'normal',
       level: 'medium',
+      // 扫雷难度（D46）：默认初级。
+      msLevel: 'easy',
       // 低调模式（D29 §8.7 / D31）：默认胶囊 + 系统通知开。
       presence: 'pill',
       notify: true,
@@ -279,6 +281,13 @@
     const PILL_CORNERS = ['top-right', 'bottom-right', 'top-left']
     const SPEED_LABEL = { slow: 'speed.slow', normal: 'speed.normal', fast: 'speed.fast' }
     const LEVEL_LABEL = { easy: 'level.easy', medium: 'level.medium', hard: 'level.hard' }
+    // Minesweeper presets (D46); lives here so createSettingsStore sees it.
+    const MS_LEVEL_PRESETS = {
+      easy: { cols: 9, rows: 9, mines: 10 },
+      medium: { cols: 12, rows: 12, mines: 24 },
+      hard: { cols: 16, rows: 16, mines: 40 },
+    }
+    const MS_LEVEL_LABEL = { easy: 'ms.level.easy', medium: 'ms.level.medium', hard: 'ms.level.hard' }
 
     /** Player preferences; corrupt or unavailable storage falls back to defaults. */
     function readSettings() {
@@ -289,6 +298,7 @@
         return {
           speed: SPEED_PRESETS[parsed.speed] === undefined ? DEFAULT_SETTINGS.speed : parsed.speed,
           level: LEVEL_PRESETS[parsed.level] === undefined ? DEFAULT_SETTINGS.level : parsed.level,
+          msLevel: MS_LEVEL_PRESETS[parsed.msLevel] === undefined ? DEFAULT_SETTINGS.msLevel : parsed.msLevel,
           presence: PRESENCE_MODES.includes(parsed.presence) ? parsed.presence : DEFAULT_SETTINGS.presence,
           notify: typeof parsed.notify === 'boolean' ? parsed.notify : DEFAULT_SETTINGS.notify,
           shortcut: typeof parsed.shortcut === 'boolean' ? parsed.shortcut : DEFAULT_SETTINGS.shortcut,
@@ -333,6 +343,10 @@
         setLevel(id) {
           if (LEVEL_PRESETS[id] === undefined || state.level === id) return
           publish({ ...state, level: id })
+        },
+        setMsLevel(id) {
+          if (MS_LEVEL_PRESETS[id] === undefined || state.msLevel === id) return
+          publish({ ...state, msLevel: id })
         },
         setPresence(id) {
           if (!PRESENCE_MODES.includes(id) || state.presence === id) return
@@ -756,7 +770,7 @@ const CSS = `
 .wb-setting{display:flex;align-items:center;gap:8px;flex:none}
 .wb-settingLabel{margin-right:2px;font-size:12px;line-height:20px;color:var(--dsw-alias-label-secondary)}
 .wb-squareBoard{flex:0 1 auto;width:min(100%,max(200px,min(46vh,520px)));max-width:100%;height:auto;min-height:0;max-height:520px;aspect-ratio:1/1;border:0;background:transparent;align-self:center;margin:0 auto}
-@container (max-width:480px){.wb-inner{padding:8px 12px 176px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-disclaimer{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:140px;min-height:140px;max-height:140px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
+@container (max-width:480px){.wb-inner{padding:8px 12px 176px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-disclaimer{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:128px;min-height:128px;max-height:128px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
 .wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
 @media (prefers-reduced-motion: reduce){.wb-pulseFill{animation:none}.wb-reward{animation:none;opacity:1}.wb-notice{animation:none;opacity:1}}
 `

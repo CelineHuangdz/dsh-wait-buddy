@@ -145,6 +145,18 @@ window.__ModuleLoader__.load({
       'notify.aborted': '会话 {session} 任务已中断',
       'game.hiddenPausedBody': '已一键隐藏（Ctrl+Shift+W），游戏保持暂停',
       'game.hiddenResumeBody': '已从隐藏中恢复，按空格或点击继续',
+      'ms.title': '扫雷',
+      'ms.level': '难度',
+      'ms.level.easy': '初级',
+      'ms.level.medium': '中级',
+      'ms.level.hard': '高级',
+      'ms.mines': '剩 {left} 雷',
+      'ms.flagMode': '旗子模式',
+      'ms.won': '排雷成功 ✅',
+      'ms.lost': '踩雷了 💥',
+      'ms.again': '再来一局',
+      'ms.hint': '单击揭开，右键或旗子模式插旗；首次点击必定安全',
+      'ms.canvasLabel': '扫雷棋盘，剩 {left} 雷',
       'presence.mode': '存在感',
       'presence.quiet': '后台',
       'presence.pill': '胶囊',
@@ -258,6 +270,18 @@ window.__ModuleLoader__.load({
       'notify.aborted': 'Session {session} was interrupted',
       'game.hiddenPausedBody': 'Hidden by shortcut (Ctrl+Shift+W); the game stays paused',
       'game.hiddenResumeBody': 'Restored from hidden — press Space or click Resume',
+      'ms.title': 'Minesweeper',
+      'ms.level': 'Level',
+      'ms.level.easy': 'Easy',
+      'ms.level.medium': 'Medium',
+      'ms.level.hard': 'Hard',
+      'ms.mines': '{left} mines left',
+      'ms.flagMode': 'Flag mode',
+      'ms.won': 'Field cleared ✅',
+      'ms.lost': 'Boom 💥',
+      'ms.again': 'Play again',
+      'ms.hint': 'Click to reveal; right-click or flag mode to flag. First click is safe.',
+      'ms.canvasLabel': 'Minesweeper board, {left} mines left',
       'presence.mode': 'Presence',
       'presence.quiet': 'Background',
       'presence.pill': 'Pill',
@@ -1942,6 +1966,8 @@ window.__ModuleLoader__.load({
     const DEFAULT_SETTINGS = {
       speed: 'normal',
       level: 'medium',
+      // 扫雷难度（D46）：默认初级。
+      msLevel: 'easy',
       // 低调模式（D29 §8.7 / D31）：默认胶囊 + 系统通知开。
       presence: 'pill',
       notify: true,
@@ -1955,6 +1981,13 @@ window.__ModuleLoader__.load({
     const PILL_CORNERS = ['top-right', 'bottom-right', 'top-left']
     const SPEED_LABEL = { slow: 'speed.slow', normal: 'speed.normal', fast: 'speed.fast' }
     const LEVEL_LABEL = { easy: 'level.easy', medium: 'level.medium', hard: 'level.hard' }
+    // Minesweeper presets (D46); lives here so createSettingsStore sees it.
+    const MS_LEVEL_PRESETS = {
+      easy: { cols: 9, rows: 9, mines: 10 },
+      medium: { cols: 12, rows: 12, mines: 24 },
+      hard: { cols: 16, rows: 16, mines: 40 },
+    }
+    const MS_LEVEL_LABEL = { easy: 'ms.level.easy', medium: 'ms.level.medium', hard: 'ms.level.hard' }
 
     /** Player preferences; corrupt or unavailable storage falls back to defaults. */
     function readSettings() {
@@ -1965,6 +1998,7 @@ window.__ModuleLoader__.load({
         return {
           speed: SPEED_PRESETS[parsed.speed] === undefined ? DEFAULT_SETTINGS.speed : parsed.speed,
           level: LEVEL_PRESETS[parsed.level] === undefined ? DEFAULT_SETTINGS.level : parsed.level,
+          msLevel: MS_LEVEL_PRESETS[parsed.msLevel] === undefined ? DEFAULT_SETTINGS.msLevel : parsed.msLevel,
           presence: PRESENCE_MODES.includes(parsed.presence) ? parsed.presence : DEFAULT_SETTINGS.presence,
           notify: typeof parsed.notify === 'boolean' ? parsed.notify : DEFAULT_SETTINGS.notify,
           shortcut: typeof parsed.shortcut === 'boolean' ? parsed.shortcut : DEFAULT_SETTINGS.shortcut,
@@ -2009,6 +2043,10 @@ window.__ModuleLoader__.load({
         setLevel(id) {
           if (LEVEL_PRESETS[id] === undefined || state.level === id) return
           publish({ ...state, level: id })
+        },
+        setMsLevel(id) {
+          if (MS_LEVEL_PRESETS[id] === undefined || state.msLevel === id) return
+          publish({ ...state, msLevel: id })
         },
         setPresence(id) {
           if (!PRESENCE_MODES.includes(id) || state.presence === id) return
@@ -2432,7 +2470,7 @@ const CSS = `
 .wb-setting{display:flex;align-items:center;gap:8px;flex:none}
 .wb-settingLabel{margin-right:2px;font-size:12px;line-height:20px;color:var(--dsw-alias-label-secondary)}
 .wb-squareBoard{flex:0 1 auto;width:min(100%,max(200px,min(46vh,520px)));max-width:100%;height:auto;min-height:0;max-height:520px;aspect-ratio:1/1;border:0;background:transparent;align-self:center;margin:0 auto}
-@container (max-width:480px){.wb-inner{padding:8px 12px 176px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-disclaimer{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:140px;min-height:140px;max-height:140px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
+@container (max-width:480px){.wb-inner{padding:8px 12px 176px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-disclaimer{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:128px;min-height:128px;max-height:128px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
 .wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
 @media (prefers-reduced-motion: reduce){.wb-pulseFill{animation:none}.wb-reward{animation:none;opacity:1}.wb-notice{animation:none;opacity:1}}
 `
@@ -2750,6 +2788,477 @@ const CSS = `
     }
 
     const GAME_ORDER = ['snake', 'gomoku']
+
+    // ---------------------------------------------------------------------
+    // §8c Minesweeper (D46): the third game, and the proof that a new game
+    // is one adapter entry. Pure logic first (unit-tested via __game), then
+    // the store, canvas drawing, and the adapter components.
+    // ---------------------------------------------------------------------
+
+    /** Neighbour indices of one cell (8-neighbourhood, board edges honored). */
+    function msNeighbors(state, index) {
+      const x = index % state.cols
+      const y = Math.floor(index / state.cols)
+      const out = []
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue
+          const nx = x + dx
+          const ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= state.cols || ny >= state.rows) continue
+          out.push(ny * state.cols + nx)
+        }
+      }
+      return out
+    }
+
+    /** Fresh board; mines are placed lazily after the first reveal. */
+    function createMinesState(levelId) {
+      const level = MS_LEVEL_PRESETS[levelId] === undefined ? 'easy' : levelId
+      const preset = MS_LEVEL_PRESETS[level]
+      const total = preset.cols * preset.rows
+      return {
+        level,
+        cols: preset.cols,
+        rows: preset.rows,
+        mines: preset.mines,
+        mineAt: new Array(total).fill(false),
+        revealed: new Array(total).fill(false),
+        flagged: new Array(total).fill(false),
+        counts: new Array(total).fill(0),
+        minesPlaced: false,
+        revealedCount: 0,
+        flagMode: false,
+        status: 'playing',
+      }
+    }
+
+    /** Place mines excluding the first-click cell and its neighbourhood. */
+    function msPlaceMines(state, safeIndex, random) {
+      const total = state.cols * state.rows
+      const forbidden = new Set([safeIndex, ...msNeighbors(state, safeIndex)])
+      const candidates = []
+      for (let i = 0; i < total; i += 1) {
+        if (!forbidden.has(i)) candidates.push(i)
+      }
+      // Partial Fisher–Yates on the candidate pool.
+      const pool = candidates.slice()
+      const need = Math.min(state.mines, pool.length)
+      for (let i = 0; i < need; i += 1) {
+        const j = i + Math.floor(random() * (pool.length - i))
+        const swap = pool[i]
+        pool[i] = pool[j]
+        pool[j] = swap
+      }
+      const mineAt = state.mineAt.slice()
+      const counts = state.counts.slice()
+      for (let i = 0; i < need; i += 1) mineAt[pool[i]] = true
+      for (let i = 0; i < total; i += 1) {
+        if (!mineAt[i]) continue
+        for (const n of msNeighbors(state, i)) counts[n] += 1
+      }
+      return { mineAt, counts, minesPlaced: true }
+    }
+
+    /**
+     * Reveal one cell. First click is always safe (mines are placed around
+     * it); zero-count cells flood-fill; hitting a mine loses and unmasks the
+     * field; revealing every safe cell wins and flags the remaining mines.
+     */
+    function msRevealAt(prev, index, random = Math.random) {
+      if (prev.status !== 'playing') return prev
+      if (index < 0 || index >= prev.revealed.length) return prev
+      if (prev.revealed[index] || prev.flagged[index]) return prev
+      let state = prev
+      if (!state.minesPlaced) {
+        state = { ...state, ...msPlaceMines(state, index, random) }
+      }
+      if (state.mineAt[index]) {
+        const revealed = state.revealed.slice()
+        for (let i = 0; i < revealed.length; i += 1) {
+          if (state.mineAt[i]) revealed[i] = true
+        }
+        return { ...state, revealed, revealedCount: state.revealedCount + 1, status: 'lost' }
+      }
+      const revealed = state.revealed.slice()
+      const flagged = state.flagged.slice()
+      let opened = 0
+      const stack = [index]
+      while (stack.length > 0) {
+        const at = stack.pop()
+        if (revealed[at] || flagged[at]) continue
+        revealed[at] = true
+        opened += 1
+        if (state.counts[at] === 0) {
+          for (const n of msNeighbors(state, at)) {
+            if (!revealed[n] && !state.mineAt[n]) stack.push(n)
+          }
+        }
+      }
+      const revealedCount = state.revealedCount + opened
+      if (revealedCount === revealed.length - state.mines) {
+        for (let i = 0; i < flagged.length; i += 1) {
+          if (state.mineAt[i]) flagged[i] = true
+        }
+        return { ...state, revealed, flagged, revealedCount, status: 'won' }
+      }
+      return { ...state, revealed, revealedCount }
+    }
+
+    /** Toggle a flag on an unrevealed cell (never reveals). */
+    function msToggleFlag(prev, index) {
+      if (prev.status !== 'playing') return prev
+      if (index < 0 || index >= prev.revealed.length) return prev
+      if (prev.revealed[index]) return prev
+      const flagged = prev.flagged.slice()
+      flagged[index] = !flagged[index]
+      return { ...prev, flagged }
+    }
+
+    /** Flags still standing minus those placed = mines still to find. */
+    function msMinesLeft(state) {
+      let placed = 0
+      for (let i = 0; i < state.flagged.length; i += 1) {
+        if (state.flagged[i]) placed += 1
+      }
+      return state.mines - placed
+    }
+
+    function createMinesweeperStore() {
+      let state = createMinesState()
+      const listeners = new Set()
+      const publish = (next) => {
+        if (next === state) return
+        state = next
+        for (const listener of [...listeners]) listener()
+      }
+      return {
+        getSnapshot: () => state,
+        subscribe(listener) {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+        place(index) {
+          publish(msRevealAt(state, index))
+        },
+        toggleFlag(index) {
+          publish(msToggleFlag(state, index))
+        },
+        toggleFlagMode() {
+          publish({ ...state, flagMode: !state.flagMode })
+        },
+        reset(levelId) {
+          publish(createMinesState(levelId))
+        },
+      }
+    }
+
+    let minesweeperStoreImpl = null
+    const minesweeperStore = forwardStore(() => minesweeperStoreImpl)
+
+    /** Cell fill for one number value (classic palette). */
+    const MS_NUMBER_COLOR = ['#0000ff', '#008000', '#ff0000', '#000080', '#800000', '#008080', '#000000', '#808080']
+
+    /** Imperative board painting; shared by the full view and the pill mini. */
+    function drawMinesweeper(canvas, state) {
+      if (canvas === null || canvas === undefined) return
+      const width = canvas.clientWidth
+      const height = canvas.clientHeight
+      if (width === 0 || height === 0) return
+      const ctx = canvas.getContext('2d')
+      if (ctx === null) return
+      const cell = Math.floor(Math.min(width / state.cols, height / state.rows))
+      const ox = Math.floor((width - cell * state.cols) / 2)
+      const oy = Math.floor((height - cell * state.rows) / 2)
+      ctx.clearRect(0, 0, width, height)
+      for (let y = 0; y < state.rows; y += 1) {
+        for (let x = 0; x < state.cols; x += 1) {
+          const i = y * state.cols + x
+          const px = ox + x * cell
+          const py = oy + y * cell
+          if (state.revealed[i]) {
+            const boom = state.mineAt[i] && state.status === 'lost'
+            ctx.fillStyle = boom ? '#5c1f24' : '#16202f'
+            ctx.fillRect(px, py, cell, cell)
+            if (state.mineAt[i]) {
+              ctx.fillStyle = '#0a0a0a'
+              ctx.beginPath()
+              ctx.arc(px + cell / 2, py + cell / 2, cell * 0.26, 0, Math.PI * 2)
+              ctx.fill()
+            } else if (state.counts[i] > 0) {
+              ctx.fillStyle = MS_NUMBER_COLOR[(state.counts[i] - 1) % MS_NUMBER_COLOR.length]
+              ctx.font = `600 ${Math.floor(cell * 0.55)}px ui-sans-serif, system-ui, sans-serif`
+              ctx.textAlign = 'center'
+              ctx.textBaseline = 'middle'
+              ctx.fillText(String(state.counts[i]), px + cell / 2, py + cell / 2 + 1)
+            }
+          } else {
+            // Covered cell: raised tile with a hairline edge.
+            ctx.fillStyle = state.flagMode ? '#26354d' : '#22304a'
+            ctx.fillRect(px, py, cell, cell)
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+            ctx.strokeRect(px + 0.5, py + 0.5, cell - 1, cell - 1)
+            if (state.flagged[i]) {
+              ctx.fillStyle = '#e5484d'
+              ctx.beginPath()
+              ctx.moveTo(px + cell * 0.62, py + cell * 0.25)
+              ctx.lineTo(px + cell * 0.3, py + cell * 0.45)
+              ctx.lineTo(px + cell * 0.62, py + cell * 0.65)
+              ctx.closePath()
+              ctx.fill()
+            }
+          }
+        }
+      }
+    }
+
+    /** Map one click to a cell index (or -1 outside the field). */
+    function msPointAt(canvas, state, clientX, clientY) {
+      const rect = canvas.getBoundingClientRect()
+      const cell = Math.min(rect.width / state.cols, rect.height / state.rows)
+      const ox = (rect.width - cell * state.cols) / 2
+      const oy = (rect.height - cell * state.rows) / 2
+      const x = Math.floor((clientX - rect.left - ox) / cell)
+      const y = Math.floor((clientY - rect.top - oy) / cell)
+      if (x < 0 || y < 0 || x >= state.cols || y >= state.rows) return -1
+      return y * state.cols + x
+    }
+
+    /** Terminal overlay (won / lost). */
+    function msOverlay(t, state, focusRoot) {
+      if (state.status === 'playing') return null
+      return h(
+        'div',
+        { className: 'wb-overlay' },
+        h('div', { className: 'wb-overlayTitle' }, state.status === 'won' ? t('ms.won') : t('ms.lost')),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'wb-btn wb-btnPrimary',
+            onClick: () => {
+              minesweeperStore.reset(settingsStore.getSnapshot().msLevel)
+              if (typeof focusRoot === 'function') focusRoot()
+            },
+          },
+          t('ms.again'),
+        ),
+      )
+    }
+
+    /** Full-view board: square canvas, click reveals, contextmenu flags. */
+    function MSBoard({ t, focusRoot, boardRef, canvasRef }) {
+      const [ms, setMs] = React.useState(() => minesweeperStore.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setMs(minesweeperStore.getSnapshot())
+        sync()
+        return minesweeperStore.subscribe(sync)
+      }, [])
+      React.useEffect(() => {
+        drawMinesweeper(canvasRef.current, ms)
+      }, [ms])
+      React.useEffect(() => {
+        const element = boardRef.current
+        if (element === null) return undefined
+        const measure = () => drawMinesweeper(canvasRef.current, minesweeperStore.getSnapshot())
+        measure()
+        if (typeof ResizeObserver !== 'function') return undefined
+        const observer = new ResizeObserver(measure)
+        observer.observe(element)
+        return () => observer.disconnect()
+      }, [])
+      const play = (event, forceFlag) => {
+        if (ms.status !== 'playing' || canvasRef.current === null) return
+        const index = msPointAt(canvasRef.current, ms, event.clientX, event.clientY)
+        if (index < 0) return
+        if (forceFlag || ms.flagMode) minesweeperStore.toggleFlag(index)
+        else minesweeperStore.place(index)
+      }
+      return h(
+        'div',
+        { className: 'wb-boardWrap wb-squareBoard', tabIndex: 0, ref: boardRef },
+        h('canvas', {
+          ref: canvasRef,
+          className: 'wb-board',
+          role: 'img',
+          'aria-label': t('ms.canvasLabel', { left: msMinesLeft(ms) }),
+          onClick: (event) => play(event, false),
+          onContextMenu: (event) => {
+            event.preventDefault()
+            play(event, true)
+          },
+        }),
+        msOverlay(t, ms, focusRoot),
+      )
+    }
+
+    /** Full-view settings row: difficulty presets. */
+    function MSSetting({ t, settings }) {
+      return h(
+        'div',
+        { className: 'wb-setting' },
+        h('span', { className: 'wb-settingLabel' }, t('ms.level')),
+        h(
+          'div',
+          { className: 'wb-seg' },
+          gameSettingButtons(t, MS_LEVEL_LABEL, settings.msLevel, (id) => settingsStore.setMsLevel(id)),
+        ),
+      )
+    }
+
+    /** Full-view foot: mines left, flag-mode toggle, reset, hint. */
+    function MSControls({ t }) {
+      const [ms, setMs] = React.useState(() => minesweeperStore.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setMs(minesweeperStore.getSnapshot())
+        sync()
+        return minesweeperStore.subscribe(sync)
+      }, [])
+      return h(
+        React.Fragment,
+        null,
+        h('div', { className: 'wb-caption' }, t('ms.mines', { left: msMinesLeft(ms) })),
+        h(
+          'div',
+          { className: 'wb-gameActions' },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-btn',
+              'data-active': ms.flagMode ? 'true' : 'false',
+              onClick: () => minesweeperStore.toggleFlagMode(),
+            },
+            `🚩 ${t('ms.flagMode')}`,
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-btn',
+              onClick: () => minesweeperStore.reset(settingsStore.getSnapshot().msLevel),
+            },
+            t('game.reset'),
+          ),
+        ),
+        h('div', { className: 'wb-hint' }, t('ms.hint')),
+      )
+    }
+
+    /** Pill mini board: same rules on a ~184px square. */
+    function FloatMinesweeper({ t }) {
+      const [state, setState] = React.useState(() => minesweeperStore.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setState(minesweeperStore.getSnapshot())
+        sync()
+        return minesweeperStore.subscribe(sync)
+      }, [])
+      const canvasRef = React.useRef(null)
+      React.useEffect(() => {
+        drawMinesweeper(canvasRef.current, state)
+      }, [state])
+      const play = (event, forceFlag) => {
+        if (state.status !== 'playing' || canvasRef.current === null) return
+        const index = msPointAt(canvasRef.current, state, event.clientX, event.clientY)
+        if (index < 0) return
+        if (forceFlag || state.flagMode) minesweeperStore.toggleFlag(index)
+        else minesweeperStore.place(index)
+      }
+      const overlay =
+        state.status === 'playing'
+          ? null
+          : h(
+              'div',
+              { className: 'wb-pillMiniOverlay' },
+              h('span', { className: 'wb-pillMiniScore' }, state.status === 'won' ? t('ms.won') : t('ms.lost')),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'wb-pillMiniBtn',
+                  onClick: () => minesweeperStore.reset(settingsStore.getSnapshot().msLevel),
+                },
+                t('ms.again'),
+              ),
+            )
+      return h(
+        'div',
+        { className: 'wb-pillGomoku' },
+        h('canvas', {
+          ref: canvasRef,
+          role: 'img',
+          'aria-label': t('ms.canvasLabel', { left: msMinesLeft(state) }),
+          onClick: (event) => play(event, false),
+          onContextMenu: (event) => {
+            event.preventDefault()
+            play(event, true)
+          },
+        }),
+        overlay,
+      )
+    }
+
+    /** Pill control row: flag-mode toggle, reset, background. */
+    function PillMinesweeperCtl({ t, goBackground }) {
+      const [state, setState] = React.useState(() => minesweeperStore.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setState(minesweeperStore.getSnapshot())
+        sync()
+        return minesweeperStore.subscribe(sync)
+      }, [])
+      return h(
+        'div',
+        { className: 'wb-pillCtl' },
+        h(
+          'span',
+          null,
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-pillCtlBtn',
+              'data-active': state.flagMode ? 'true' : 'false',
+              onClick: () => minesweeperStore.toggleFlagMode(),
+            },
+            `🚩 ${t('ms.flagMode')}`,
+          ),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'wb-pillCtlBtn',
+            onClick: () => minesweeperStore.reset(settingsStore.getSnapshot().msLevel),
+          },
+          t('game.reset'),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'wb-pillCtlBtn',
+            'aria-label': t('pill.background'),
+            onClick: goBackground,
+          },
+          t('pill.backgroundShort'),
+        ),
+      )
+    }
+
+    // D45 registry entry: the whole integration point for this game.
+    GAMES.minesweeper = {
+      id: 'minesweeper',
+      titleKey: 'ms.title',
+      store: () => minesweeperStore,
+      pauseOnLeave: false,
+      keyboard: false,
+      Board: MSBoard,
+      Setting: MSSetting,
+      Controls: MSControls,
+      Float: FloatMinesweeper,
+      FloatCtl: PillMinesweeperCtl,
+    }
+    GAME_ORDER.push('minesweeper')
 
     // ---------------------------------------------------------------------
     // §9 Shared stores & UI components (full view, floating panel, pill).
@@ -3623,12 +4132,14 @@ const CSS = `
           // keep older references pointing at the fresh impls).
           gameStoreImpl = createGameStore()
           gomokuStoreImpl = createGomokuStore()
+          minesweeperStoreImpl = createMinesweeperStore()
           const stopSignals = signalHub.subscribe((signal) => gameStore.handleSignal(signal))
           return () => {
             stopSignals()
             gameStoreImpl?.dispose()
             gameStoreImpl = null
             gomokuStoreImpl = null
+            minesweeperStoreImpl = null
           }
         }, 'wait-buddy: game runtime')
         const t = ctx.locale.bind(NS)
@@ -3781,6 +4292,7 @@ const CSS = `
       __installRuntime() {
         if (gameStoreImpl === null) gameStoreImpl = createGameStore()
         if (gomokuStoreImpl === null) gomokuStoreImpl = createGomokuStore()
+        if (minesweeperStoreImpl === null) minesweeperStoreImpl = createMinesweeperStore()
       },
       /** Pure game transitions, exported for unit testing (not used at runtime). */
       __game: {
@@ -3795,6 +4307,12 @@ const CSS = `
         gomokuAiMove,
         gomokuIsMajorThreat,
         GOMOKU_SIZE,
+        createMinesState,
+        msRevealAt,
+        msToggleFlag,
+        msPlaceMines,
+        msMinesLeft,
+        createMinesweeperStore,
         createGameState,
         startGame,
         turnGame,

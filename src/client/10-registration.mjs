@@ -52,12 +52,14 @@
           // keep older references pointing at the fresh impls).
           gameStoreImpl = createGameStore()
           gomokuStoreImpl = createGomokuStore()
+          minesweeperStoreImpl = createMinesweeperStore()
           const stopSignals = signalHub.subscribe((signal) => gameStore.handleSignal(signal))
           return () => {
             stopSignals()
             gameStoreImpl?.dispose()
             gameStoreImpl = null
             gomokuStoreImpl = null
+            minesweeperStoreImpl = null
           }
         }, 'wait-buddy: game runtime')
         const t = ctx.locale.bind(NS)
@@ -210,6 +212,7 @@
       __installRuntime() {
         if (gameStoreImpl === null) gameStoreImpl = createGameStore()
         if (gomokuStoreImpl === null) gomokuStoreImpl = createGomokuStore()
+        if (minesweeperStoreImpl === null) minesweeperStoreImpl = createMinesweeperStore()
       },
       /** Pure game transitions, exported for unit testing (not used at runtime). */
       __game: {
@@ -224,6 +227,12 @@
         gomokuAiMove,
         gomokuIsMajorThreat,
         GOMOKU_SIZE,
+        createMinesState,
+        msRevealAt,
+        msToggleFlag,
+        msPlaceMines,
+        msMinesLeft,
+        createMinesweeperStore,
         createGameState,
         startGame,
         turnGame,

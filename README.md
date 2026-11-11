@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.8.0-blue)
+![Version](https://img.shields.io/badge/version-0.9.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
-![Tests](https://img.shields.io/badge/tests-92%20%2B%204%20visual-brightgreen)
+![Tests](https://img.shields.io/badge/tests-99%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> Current version **0.8.0**: M1 status board + M2 games + M3 one-way signals + low-key presence, hardened — locale-neutral failure reason codes, notification permission on user gesture, disableable shortcut, visible fallback when the view-switch workaround fails, error boundaries. Tested on DSH `0.2.1-rc.5`.
+> Current version **0.9.0**: M1 status board + M2 games + M3 one-way signals + low-key presence, hardened — locale-neutral failure reason codes, notification permission on user gesture, disableable shortcut, visible fallback when the view-switch workaround fails, error boundaries. Tested on DSH `0.2.1-rc.5`.
 
 ## Table of Contents
 
@@ -70,6 +70,7 @@ It never controls the Agent, never intercepts the native approval dialog, and ne
 ### Games
 
 - **Snake**: Canvas, no external assets, keyboard arrows; direction queue, Space pause/resume, reset, speed presets.
+- **Minesweeper** (0.9.0): 9×9/12×12/16×16 presets; first click always safe; click to reveal, right-click or flag mode to flag; fully click-driven so the pill mini plays identically.
 - **Gomoku**: 15×15, human black vs heuristic AI; difficulty presets; redraws on resize.
 - Both games keep their own state; switching view/session pauses but does not reset.
 
@@ -166,7 +167,7 @@ npx playwright install chromium   # required for visual tests the first time
 
 npm run build:client  # regenerate client.js from src/client/ fragments (required after editing them)
 npm run test:meta    # version consistency + node --check + fragment/artifact drift check
-npm test             # 92 unit/component cases
+npm test             # 99 unit/component cases
 npm run test:visual  # 4 headless layout scenarios (with host tabs / Todo dock / composer)
 npm run test:all     # all of the above
 ```
