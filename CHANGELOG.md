@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.0 — 2026-11-11
+
+### Changed（加固，D41–D43）
+
+- **D41 失败原因结构化（ST-06）**：Host 投影新增 `reasonCode` 枚举；`errorMessage` 只保留上游原文，插件不再把中文文案写进持久化投影。Client 按原因码查词典（「模型请求失败 / 本轮达到模型输出上限 / 本轮被阻止」），英文界面不再中英混杂。`stateVersion` 4 → 5（旧投影缓存失效重算，预期行为）。
+- **D42 通知权限改为用户手势触发**：移除插件加载时的 `Notification.requestPermission()`；权限为 `default` 时看板脚注出现「启用系统通知」按钮，点击（手势）才请求。
+- **D42 快捷键可关闭**：设置新增 `shortcut`（默认开）；关闭后 `Ctrl/Cmd+Shift+W` 不再被插件拦截。
+- **D42 视图跳转失败可见反馈**：后台按钮的视图跳转（宿主无公开 API 的 DOM 驱动 workaround）失败时，胶囊显示「无法自动切换视图，请手动点击 WaitBuddy 标签」4 秒；后台模式下权限已授予时改发系统通知；不再静默返回 `false`。
+- **D43 store 生命周期迁入 apply（RT-04）**：`gameStore`/`gomokuStore` 每轮 apply 重建、dispose 清理 `visibilitychange`；插件重载后监听必然重新绑定。模块级引用经转发对象保持有效。
+
+### Fixed
+
+- **D43 RT-05**：`uiSession` 声明进 `inject`；会话 binding / 投影 face 晚到时按 500ms×6 限时重订（每项恰好订阅一次）；`refreshProjections` 失败允许重试（上限 3 次）。
+- **D43 RT-03/AR-02（部分）**：完整视图与胶囊均包 React 错误边界——渲染崩溃显示兜底文案，不再波及宿主树；`mode === 'snake'` 硬编码与 GameAdapter 拆分仍留待 0.8.0。
+
+### Added
+
+- **D43 AT-07（部分）**：`@media (prefers-reduced-motion: reduce)` 关闭运行脉冲/浮字/toast 动画；深色主题令牌仍待做。
+- 测试新增 3 个（快捷键设置、adapterNotice、错误边界），总 **90 + 4 visual**；测试加载器的 React stub 补 `Component` 基类。
+
 ## 0.6.1 — 2026-11-11
 
 ### Added

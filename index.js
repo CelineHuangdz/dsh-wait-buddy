@@ -25,6 +25,18 @@ import { z } from 'zod'
 
 const STATUS = ['idle', 'running', 'success', 'failed', 'aborted']
 const ACTIVITY_KINDS = ['command', 'tool']
+// D41: the Host writes a locale-neutral reason code; the Client translates.
+const REASON_CODES = [
+  '',
+  'error',
+  'max-tokens',
+  'blocked',
+  'aborted',
+  'interrupted',
+  'forked',
+  'completed',
+  'unknown',
+]
 
 /** Newest-first feed length. */
 const ACTIVITY_LIMIT = 3
@@ -40,6 +52,7 @@ const stateSchema = z.object({
   status: z.enum(STATUS),
   turn: z.number().int().nonnegative(),
   stepCount: z.number().int().nonnegative(),
+  reasonCode: z.enum(REASON_CODES),
   errorMessage: z.string(),
   updatedAt: z.number(),
   revision: z.number().int().nonnegative(),
@@ -50,6 +63,7 @@ const viewSchema = z.object({
   status: z.enum(STATUS),
   turn: z.number().int().nonnegative(),
   stepCount: z.number().int().nonnegative(),
+  reasonCode: z.enum(REASON_CODES),
   errorMessage: z.string(),
   updatedAt: z.number(),
   revision: z.number().int().nonnegative(),
@@ -75,6 +89,7 @@ function initial() {
     status: 'idle',
     turn: 0,
     stepCount: 0,
+    reasonCode: '',
     errorMessage: '',
     updatedAt: 0,
     revision: 0,
@@ -130,34 +145,41 @@ function toolActivity(name, argsText) {
   return { kind: 'tool', text: hint === '' ? tool : clip(`${tool} ${hint}`) }
 }
 
-/** Map one `turn/end` reason onto the baseline status vocabulary. */
+/**
+ * Map one `turn/end` reason onto the baseline status vocabulary (D41).
+ * `errorMessage` carries only upstream raw text (the model's error message,
+ * or the raw kind for unknown reasons) — never plugin-authored copy; the
+ * Client translates `reasonCode` into localized copy.
+ */
 export function endedWith(reason) {
   const kind = reason !== null && typeof reason === 'object' ? reason.kind : undefined
   switch (kind) {
     case 'error':
       return {
         status: 'failed',
-        errorMessage: clip(reason.error?.message ?? '模型请求失败'),
+        reasonCode: 'error',
+        errorMessage: clip(reason.error?.message ?? ''),
       }
     case 'max-tokens':
-      return { status: 'failed', errorMessage: '本轮达到模型输出上限' }
+      return { status: 'failed', reasonCode: 'max-tokens', errorMessage: '' }
     case 'blocked':
-      return { status: 'failed', errorMessage: '本轮被阻止，未继续执行' }
+      return { status: 'failed', reasonCode: 'blocked', errorMessage: '' }
     case 'aborted':
-      return { status: 'aborted', errorMessage: '' }
+      return { status: 'aborted', reasonCode: 'aborted', errorMessage: '' }
     case 'interrupted':
-      return { status: 'aborted', errorMessage: '' }
+      return { status: 'aborted', reasonCode: 'interrupted', errorMessage: '' }
     case 'forked':
-      return { status: 'idle', errorMessage: '' }
+      return { status: 'idle', reasonCode: 'forked', errorMessage: '' }
     case 'completed':
-      return { status: 'success', errorMessage: '' }
+      return { status: 'success', reasonCode: 'completed', errorMessage: '' }
     default:
       // The baseline status enum has no "unknown" value. Map an unknown
-      // reason to the neutral terminal state and keep the raw kind as the
-      // human-readable reason; never report it as success.
+      // reason to the neutral terminal state and keep the raw kind as data;
+      // never report it as success.
       return {
         status: 'aborted',
-        errorMessage: `未知结束原因：${clip(kind === undefined || kind === '' ? 'unknown' : String(kind))}`,
+        reasonCode: 'unknown',
+        errorMessage: clip(kind === undefined || kind === '' ? 'unknown' : String(kind)),
       }
   }
 }
@@ -181,6 +203,7 @@ export function fold(state, event) {
         status: 'running',
         turn: event.data.turn,
         stepCount: 0,
+        reasonCode: '',
         errorMessage: '',
         updatedAt: event.time,
         revision: state.revision + 1,
@@ -214,6 +237,7 @@ export function fold(state, event) {
       return {
         ...state,
         status: ended.status,
+        reasonCode: ended.reasonCode,
         errorMessage: ended.errorMessage,
         updatedAt: event.time,
         revision: state.revision + 1,
@@ -234,6 +258,7 @@ function viewOf(state) {
     status: state.status,
     turn: state.turn,
     stepCount: state.stepCount,
+    reasonCode: state.reasonCode,
     errorMessage: state.errorMessage,
     updatedAt: state.updatedAt,
     revision: state.revision,
@@ -251,7 +276,7 @@ export function apply(ctx) {
   ctx.sessionProjections.register({
     key: 'waitbuddy',
     stateSchema,
-    stateVersion: 4,
+    stateVersion: 5,
     init: () => initial(),
     apply: fold,
     wire: {

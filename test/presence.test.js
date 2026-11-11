@@ -241,3 +241,22 @@ test('mouse-leave pause in the floating panel stays paused until manual resume (
   store.resume()
   assert.equal(store.getSnapshot().status, 'running')
 })
+
+test('D42: the presence shortcut defaults on and can be disabled', () => {
+  assert.equal(settingsStore.getSnapshot().shortcut, true)
+  settingsStore.setShortcut(false)
+  assert.equal(settingsStore.getSnapshot().shortcut, false)
+  settingsStore.setShortcut(true)
+  assert.equal(settingsStore.getSnapshot().shortcut, true)
+})
+
+test('D42: adapterNotice shows host-workaround failures and notifies subscribers', async () => {
+  const { adapterNotice } = client.__presence
+  assert.equal(adapterNotice.get(), '')
+  const seen = []
+  const stop = adapterNotice.subscribe(() => seen.push(adapterNotice.get()))
+  adapterNotice.show('switch failed')
+  assert.equal(adapterNotice.get(), 'switch failed')
+  assert.deepEqual(seen, ['switch failed'])
+  stop()
+})

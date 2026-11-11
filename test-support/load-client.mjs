@@ -37,6 +37,19 @@ export function loadClient(options = {}) {
     createElement() {
       return null
     },
+    // Minimal base for the client's error boundary (D43): subclasses only
+    // need construction + setState semantics, never rendered in this harness.
+    Component: class Component {
+      constructor(props) {
+        this.props = props
+        this.state = {}
+      }
+
+      setState(next, callback) {
+        this.state = { ...this.state, ...(typeof next === 'function' ? next(this.state) : next) }
+        if (typeof callback === 'function') callback()
+      }
+    },
   }
   const context = {
     window,

@@ -6,6 +6,7 @@ const initial = () => ({
   status: 'idle',
   turn: 0,
   stepCount: 0,
+  reasonCode: '',
   errorMessage: '',
   updatedAt: 0,
   revision: 0,
@@ -46,10 +47,29 @@ test('step/end counts only the active running turn', () => {
 test('unknown turn/end reason never becomes success', () => {
   const ended = endedWith({ kind: 'goal-budget' })
   assert.equal(ended.status, 'aborted')
+  assert.equal(ended.reasonCode, 'unknown')
   assert.match(ended.errorMessage, /goal-budget/)
   const state = fold(started(1), event('turn/end', { turn: 1, reason: { kind: 'goal-budget' } }, 20))
   assert.equal(state.status, 'aborted')
+  assert.equal(state.reasonCode, 'unknown')
   assert.notEqual(state.status, 'success')
+})
+
+test('D41: failure reasons are locale-neutral codes, not copy', () => {
+  const max = endedWith({ kind: 'max-tokens' })
+  assert.deepEqual([max.status, max.reasonCode, max.errorMessage], ['failed', 'max-tokens', ''])
+  const blocked = endedWith({ kind: 'blocked' })
+  assert.deepEqual([blocked.status, blocked.reasonCode, blocked.errorMessage], ['failed', 'blocked', ''])
+  const error = endedWith({ kind: 'error', error: { message: 'upstream boom' } })
+  assert.equal(error.reasonCode, 'error')
+  assert.equal(error.errorMessage, 'upstream boom')
+  assert.equal(endedWith({ kind: 'error' }).errorMessage, '')
+  assert.equal(endedWith({ kind: 'completed' }).reasonCode, 'completed')
+  assert.equal(endedWith({ kind: 'aborted' }).reasonCode, 'aborted')
+  // No plugin-authored copy anywhere in the projection.
+  for (const kind of ['error', 'max-tokens', 'blocked', 'aborted', 'interrupted', 'forked', 'completed']) {
+    assert.doesNotMatch(endedWith({ kind }).errorMessage, /[\u4e00-\u9fff]/, kind)
+  }
 })
 
 test('explicit completed remains success', () => {

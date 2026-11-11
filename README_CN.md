@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.6.1-blue)
+![Version](https://img.shields.io/badge/version-0.7.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
-![Tests](https://img.shields.io/badge/tests-85%20%2B%204%20visual-brightgreen)
+![Tests](https://img.shields.io/badge/tests-90%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 当前版本 **0.6.1**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式（胶囊 / 浮动小窗 / 后台模式，含系统通知与后台按钮）。已在 DSH `0.2.1-rc.5` 上测试。
+> 当前版本 **0.7.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式，并完成加固——失败原因码本地化、通知权限改为用户手势触发、快捷键可关闭、视图跳转失败可见反馈、错误边界。已在 DSH `0.2.1-rc.5` 上测试。
 
 ## 目录
 
@@ -165,7 +165,7 @@ pnpm install
 npx playwright install chromium   # 首次运行视觉测试需要
 
 npm run test:meta    # 版本一致性（package.json vs README/CHANGELOG/release.md）+ node --check
-npm test             # 85 个纯逻辑/组件用例
+npm test             # 90 个纯逻辑/组件用例
 npm run test:visual  # 4 个无头布局场景（含宿主 tab bar / Todo dock / composer）
 npm run test:all     # 以上全部
 ```
@@ -216,6 +216,7 @@ CHANGELOG.md        版本变更
 - **0.5.0**：低调模式——胶囊、可拖拽浮动小窗、`Ctrl/Cmd+Shift+W` 后台模式、窗口失焦系统通知（D28–D35）。
 - **0.6.0**：胶囊后台按钮、空格全状态控制（D36）。
 - **0.6.1**：五子棋高级难度封堵成四/双三（D39）、底部按 Todo dock 展开态预留（D40）、分发收敛为 GitHub-only（D37）、文档与验收对齐代码。
+- **0.7.0**：加固——失败原因码本地化 + `stateVersion` 5（D41）、视图跳转失败可见反馈、通知权限用户手势触发、快捷键可关闭、store 生命周期随 apply、晚绑定重试、错误边界、reduced-motion（D42/D43）。
 - **下一步**：DSH 多版本兼容性——宿主 API 契约与逐版本核对清单见 [docs/compat.md](docs/compat.md)，新版本 DSH 发布后照单验证。加固 backlog（宿主耦合适配层、通知权限改为用户手势触发、RT-04/RT-05、错误边界）见 [docs/iteration-plan.md](docs/iteration-plan.md)。
 - **不做**：游戏内审批、自动审批、任何反向控制 Agent 的能力。
 

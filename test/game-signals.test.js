@@ -44,7 +44,7 @@ test('failed/aborted finish only shows a notice and keeps the round', (t) => {
   store.handleSignal({
     type: 'agent:task_finish',
     key: '3:aborted',
-    detail: { status: 'aborted', reasonKind: '未知结束原因：goal-budget' },
+    detail: { status: 'aborted', reasonCode: 'unknown' },
   })
   assert.equal(store.getSnapshot().notice.kind, 'unknown')
 })

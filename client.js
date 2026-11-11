@@ -60,6 +60,9 @@ window.__ModuleLoader__.load({
       'status.pending': '【重要】Agent 在等你处理请求！',
       'status.success': '任务执行成功 ✅',
       'status.failed': '任务执行失败',
+      'status.fail.error': '模型请求失败',
+      'status.fail.maxTokens': '本轮达到模型输出上限',
+      'status.fail.blocked': '本轮被阻止，未继续执行',
       'status.aborted': '任务已中断',
       'status.loading': '正在读取监控数据…',
       'status.degraded': '监控数据不可用',
@@ -68,6 +71,12 @@ window.__ModuleLoader__.load({
       'status.steps': '已完成 {count} 步',
       'status.openChat': '查看对话',
       'status.updated': '更新于 {time}',
+      'shortcut.label': '快捷键',
+      'shortcut.on': '开',
+      'shortcut.off': '关',
+      'notify.enable': '启用系统通知',
+      'adapter.openViewFailed': '无法自动切换视图，请手动点击 WaitBuddy 标签',
+      'ui.crashed': 'WaitBuddy 渲染出错，请刷新页面；若持续出现请禁用插件后反馈。',
       'feed.command': '命令',
       'feed.tool': '工具',
       'feed.empty': '等待 Agent 活动',
@@ -164,6 +173,9 @@ window.__ModuleLoader__.load({
       'status.pending': 'Important: the agent is waiting for you!',
       'status.success': 'Task finished successfully ✅',
       'status.failed': 'Task failed',
+      'status.fail.error': 'The model request failed',
+      'status.fail.maxTokens': 'The model hit its output limit this turn',
+      'status.fail.blocked': 'This turn was blocked before continuing',
       'status.aborted': 'Task was interrupted',
       'status.loading': 'Loading monitoring data…',
       'status.degraded': 'Monitoring data unavailable',
@@ -172,6 +184,12 @@ window.__ModuleLoader__.load({
       'status.steps': '{count} steps completed',
       'status.openChat': 'Open chat',
       'status.updated': 'Updated {time}',
+      'shortcut.label': 'Shortcut',
+      'shortcut.on': 'On',
+      'shortcut.off': 'Off',
+      'notify.enable': 'Enable notifications',
+      'adapter.openViewFailed': 'Could not switch views automatically — click the WaitBuddy tab',
+      'ui.crashed': 'WaitBuddy crashed while rendering. Refresh the page; if it persists, disable the plugin and report.',
       'feed.command': 'Command',
       'feed.tool': 'Tool',
       'feed.empty': 'Waiting for agent activity',
@@ -269,6 +287,7 @@ window.__ModuleLoader__.load({
       running: false,
       stepCount: 0,
       turn: 0,
+      reasonCode: '',
       errorMessage: '',
       activity: EMPTY_ACTIVITY,
       updatedAt: 0,
@@ -290,6 +309,7 @@ window.__ModuleLoader__.load({
         left.stepCount === right.stepCount &&
         left.turn === right.turn &&
         left.activity === right.activity &&
+        left.reasonCode === right.reasonCode &&
         left.errorMessage === right.errorMessage &&
         left.updatedAt === right.updatedAt &&
         left.revision === right.revision &&
@@ -390,6 +410,7 @@ window.__ModuleLoader__.load({
         running,
         stepCount: base.stepCount === undefined ? 0 : base.stepCount,
         turn: base.turn === undefined ? 0 : base.turn,
+        reasonCode: base.reasonCode === undefined ? '' : base.reasonCode,
         errorMessage: base.errorMessage === undefined ? '' : base.errorMessage,
         activity: Array.isArray(base.activity) ? base.activity : EMPTY_ACTIVITY,
         updatedAt: base.updatedAt === undefined ? 0 : base.updatedAt,
@@ -495,7 +516,7 @@ window.__ModuleLoader__.load({
         signals.push(
           make('agent:task_finish', `${next.turn}:${next.status}`, {
             status: next.status,
-            reasonKind: next.errorMessage,
+            reasonCode: next.reasonCode,
           }),
         )
       }
@@ -517,8 +538,12 @@ window.__ModuleLoader__.load({
       let mismatchSince = null
       let projectionError = false
       let healthTimer = null
-      let refreshRequested = false
       let hasBaseline = false
+      // RT-05: projection refresh attempts (cap 3) and late-binding retries.
+      let projectionAttempts = 0
+      let bindRetryTimer = null
+      const BIND_RETRY_DELAY = 500
+      const BIND_RETRY_LIMIT = 6
 
       const bindingOf = () => ctx.sessions.binding(sessionId)
 
@@ -611,10 +636,11 @@ window.__ModuleLoader__.load({
         scheduleHealth(next)
       }
 
-      /** Ask the controller once for a fresh projection read when the key is still missing. */
+      /** RT-05: retry a projection refresh a few times before giving up. */
       const ensureProjection = () => {
-        if (refreshRequested || readDurable() !== undefined) return
-        refreshRequested = true
+        if (readDurable() !== undefined) return
+        if (projectionAttempts >= 3) return
+        projectionAttempts += 1
         const failed = (error) => {
           projectionError = true
           refresh()
@@ -627,6 +653,8 @@ window.__ModuleLoader__.load({
               .then(() => {
                 projectionError = false
                 refresh()
+                // Still missing after a successful refresh: one more round.
+                if (readDurable() === undefined && projectionAttempts < 3) ensureProjection()
               })
               .catch(failed)
           }
@@ -639,7 +667,7 @@ window.__ModuleLoader__.load({
         mountedAt = Date.now()
         mismatchSince = null
         projectionError = false
-        refreshRequested = false
+        projectionAttempts = 0
         hasBaseline = false
         ensureProjection()
         const disposersNext = []
@@ -653,11 +681,56 @@ window.__ModuleLoader__.load({
         if (uiSession !== undefined && uiSession.sessionStatus !== undefined) {
           disposersNext.push(uiSession.sessionStatus.subscribe(refresh))
         }
+        // RT-05: a session binding or the projection face may arrive after the
+        // first render (host applies plugins before the session wire is up).
+        // Retry the missing subscriptions for a few rounds instead of staying
+        // deaf; every piece is subscribed exactly once.
+        const subscribed = {
+          face: binding !== undefined && binding.session.projections.faceOf('waitbuddy') !== undefined,
+          session: binding !== undefined,
+          ui: uiSession !== undefined && uiSession.sessionStatus !== undefined,
+        }
+        let attempts = 0
+        const retry = () => {
+          bindRetryTimer = null
+          attempts += 1
+          const lateBinding = bindingOf()
+          if (!subscribed.session && lateBinding !== undefined) {
+            disposers.push(lateBinding.session.subscribe(refresh))
+            subscribed.session = true
+          }
+          if (!subscribed.face && lateBinding !== undefined) {
+            const lateFace = lateBinding.session.projections.faceOf('waitbuddy')
+            if (lateFace !== undefined) {
+              disposers.push(lateFace.subscribe(refresh))
+              subscribed.face = true
+            }
+          }
+          if (!subscribed.ui) {
+            const lateUi = ctx.get('uiSession')
+            if (lateUi !== undefined && lateUi.sessionStatus !== undefined) {
+              disposers.push(lateUi.sessionStatus.subscribe(refresh))
+              subscribed.ui = true
+            }
+          }
+          refresh()
+          const wired = subscribed.face && subscribed.session
+          if (!wired && attempts < BIND_RETRY_LIMIT) {
+            bindRetryTimer = setTimeout(retry, BIND_RETRY_DELAY)
+          }
+        }
+        if (!subscribed.face || !subscribed.session || !subscribed.ui) {
+          bindRetryTimer = setTimeout(retry, BIND_RETRY_DELAY)
+        }
         disposers = disposersNext
         refresh()
       }
 
       const stop = () => {
+        if (bindRetryTimer !== null) {
+          clearTimeout(bindRetryTimer)
+          bindRetryTimer = null
+        }
         clearHealthTimer()
         for (const dispose of disposers) {
           try {
@@ -693,6 +766,18 @@ window.__ModuleLoader__.load({
       tool: 'feed.tool',
     }
 
+    /**
+     * D41: localized failure copy from the Host's locale-neutral reasonCode;
+     * `errorMessage` (upstream raw text) is shown as secondary detail only.
+     */
+    function failureText(t, state) {
+      if (state.status !== 'failed') return t('status.failed')
+      if (state.reasonCode === 'error') return t('status.fail.error')
+      if (state.reasonCode === 'max-tokens') return t('status.fail.maxTokens')
+      if (state.reasonCode === 'blocked') return t('status.fail.blocked')
+      return t('status.failed')
+    }
+
     /** Status line copy for one monitor state. */
     function statusText(t, state) {
       // Approval/failure are the highest-priority copy; health never hides them.
@@ -714,9 +799,9 @@ window.__ModuleLoader__.load({
         case 'success':
           return t('status.success')
         case 'failed':
-          return t('status.failed')
+          return failureText(t, state)
         case 'aborted':
-          return state.errorMessage === '' ? t('status.aborted') : t('status.endedUnknown')
+          return state.reasonCode === 'unknown' ? t('status.endedUnknown') : t('status.aborted')
         default:
           return t('status.idle')
       }
@@ -1196,11 +1281,11 @@ window.__ModuleLoader__.load({
               addScore(50)
               setNotice('success')
             } else if (status === 'aborted') {
-              const reasonKind =
-                signal.detail === undefined || signal.detail.reasonKind === undefined
+              const reasonCode =
+                signal.detail === undefined || signal.detail.reasonCode === undefined
                   ? ''
-                  : signal.detail.reasonKind
-              setNotice(reasonKind === '' ? 'aborted' : 'unknown')
+                  : signal.detail.reasonCode
+              setNotice(reasonCode === 'unknown' ? 'unknown' : 'aborted')
             } else {
               setNotice('failed')
             }
@@ -1220,7 +1305,32 @@ window.__ModuleLoader__.load({
       }
     }
 
-    const gameStore = createGameStore()
+    /**
+     * RT-04: store impls are created inside apply() (one lifetime per plugin
+     * load) so a host re-apply always re-binds the `visibilitychange` listener
+     * after a dispose. Module-level code holds forwarding objects; accessing
+     * a store before apply() (tests, SSR) throws early instead of silently
+     * using a stale impl.
+     */
+    let gameStoreImpl = null
+    let gomokuStoreImpl = null
+
+    const forwardStore = (implOf) =>
+      new Proxy(
+        {},
+        {
+          get(_target, prop) {
+            const impl = implOf()
+            if (impl === null) {
+              throw new Error('[wait-buddy] store accessed outside apply() lifetime')
+            }
+            const value = impl[prop]
+            return typeof value === 'function' ? value.bind(impl) : value
+          },
+        },
+      )
+
+    const gameStore = forwardStore(() => gameStoreImpl)
 
     /** Process-local signal hub; monitor sources publish, the game consumes. */
     const signalHub = createSignalHub()
@@ -1824,7 +1934,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    const gomokuStore = createGomokuStore()
+    const gomokuStore = forwardStore(() => gomokuStoreImpl)
 
     const SETTINGS_KEY = 'dsh-wait-buddy.settings.v1'
     const DEFAULT_SETTINGS = {
@@ -1833,6 +1943,8 @@ window.__ModuleLoader__.load({
       // 低调模式（D29 §8.7 / D31）：默认胶囊 + 系统通知开。
       presence: 'pill',
       notify: true,
+      // D42: the Ctrl/Cmd+Shift+W presence shortcut can be turned off.
+      shortcut: true,
       pillCorner: 'top-right',
       // Floating-panel position {x,y} (D30); null = use the corner origin.
       pillPos: null,
@@ -1853,6 +1965,7 @@ window.__ModuleLoader__.load({
           level: LEVEL_PRESETS[parsed.level] === undefined ? DEFAULT_SETTINGS.level : parsed.level,
           presence: PRESENCE_MODES.includes(parsed.presence) ? parsed.presence : DEFAULT_SETTINGS.presence,
           notify: typeof parsed.notify === 'boolean' ? parsed.notify : DEFAULT_SETTINGS.notify,
+          shortcut: typeof parsed.shortcut === 'boolean' ? parsed.shortcut : DEFAULT_SETTINGS.shortcut,
           pillCorner: PILL_CORNERS.includes(parsed.pillCorner)
             ? parsed.pillCorner
             : DEFAULT_SETTINGS.pillCorner,
@@ -1902,6 +2015,10 @@ window.__ModuleLoader__.load({
         setNotify(enabled) {
           if (typeof enabled !== 'boolean' || state.notify === enabled) return
           publish({ ...state, notify: enabled })
+        },
+        setShortcut(enabled) {
+          if (typeof enabled !== 'boolean' || state.shortcut === enabled) return
+          publish({ ...state, shortcut: enabled })
         },
         setPillCorner(id) {
           if (!PILL_CORNERS.includes(id) || state.pillCorner === id) return
@@ -2065,6 +2182,21 @@ window.__ModuleLoader__.load({
       const boardRef = React.useRef(null)
       const gomokuCanvasRef = React.useRef(null)
       const lastSession = React.useRef(sessionId)
+      // D42: notification permission is requested from this button (user
+      // gesture), never at plugin load; the local state re-renders the row.
+      const [notifyPerm, setNotifyPerm] = React.useState(
+        () => (typeof Notification === 'undefined' ? 'denied' : Notification.permission),
+      )
+      const requestNotify = () => {
+        if (typeof Notification === 'undefined') return
+        try {
+          Promise.resolve(Notification.requestPermission())
+            .then((value) => setNotifyPerm(value === undefined ? 'default' : value))
+            .catch(() => {})
+        } catch (error) {
+          console.warn('[wait-buddy] notification permission request failed', error)
+        }
+      }
       React.useEffect(() => {
         if (lastSession.current === sessionId) return
         lastSession.current = sessionId
@@ -2293,6 +2425,36 @@ window.__ModuleLoader__.load({
         ),
       )
 
+      // D42: the presence shortcut can be disabled; notification permission is
+      // requested here (user gesture) — never at plugin load.
+      const shortcutSetting = h(
+        'div',
+        { className: 'wb-setting' },
+        h('span', { className: 'wb-settingLabel' }, t('shortcut.label')),
+        h(
+          'div',
+          { className: 'wb-seg' },
+          segButton(t('shortcut.on'), 'shortcut-on', settings.shortcut, () =>
+            settingsStore.setShortcut(true),
+          ),
+          segButton(t('shortcut.off'), 'shortcut-off', !settings.shortcut, () =>
+            settingsStore.setShortcut(false),
+          ),
+        ),
+      )
+      const notifySetting =
+        notifyPerm === 'default'
+          ? h(
+              'div',
+              { className: 'wb-setting' },
+              h(
+                'button',
+                { type: 'button', className: 'wb-btn', onClick: requestNotify },
+                t('notify.enable'),
+              ),
+            )
+          : null
+
       return h(
         'section',
         { className: 'wb-game' },
@@ -2308,6 +2470,8 @@ window.__ModuleLoader__.load({
           ),
           setting,
           presenceSetting,
+          shortcutSetting,
+          notifySetting,
           controls,
         ),
       )
@@ -2354,9 +2518,16 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'wb-alert', 'data-kind': 'failed', role: 'alert' },
           h('span', { className: 'wb-alertTitle' }, t('alert.failed.title')),
-          state.errorMessage === ''
+          state.reasonCode === '' && state.errorMessage === ''
             ? null
-            : h('span', { className: 'wb-alertMeta', title: state.errorMessage }, state.errorMessage),
+            : h(
+                'span',
+                {
+                  className: 'wb-alertMeta',
+                  title: state.errorMessage === '' ? undefined : state.errorMessage,
+                },
+                failureText(t, state),
+              ),
         )
       }
       return null
@@ -2422,6 +2593,8 @@ const CSS = `
 .wb-settingLabel{margin-right:2px;font-size:12px;line-height:20px;color:var(--dsw-alias-label-secondary)}
 .wb-squareBoard{flex:0 1 auto;width:min(100%,max(200px,min(46vh,520px)));max-width:100%;height:auto;min-height:0;max-height:520px;aspect-ratio:1/1;border:0;background:transparent;align-self:center;margin:0 auto}
 @container (max-width:480px){.wb-inner{padding:8px 12px 176px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-disclaimer{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:140px;min-height:140px;max-height:140px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
+.wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
+@media (prefers-reduced-motion: reduce){.wb-pulseFill{animation:none}.wb-reward{animation:none;opacity:1}.wb-notice{animation:none;opacity:1}}
 `
 
     // ---------------------------------------------------------------------
@@ -2499,6 +2672,7 @@ const CSS = `
 .wb-hdMenuBtn{border:none;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:6px 10px;width:100%;text-align:left}
 .wb-pillGomoku{position:relative;width:184px;height:184px;margin:0 auto;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden}
 .wb-pillGomoku canvas{width:100%;height:100%;display:block;cursor:pointer}
+.wb-pillNotice{padding:5px 10px;border-top:1px solid var(--dsw-alias-border-l2);font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);white-space:normal}
 `
 
     /** Panel width (px) for the expanded floating window (D30). */
@@ -2700,10 +2874,42 @@ const CSS = `
     let viewOpener = null
 
     /**
-     * D36: open the WaitBuddy conversation view. No public service exists
-     * (activateView depends on host-internal store actions), so this drives
-     * the same UI a user would: the WaitBuddy tab in the session header, or
-     * the More-views menu entry when the tab is collapsed into it.
+     * D42: transient visible feedback when a host-coupling workaround fails
+     * (instead of a silent `false`). The pill renders it; quiet mode falls
+     * back to a system notification when permission allows.
+     */
+    const adapterNotice = (() => {
+      let text = ''
+      let timer = null
+      const listeners = new Set()
+      const push = () => {
+        for (const listener of [...listeners]) listener()
+      }
+      return {
+        get: () => text,
+        show(next) {
+          text = next
+          if (timer !== null) clearTimeout(timer)
+          timer = setTimeout(() => {
+            text = ''
+            timer = null
+            push()
+          }, 4000)
+          push()
+        },
+        subscribe(listener) {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+      }
+    })()
+
+    /**
+     * D36/D42 (hostAdapter): open the WaitBuddy conversation view. No public
+     * service exists (activateView depends on host-internal store actions),
+     * so this drives the same UI a user would: the WaitBuddy tab in the
+     * session header, or the More-views menu entry when the tab is collapsed
+     * into it. Callers must surface a `false` result — never fail silently.
      */
     async function openFullView() {
       if (viewOpener !== null) {
@@ -2768,6 +2974,9 @@ const CSS = `
       const t = boundT
       const [settings, setSettings] = React.useState(() => settingsStore.getSnapshot())
       const [presence, setPresence] = React.useState(() => presenceStore.getSnapshot())
+      // D42: host-adapter failure feedback (auto-dismisses).
+      const [notice, setNotice] = React.useState(() => adapterNotice.get())
+      React.useEffect(() => adapterNotice.subscribe(() => setNotice(adapterNotice.get())), [])
       React.useEffect(() => {
         const sync = () => {
           setSettings(settingsStore.getSnapshot())
@@ -2901,9 +3110,21 @@ const CSS = `
         setExpanded((value) => !value)
       }
       // D36: hide all UI (notifications only) and jump to the full view.
+      // D42: a failed view switch is never silent — pill notice + optional
+      // system notification (quiet mode has no UI left to show it in).
       const goBackground = async () => {
         settingsStore.setPresence('quiet')
-        await openFullView()
+        const opened = await openFullView()
+        if (opened) return
+        console.warn('[wait-buddy] openFullView failed on this host')
+        adapterNotice.show(t('adapter.openViewFailed'))
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          try {
+            new Notification(t('notify.title'), { body: t('adapter.openViewFailed') })
+          } catch (error) {
+            console.warn('[wait-buddy] adapter feedback notification failed', error)
+          }
+        }
       }
       // Expanding near a viewport edge re-clamps so the panel stays visible.
       React.useEffect(() => {
@@ -2961,6 +3182,9 @@ const CSS = `
           onMouseLeave: showGame ? onPanelLeave : undefined,
         },
         h('style', { key: 'wb-pill-style' }, PILL_CSS),
+        notice === ''
+          ? null
+          : h('div', { className: 'wb-pillNotice', role: 'status' }, notice),
         h(
           'div',
           {
@@ -3252,18 +3476,64 @@ const CSS = `
     }
 
     // ---------------------------------------------------------------------
-    // §10 Module registration. The host injects these three services before
+    // §10 Module registration. The host injects these services before
     // apply(); missing optional slots degrade per docs/compat.md.
+    // D43 (RT-03/AR-02): every registered surface is wrapped in an error
+    // boundary — a render crash shows a fallback line instead of a blank
+    // pane, and never propagates into the host tree.
     // ---------------------------------------------------------------------
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props)
+        this.state = { failed: false }
+      }
+
+      static getDerivedStateFromError() {
+        return { failed: true }
+      }
+
+      componentDidCatch(error) {
+        console.error('[wait-buddy] view crashed', error)
+      }
+
+      render() {
+        if (this.state.failed) {
+          return h(
+            'div',
+            { className: 'wb-crash', role: 'alert' },
+            this.props.t('ui.crashed'),
+          )
+        }
+        return this.props.children
+      }
+    }
+
+    function ViewWithBoundary(props) {
+      return h(ErrorBoundary, { t: boundT }, h(WaitBuddyView, props))
+    }
+
+    function PillWithBoundary(props) {
+      return h(ErrorBoundary, { t: boundT }, h(PresencePill, props))
+    }
+
     return {
-      inject: ['slots', 'sessions', 'locale'],
+      // RT-05: `uiSession` is declared (not just ctx.get) so the host binds it
+      // before apply(); the monitor source still tolerates a late binding.
+      inject: ['slots', 'sessions', 'locale', 'uiSession'],
       apply(ctx) {
         clientCtx = ctx
         ctx.effect(() => {
+          // RT-04: impls live per-apply; dispose clears the DOM listener and a
+          // later re-apply rebuilds everything (the forwarding objects above
+          // keep older references pointing at the fresh impls).
+          gameStoreImpl = createGameStore()
+          gomokuStoreImpl = createGomokuStore()
           const stopSignals = signalHub.subscribe((signal) => gameStore.handleSignal(signal))
           return () => {
             stopSignals()
-            gameStore.dispose()
+            gameStoreImpl?.dispose()
+            gameStoreImpl = null
+            gomokuStoreImpl = null
           }
         }, 'wait-buddy: game runtime')
         const t = ctx.locale.bind(NS)
@@ -3285,7 +3555,7 @@ const CSS = `
               label: () => t('view.label'),
               locale: NS,
             },
-            WaitBuddyView,
+            ViewWithBoundary,
           ),
         )
         // L2: global presence pill on the shell overlay (D29 §8.4). The layer
@@ -3300,7 +3570,7 @@ const CSS = `
                 order: 20,
                 locale: NS,
               },
-              PresencePill,
+              PillWithBoundary,
             ),
           )
         } catch (error) {
@@ -3324,18 +3594,11 @@ const CSS = `
           console.warn('[wait-buddy] views actions slot unavailable on this host', error)
         }
         // L0: system notifications, only while the window is unfocused (§8.5).
+        // D42: permission is never requested here — only from the board's
+        // "Enable notifications" button (user gesture). Without permission
+        // the notifier simply never fires.
         ctx.effect(() => {
           if (typeof Notification === 'undefined') return () => {}
-          if (Notification.permission === 'default') {
-            try {
-              const request = Notification.requestPermission()
-              if (request !== undefined && typeof request.catch === 'function') {
-                request.catch(() => {})
-              }
-            } catch (error) {
-              console.warn('[wait-buddy] notification permission request failed', error)
-            }
-          }
           const sessionTitleOf = (sessionId) => {
             let title = ''
             try {
@@ -3367,11 +3630,14 @@ const CSS = `
         // One-key hide: Ctrl/Cmd+Shift+W cycles the presence stages (§8.6).
         // Implemented as a window listener: the host shortcut catalog resolves
         // command ids only, a binding contract plugins cannot rely on yet.
+        // D42: the shortcut can be disabled in the board footer; when off it
+        // never intercepts the key (no preventDefault).
         ctx.effect(() => {
           if (typeof window === 'undefined') return () => {}
           const onKeyDown = (event) => {
             if (event.code !== 'KeyW') return
             if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey) return
+            if (!settingsStore.getSnapshot().shortcut) return
             const target = event.target
             if (target !== null && typeof target === 'object') {
               const tag = target.tagName
@@ -3391,7 +3657,7 @@ const CSS = `
       /** Pure signal conversion, exported for unit testing. */
       __signals: { createSignalHub, diffMonitorSignals },
       /** Pure copy helpers, exported for unit testing. */
-      __ui: { statusText, metaText },
+      __ui: { statusText, metaText, failureText },
       /** Low-key presence (D29): store, notifier and pure helpers for tests. */
       __presence: {
         presenceStore,
@@ -3403,13 +3669,22 @@ const CSS = `
         PresencePill,
         pickMainViewSession,
         clampToViewport,
+        adapterNotice,
       },
       /** Static UI pieces + stylesheet, exported for component tests. */
-      __components: { AlertBanner, gameOverlay, gomokuOverlay },
+      __components: { AlertBanner, gameOverlay, gomokuOverlay, ErrorBoundary },
       __css: CSS,
       /** Full view, exported for static layout tests only. */
       __view: WaitBuddyView,
       __gameStore: gameStore,
+      /**
+       * Test/visual-harness hook (RT-04): installs a store runtime without a
+       * host apply(); production code never calls this.
+       */
+      __installRuntime() {
+        if (gameStoreImpl === null) gameStoreImpl = createGameStore()
+        if (gomokuStoreImpl === null) gomokuStoreImpl = createGomokuStore()
+      },
       /** Pure game transitions, exported for unit testing (not used at runtime). */
       __game: {
         createGameStore,

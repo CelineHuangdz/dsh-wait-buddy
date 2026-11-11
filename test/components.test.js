@@ -61,10 +61,11 @@ test('AlertBanner shows approval tool / failure reason', () => {
   const failed = render(
     React.createElement(AlertBanner, {
       t,
-      state: { status: 'failed', approvalTool: '', errorMessage: 'network down' },
+      state: { status: 'failed', approvalTool: '', reasonCode: 'error', errorMessage: 'network down' },
     }),
   )
   assert.match(failed, /任务执行失败/)
+  assert.match(failed, /status\.fail\.error/)
   assert.match(failed, /network down/)
 })
 
@@ -174,4 +175,15 @@ test('stylesheet encodes the independent alert rail and narrow/container rules',
   assert.match(css, /@container \(max-width:480px\)/)
   assert.match(css, /\.wb-squareBoard\{[^}]*aspect-ratio:1\/1/)
   assert.match(css, /#0d1624 48%/)
+})
+
+test('D43: the error boundary derives a failed state and renders a fallback (RT-03)', () => {
+  const { ErrorBoundary } = client.__components
+  const boundary = new ErrorBoundary({ t })
+  assert.equal(boundary.state.failed, false)
+  boundary.state = ErrorBoundary.getDerivedStateFromError(new Error('boom'))
+  assert.equal(boundary.state.failed, true)
+  const markup = renderToStaticMarkup(boundary.render())
+  assert.match(markup, /wb-crash/)
+  assert.match(markup, /ui\.crashed/)
 })

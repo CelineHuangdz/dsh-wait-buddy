@@ -216,6 +216,8 @@ fs.mkdirSync('test-results', { recursive: true })
 
 for (const entry of cases) {
   const client = loadClient({ react: React })
+  // RT-04: stores live per-apply now; the harness installs one explicitly.
+  client.__installRuntime()
   entry.setup(client)
   const markup = render(client, entry.monitor)
   const page = await browser.newPage({ viewport: { width: entry.width, height: entry.height } })

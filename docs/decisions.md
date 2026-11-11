@@ -464,3 +464,32 @@
 **教训登记**：宿主 overlay 类 mock 必须按**最坏实测形态**建模，按收起态建模会让"测试通过"成为假阴性来源。
 
 **影响面**：`client.js`（CSS）、`tools/visual-layout.mjs`、ui-spec §4（布局间距）、CHANGELOG。
+
+## D41 失败原因结构化：Host 写原因码，Client 负责翻译（2026-11-11，已实现，0.7.0）
+
+**问题（ST-06）**：`endedWith` 把中文文案（「本轮达到模型输出上限」等）写进持久化投影的 `errorMessage`；英文界面中英混杂，且换文案就要 bump 投影缓存。
+
+**结论**：
+1. Host 投影新增 `reasonCode` 枚举字段：`''` `error` `max-tokens` `blocked` `aborted` `interrupted` `forked` `completed` `unknown`；`errorMessage` 只保留**上游原文**（模型错误消息 / 未知 kind），不再承载插件文案。`stateVersion` 4 → 5（旧缓存失效重算，预期行为）。
+2. Client 按 `reasonCode` 查词典（`status.fail.*`）；`errorMessage` 作为次要细节（title/悬停）显示。`agent:task_finish` 的 `detail.reasonKind` 改传原因码。
+3. 红线不变：未知原因映射 `aborted` + `unknown` 码，永不报成功。
+
+**影响面**：`index.js`（schema/fold/version）、`client.js`（compose/sameMonitor/词典/statusText/AlertBanner/信号）、`test/fold.test.js` 等、ui-spec §5。
+
+## D42 宿主耦合适配层 + 可见反馈（2026-11-11，已实现，0.7.0）
+
+**问题**：D36 视图跳转靠抓 DOM/匹配文案，DSH 改版后**静默失效**（返回 false 无人知）；快捷键/通知权限同样无契约。
+
+**结论**：
+1. 新增 `hostAdapter`（client.js §7a）：集中封装 `openFullView()`（能力梯度：捕获的 `onOpen` → tab → 菜单）与能力探测结果；调用失败时**给可见反馈**（胶囊短暂显示「请手动切换到 WaitBuddy」），不再静默。
+2. 通知权限：移除插件加载时的 `requestPermission()`；改为看板脚注「启用系统通知」按钮**用户手势触发**；权限 denied/unsupported 时按钮隐藏或禁用。
+3. 快捷键 `Ctrl/Cmd+Shift+W` 增加 `shortcut` 设置（默认开），关闭后不注册监听。
+4. 根治仍需上游契约：向 DSH 提公开视图切换 API 与快捷键绑定契约（compat.md 已登记）。
+
+## D43 生命周期加固：RT-04 / RT-05 / 错误边界 / reduced-motion（2026-11-11，已实现，0.7.0）
+
+**结论**：
+1. RT-04：`gameStore`/`gomokuStore` 生命周期迁入 `apply()`（工厂每轮重建），dispose 清理 `visibilitychange`；插件重载（重跑 apply）后监听必然重新绑定。模块级导出改为 getter 转发。
+2. RT-05：`uiSession` 声明进 `inject`；monitor source 订阅阶段对 `binding`/`face` 缺失做**限时重试**（500ms × 6），`refreshProjections` 失败允许重试（上限 3 次）。
+3. RT-03/AR-02：完整视图与胶囊包 React 错误边界，渲染崩溃显示兜底文案而非白屏。
+4. AT-07：CSS 增加 `@media (prefers-reduced-motion: reduce)` 关闭脉冲动画。

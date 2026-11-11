@@ -15,6 +15,9 @@ const dict = {
   'status.pending': 'pending-generic',
   'status.success': 'success',
   'status.failed': 'failed',
+  'status.fail.error': 'fail-error',
+  'status.fail.maxTokens': 'fail-max-tokens',
+  'status.fail.blocked': 'fail-blocked',
   'status.aborted': 'aborted',
   'status.loading': 'loading',
   'status.degraded': 'degraded',
@@ -60,9 +63,16 @@ test('pending copy follows the blocking kind (D28)', () => {
   assert.equal(statusText(t, state({ ...base, pendingKind: 'approval' })), 'approval')
 })
 
-test('aborted with a reason is shown as an unknown end, not a cancel', () => {
-  assert.equal(statusText(t, state({ status: 'aborted', errorMessage: '' })), 'aborted')
-  assert.equal(statusText(t, state({ status: 'aborted', errorMessage: '未知结束原因：x' })), 'ended-unknown')
+test('aborted with an unknown reason is shown as an unknown end, not a cancel', () => {
+  assert.equal(statusText(t, state({ status: 'aborted', reasonCode: 'aborted' })), 'aborted')
+  assert.equal(statusText(t, state({ status: 'aborted', reasonCode: 'unknown' })), 'ended-unknown')
+})
+
+test('D41: failed copy follows the reason code, not the raw message', () => {
+  assert.equal(statusText(t, state({ status: 'failed', reasonCode: 'error', errorMessage: 'boom' })), 'fail-error')
+  assert.equal(statusText(t, state({ status: 'failed', reasonCode: 'max-tokens' })), 'fail-max-tokens')
+  assert.equal(statusText(t, state({ status: 'failed', reasonCode: 'blocked' })), 'fail-blocked')
+  assert.equal(statusText(t, state({ status: 'failed', reasonCode: '' })), 'failed')
 })
 
 test('meta includes the real step count when present', () => {

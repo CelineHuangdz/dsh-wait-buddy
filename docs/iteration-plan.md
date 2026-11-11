@@ -108,7 +108,7 @@
 | ST-03b | P1（需批准） | `question` / `plan-review` 不可见；M0 §6 最小集不含这两类，属范围扩展，需 D28 批准 | `client.js:208-236` | C | ❓ 需 D28 |
 | ST-04 | P0 | `ready` 算出来但 UI 不用；投影刷新失败只写 console，界面仍显示"空闲"。**建议用 `health` 字段承载 loading/degraded/stale，不新增 `status` 值（M0 §8 六值封闭）** | `client.js:235/249-259` | C/G/M | ✅ |
 | ST-05 | P1 | `tool/call`、`turn/end` 缺 `status === running` / `turn` 守卫 | `index.js` | G/M | ✅ |
-| ST-06 | P1 | 错误文案硬编码中文并写入持久化投影；切英文后中英混杂 | `index.js:160-168` | M | ✅ |
+| ST-06 | P1 | 错误文案硬编码中文并写入持久化投影；切英文后中英混杂 | `index.js:160-168` | M | ✅ 0.7.0 已落地（D41 原因码 + stateVersion 5） |
 | ST-07 | P1 | 快照只带 `approvalTool`，不带 `pendingInteraction.key`；同名工具连续审批可能被 `sameMonitor()` 去重 | `client.js:148-163/232-234` | C/G | ✅ |
 | ST-08 | P1 | 只有绝对时间"更新于 HH:MM:SS"，没有运行时长/活动年龄 | `client.js:331-340` | C | ✅ |
 | ST-09 | P2 | goal 续跑轮间会闪"成功" | DSH goal continuation；未在本仓库验证 | C | ⚠️ |
@@ -124,7 +124,7 @@
 | AT-04 | P1 | 告警插入/消失会把棋盘向下推，五子棋落子可能点偏 | `client.js:1434-1435/1526` | G/M | ⚠️ 实测 |
 | AT-05 | P1 | 成功没有"到达感"；running 与 success 用同一个绿色点 | `client.js:1443-1445` | C/M | ✅ |
 | AT-06 | P1 | 窄窗口：`min-width:260px` + 24px padding、`.wb-alertTitle` 不换行，可能横向溢出 | `client.js:1437/1440` | C/G/M | ⚠️ 实测 |
-| AT-07 | P2 | 视觉重心被棋盘抢走；运行脉冲用告警橙；无 `prefers-reduced-motion`；棋盘/浮层硬编码深色 | `client.js:630/664/1452/1460` | C/G/M | ⚠️ 视觉 |
+| AT-07 | P2 | 视觉重心被棋盘抢走；运行脉冲用告警橙；无 `prefers-reduced-motion`；棋盘/浮层硬编码深色 | `client.js:630/664/1452/1460` | C/G/M | ⚠️ 视觉（reduced-motion 已于 0.7.0 落地，D43；深色主题仍待） |
 
 ### 3.3 游戏正确性
 
@@ -145,9 +145,9 @@
 |---|---|---|---|---|---|
 | RT-01 | P0 | 切会话时 `WaitBuddyView` 被复用、`GameArea` 不卸载，游戏继续跑；违反 ui-spec「切会话自动暂停」 | `client.js` `GameArea` | G/M | ✅ 已加 `sessionId` 变化 pause；双实例回归待做 |
 | RT-02 | P0 | `gameCanvas/boardEl/rootEl/gomokuCanvas` 是模块级单例；两个视图会互相覆盖，卸载一个会把引用置 null | `client.js:586-610/993/1067` | C/G/M | ✅ |
-| RT-03 | P1 | 没有错误边界；游戏绘制抛异常会连监控区一起崩 | `client.js:1498-1582` | C/G | ✅ |
-| RT-04 | P1 | `gameStore` 在模块工厂创建；dispose 移除 `visibilitychange` 后，插件重载不会重新绑定；`clientCtx/boundT` 残留旧 ctx | `client.js:505-586/1578` | C/G/M | ✅ |
-| RT-05 | P1 | `uiSession` 用 `ctx.get` 读取但未声明 inject；`binding` 晚到不会重订；`refreshProjections` 失败只试一次 | `client.js:193-197/262-277` | C/G/M | ✅ |
+| RT-03 | P1 | 没有错误边界；游戏绘制抛异常会连监控区一起崩 | `client.js:1498-1582` | C/G | ✅ 0.7.0 已落地（视图/胶囊错误边界，D43） |
+| RT-04 | P1 | `gameStore` 在模块工厂创建；dispose 移除 `visibilitychange` 后，插件重载不会重新绑定；`clientCtx/boundT` 残留旧 ctx | `client.js:505-586/1578` | C/G/M | ✅ 0.7.0 已落地（store 生命周期迁入 apply，D43） |
+| RT-05 | P1 | `uiSession` 用 `ctx.get` 读取但未声明 inject；`binding` 晚到不会重订；`refreshProjections` 失败只试一次 | `client.js:193-197/262-277` | C/G/M | ✅ 0.7.0 已落地（inject 声明 + 限时重订 + 刷新重试，D43） |
 | RT-06 | P2 | 标准 hooks（`useProjection`/`useSessionStatus`）迁移未验证 | `client.js:184-197` | C/G | ❓ spike |
 
 ### 3.5 架构、质量与文档
