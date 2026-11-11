@@ -67,14 +67,14 @@ test('maps are deterministic per region+shape and spawn is always walkable', () 
   }
 })
 
-test('grid shape follows the board aspect at ~18px cells', () => {
+test('grid shape follows the board aspect at ~14px cells', () => {
   const wide = sfFitDims(920, 420)
-  assert.equal(wide.cols, 51)
-  assert.equal(wide.rows, 23)
+  assert.equal(wide.cols, 66)
+  assert.equal(wide.rows, 30)
   const narrow = sfFitDims(320, 128)
-  assert.equal(narrow.cols, 18)
-  assert.equal(narrow.rows, 7)
-  assert.equal(sfFitDims(2000, 900).cols <= 64, true)
+  assert.equal(narrow.cols, 23)
+  assert.equal(narrow.rows, 9)
+  assert.equal(sfFitDims(2000, 900).cols <= 90, true)
 })
 
 test('sfPath finds a walkable route and refuses unwalkable targets', () => {
@@ -169,8 +169,8 @@ test('the store walks to a target, refits the board and round-trips the dex', ()
   assert.equal(store.getSnapshot().pos, Math.floor(snap.rows / 2) * snap.cols + Math.floor(snap.cols / 2))
   store.fitBoard(920, 420)
   const fitted = store.getSnapshot()
-  assert.deepEqual([fitted.cols, fitted.rows], [51, 23])
-  assert.equal(fitted.map.length, 51 * 23)
+  assert.deepEqual([fitted.cols, fitted.rows], [66, 30])
+  assert.equal(fitted.map.length, 66 * 30)
   store.toggleDex()
   assert.equal(store.getSnapshot().dexOpen, true)
   store.dispose()
@@ -204,4 +204,54 @@ test('drawSafariMap paints on a stub canvas without throwing', () => {
   // Degenerate sizes are ignored, not crashed.
   drawSafariMap({ clientWidth: 0, clientHeight: 0, getContext: () => ctx }, state)
   drawSafariMap(null, state)
+})
+
+test('D47b: clicking an unreachable cell flashes feedback instead of silence', () => {
+  const store = createSafariStore()
+  const state = store.getSnapshot()
+  // Find a water cell: it is unreachable by definition.
+  const water = state.map.indexOf(2)
+  assert.ok(water >= 0)
+  store.walkTo(water)
+  assert.equal(store.getSnapshot().invalid, water, 'red-cross flash set')
+  assert.equal(store.getSnapshot().target, null)
+  store.dispose()
+})
+
+test('D47b: a walk sets a visible target marker that clears on arrival', async () => {
+  const store = createSafariStore()
+  const fresh = createSafariState() // same deterministic map as the store
+  const spawn = fresh.pos
+  // Pick a reachable target ≥3 steps away whose whole route is plain ground,
+  // so no grass encounter can interrupt the walk.
+  let targetCell = null
+  let routeLen = 0
+  const sx = spawn % fresh.cols
+  const sy = Math.floor(spawn / fresh.cols)
+  outer: for (let d = 3; d <= 8; d += 1) {
+    for (let ry = sy - d; ry <= sy + d; ry += 1) {
+      for (let rx = sx - d; rx <= sx + d; rx += 1) {
+        if (rx < 0 || ry < 0 || rx >= fresh.cols || ry >= fresh.rows) continue
+        const dist = Math.abs(rx - sx) + Math.abs(ry - sy)
+        if (dist < 3) continue
+        const c = ry * fresh.cols + rx
+        const route = sfPath(fresh, c)
+        if (route !== null && route.length >= 3 && route.every((i) => fresh.map[i] === 0)) {
+          targetCell = c
+          routeLen = route.length
+          break outer
+        }
+      }
+    }
+  }
+  assert.ok(targetCell !== null, 'a plain reachable target exists near spawn')
+  store.walkTo(targetCell)
+  assert.equal(store.getSnapshot().target, targetCell, 'marker shows immediately')
+  assert.equal(store.getSnapshot().invalid, null)
+  // The walk continues on the timer and clears the marker on arrival.
+  await new Promise((resolve) => setTimeout(resolve, routeLen * 90 + 250))
+  const done = store.getSnapshot()
+  assert.equal(done.pos, targetCell)
+  assert.equal(done.target, null)
+  store.dispose()
 })

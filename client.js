@@ -2819,7 +2819,7 @@ const CSS = `
 
     // D47b: cells stay ~36px; the grid shape follows the board's aspect ratio
     // (a wide board is e.g. 25×12), so tiles never stretch into bars.
-    const SF_CELL_TARGET = 18
+    const SF_CELL_TARGET = 14
     const SAFARI_GRASS_CHANCE = 0.18
     const SF_TERRAIN = { plain: 0, grass: 1, water: 2, rock: 3 }
     const SF_DEX_KEY = 'dsh-wait-buddy.dex.v1'
@@ -2889,8 +2889,8 @@ const CSS = `
     function sfFitDims(width, height) {
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
       return {
-        cols: clamp(Math.round(width / SF_CELL_TARGET), 8, 64),
-        rows: clamp(Math.round(height / SF_CELL_TARGET), 6, 30),
+        cols: clamp(Math.round(width / SF_CELL_TARGET), 10, 90),
+        rows: clamp(Math.round(height / SF_CELL_TARGET), 8, 44),
       }
     }
 
@@ -2967,6 +2967,8 @@ const CSS = `
         pos: sfSpawnOf(cols, rows),
         encounter: null, // { species, rarity }
         lastResult: '', // 'caught' | 'fled' | 'released'
+        target: null, // walk destination (click feedback, D47b)
+        invalid: null, // clicked an unreachable cell (red cross flash)
         dex,
         dexCaught: caught,
         dexOpen: false,
@@ -3028,6 +3030,7 @@ const CSS = `
       let state = createSafariState()
       let path = []
       let timer = null
+      let invalidTimer = null
       const listeners = new Set()
       const stopWalk = () => {
         if (timer !== null) {
@@ -3045,6 +3048,7 @@ const CSS = `
       const tick = () => {
         if (path.length === 0) {
           stopWalk()
+          publish({ ...state, target: null })
           return
         }
         const next = path.shift()
@@ -3060,13 +3064,28 @@ const CSS = `
         /** Click-to-walk: BFS to the target, one step per tick; encounters stop. */
         walkTo(cell) {
           if (state.encounter !== null) return
+          if (invalidTimer !== null) {
+            clearTimeout(invalidTimer)
+            invalidTimer = null
+          }
           const route = sfPath(state, cell)
-          if (route === null || route.length === 0) return
+          if (route === null || route.length === 0) {
+            // D47b: never a silent no-op — flash a red cross on the cell.
+            if (route === null) {
+              publish({ ...state, invalid: cell })
+              invalidTimer = setTimeout(() => {
+                invalidTimer = null
+                if (state.invalid === cell) publish({ ...state, invalid: null })
+              }, 450)
+            }
+            return
+          }
           path = route
           if (timer === null) {
-            timer = setInterval(tick, 140)
+            timer = setInterval(tick, 90)
             tick()
           }
+          publish({ ...state, target: cell, invalid: null })
         },
         /** Re-fit the grid to the measured board; keeps region and dex. */
         fitBoard(width, height) {
@@ -3091,9 +3110,15 @@ const CSS = `
         },
         nextRegion() {
           stopWalk()
+          if (invalidTimer !== null) {
+            clearTimeout(invalidTimer)
+            invalidTimer = null
+          }
           publish({
             ...state,
             region: state.region + 1,
+            target: null,
+            invalid: null,
             map: sfMapOf(state.region + 1, state.cols, state.rows),
             pos: sfSpawnOf(state.cols, state.rows),
             encounter: null,
@@ -3105,6 +3130,7 @@ const CSS = `
         },
         dispose() {
           stopWalk()
+          if (invalidTimer !== null) clearTimeout(invalidTimer)
           listeners.clear()
         },
       }
@@ -3250,6 +3276,35 @@ const CSS = `
         ctx.lineTo(width, g * cellH)
       }
       ctx.stroke()
+      // Walk target ring / invalid cross (click feedback, D47b).
+      if (state.target !== null) {
+        const tx = (state.target % state.cols) * cell + cell / 2
+        const ty = Math.floor(state.target / state.cols) * cellH + cellH / 2
+        ctx.strokeStyle = 'rgba(142,247,176,0.9)'
+        ctx.lineWidth = Math.max(1.5, unit * 0.07)
+        ctx.beginPath()
+        ctx.arc(tx, ty, unit * 0.22, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.fillStyle = 'rgba(142,247,176,0.9)'
+        ctx.beginPath()
+        ctx.arc(tx, ty, unit * 0.07, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.lineWidth = 1
+      }
+      if (state.invalid !== null) {
+        const ix = (state.invalid % state.cols) * cell + cell / 2
+        const iy = Math.floor(state.invalid / state.cols) * cellH + cellH / 2
+        const r = unit * 0.16
+        ctx.strokeStyle = 'rgba(229,72,77,0.95)'
+        ctx.lineWidth = Math.max(2, unit * 0.08)
+        ctx.beginPath()
+        ctx.moveTo(ix - r, iy - r)
+        ctx.lineTo(ix + r, iy + r)
+        ctx.moveTo(ix + r, iy - r)
+        ctx.lineTo(ix - r, iy + r)
+        ctx.stroke()
+        ctx.lineWidth = 1
+      }
       // The player: shadow, rounded body, eyes.
       const px = (state.pos % state.cols) * cell
       const py = Math.floor(state.pos / state.cols) * cellH
