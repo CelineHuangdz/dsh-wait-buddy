@@ -141,3 +141,33 @@ test('the store drives step/throw/region and the dex round-trips storage', () =>
   store.toggleDex()
   assert.equal(store.getSnapshot().dexOpen, true)
 })
+
+test('drawSafariMap paints on a stub canvas without throwing', () => {
+  const { drawSafariMap } = client.__game
+  const calls = { fillRect: 0, arc: 0, stroke: 0 }
+  const ctx = new Proxy(
+    {},
+    {
+      get(_t, prop) {
+        if (prop === 'createLinearGradient') {
+          return () => ({ addColorStop() {} })
+        }
+        if (prop in calls) {
+          return () => {
+            calls[prop] += 1
+          }
+        }
+        return () => {}
+      },
+    },
+  )
+  const canvas = { clientWidth: 480, clientHeight: 360, getContext: () => ctx }
+  const state = createSafariState()
+  drawSafariMap(canvas, state)
+  assert.ok(calls.fillRect > 100, `terrain tiles painted (${calls.fillRect})`)
+  assert.ok(calls.arc >= 2, `player/rocks drawn (${calls.arc})`)
+  assert.ok(calls.stroke >= 2, `grid/details stroked (${calls.stroke})`)
+  // Degenerate sizes are ignored, not crashed.
+  drawSafariMap({ clientWidth: 0, clientHeight: 0, getContext: () => ctx }, state)
+  drawSafariMap(null, state)
+})

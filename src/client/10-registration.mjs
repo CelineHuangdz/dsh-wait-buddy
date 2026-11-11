@@ -237,6 +237,7 @@
         sfRarityOf,
         sfSpeciesName,
         SF_SPECIES_TOTAL,
+        drawSafariMap,
         createGameState,
         startGame,
         turnGame,

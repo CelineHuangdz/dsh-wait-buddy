@@ -202,6 +202,13 @@
 
     // ---- painting ----------------------------------------------------------
 
+    /** Deterministic per-cell jitter in [0,1) — organic but never flickering. */
+    function sfJitter(i, salt) {
+      let h = (i * 2654435761 + salt * 40503) % 2147483647
+      if (h < 0) h += 2147483647
+      return (h % 1000) / 1000
+    }
+
     function drawSafariMap(canvas, state) {
       if (canvas === null || canvas === undefined) return
       const width = canvas.clientWidth
@@ -213,55 +220,145 @@
       // stretch with the container instead of locking to a centered square.
       const cell = width / SAFARI_SIZE
       const cellH = height / SAFARI_SIZE
-      const ox = 0
-      const oy = 0
+      const unit = Math.min(cell, cellH)
       ctx.clearRect(0, 0, width, height)
+      ctx.fillStyle = '#141f2e'
+      ctx.fillRect(0, 0, width, height)
       for (let y = 0; y < SAFARI_SIZE; y += 1) {
         for (let x = 0; x < SAFARI_SIZE; x += 1) {
           const i = y * SAFARI_SIZE + x
-          const px = ox + x * cell
-          const py = oy + y * cell
+          const px = x * cell
+          const py = y * cellH
           const terrain = state.map[i]
-          ctx.fillStyle =
-            terrain === SF_TERRAIN.grass
-              ? '#1f3d2b'
-              : terrain === SF_TERRAIN.water
-                ? '#16324a'
-                : terrain === SF_TERRAIN.rock
-                  ? '#2a3546'
-                  : '#1b2839'
-          ctx.fillRect(px, py, cell, cellH)
-          if (terrain === SF_TERRAIN.grass) {
-            ctx.strokeStyle = '#2f5d42'
+          if (terrain === SF_TERRAIN.water) {
+            const g = ctx.createLinearGradient(px, py, px, py + cellH)
+            g.addColorStop(0, '#1b3a58')
+            g.addColorStop(1, '#12283d')
+            ctx.fillStyle = g
+            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
+            ctx.strokeStyle = 'rgba(120,180,220,0.35)'
+            ctx.lineWidth = Math.max(1, unit * 0.04)
             ctx.beginPath()
-            for (let b = 1; b <= 3; b += 1) {
-              const bx = px + (cell * b) / 4
-              ctx.moveTo(bx, py + cellH * 0.7)
-              ctx.lineTo(bx + cell * 0.08, py + cellH * 0.35)
+            for (let w = 0; w < 2; w += 1) {
+              const wy = py + cellH * (0.35 + w * 0.35) + sfJitter(i, w + 1) * cellH * 0.1
+              const wx = px + cell * (0.15 + sfJitter(i, w + 7) * 0.3)
+              ctx.moveTo(wx, wy)
+              ctx.quadraticCurveTo(wx + cell * 0.15, wy - cellH * 0.06, wx + cell * 0.3, wy)
             }
             ctx.stroke()
+            ctx.lineWidth = 1
           } else if (terrain === SF_TERRAIN.rock) {
-            ctx.fillStyle = '#3b4860'
+            ctx.fillStyle = '#1d2836'
+            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
+            const cx = px + cell / 2
+            const cy = py + cellH / 2
+            const r = unit * 0.3
+            ctx.fillStyle = '#46536b'
             ctx.beginPath()
-            ctx.arc(px + cell / 2, py + cellH / 2, Math.min(cell, cellH) * 0.24, 0, Math.PI * 2)
+            ctx.ellipse(cx, cy + r * 0.12, r * 1.15, r * 0.92, 0, 0, Math.PI * 2)
             ctx.fill()
+            ctx.fillStyle = '#5b6a86'
+            ctx.beginPath()
+            ctx.ellipse(cx - r * 0.25, cy - r * 0.28, r * 0.62, r * 0.5, -0.4, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)'
+            ctx.beginPath()
+            ctx.ellipse(cx, cy + r * 0.12, r * 1.15, r * 0.92, 0, 0, Math.PI * 2)
+            ctx.stroke()
+          } else if (terrain === SF_TERRAIN.grass) {
+            const g = ctx.createLinearGradient(px, py, px, py + cellH)
+            g.addColorStop(0, '#24462f')
+            g.addColorStop(1, '#1c3826')
+            ctx.fillStyle = g
+            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
+            const blades = 4 + Math.floor(sfJitter(i, 3) * 2)
+            for (let b = 0; b < blades; b += 1) {
+              const bx = px + cell * (0.14 + (b / blades) * 0.68 + sfJitter(i, b + 11) * 0.1)
+              const by = py + cellH * (0.78 - sfJitter(i, b + 17) * 0.12)
+              const tip = by - cellH * (0.22 + sfJitter(i, b + 23) * 0.16)
+              const lean = (sfJitter(i, b + 29) - 0.5) * cell * 0.16
+              ctx.strokeStyle = b % 2 === 0 ? 'rgba(88,166,110,0.85)' : 'rgba(64,128,84,0.9)'
+              ctx.lineWidth = Math.max(1, unit * 0.045)
+              ctx.beginPath()
+              ctx.moveTo(bx, by)
+              ctx.quadraticCurveTo(bx + lean * 0.4, (by + tip) / 2, bx + lean, tip)
+              ctx.stroke()
+            }
+            ctx.lineWidth = 1
+          } else {
+            ctx.fillStyle = '#1b2634'
+            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
+            if (sfJitter(i, 41) < 0.4) {
+              ctx.fillStyle = 'rgba(255,255,255,0.05)'
+              ctx.beginPath()
+              ctx.arc(
+                px + cell * (0.25 + sfJitter(i, 43) * 0.5),
+                py + cellH * (0.25 + sfJitter(i, 47) * 0.5),
+                unit * 0.05,
+                0,
+                Math.PI * 2,
+              )
+              ctx.fill()
+            }
           }
-          // Walkable-adjacent highlight (where the player may step).
+          // Walkable-adjacent affordance: soft corner ticks.
           if (sfAdjacent(state.pos, i) && sfWalkable(terrain)) {
-            ctx.strokeStyle = 'rgba(142,247,176,0.55)'
-            ctx.strokeRect(px + 1.5, py + 1.5, cell - 3, cellH - 3)
+            ctx.strokeStyle = 'rgba(142,247,176,0.7)'
+            ctx.lineWidth = Math.max(1.5, unit * 0.06)
+            const inset = unit * 0.14
+            const len = unit * 0.28
+            ctx.beginPath()
+            ctx.moveTo(px + inset, py + inset + len)
+            ctx.lineTo(px + inset, py + inset)
+            ctx.lineTo(px + inset + len, py + inset)
+            ctx.moveTo(px + cell - inset - len, py + inset)
+            ctx.lineTo(px + cell - inset, py + inset)
+            ctx.lineTo(px + cell - inset, py + inset + len)
+            ctx.moveTo(px + cell - inset, py + cellH - inset - len)
+            ctx.lineTo(px + cell - inset, py + cellH - inset)
+            ctx.lineTo(px + cell - inset - len, py + cellH - inset)
+            ctx.moveTo(px + inset + len, py + cellH - inset)
+            ctx.lineTo(px + inset, py + cellH - inset)
+            ctx.lineTo(px + inset, py + cellH - inset - len)
+            ctx.stroke()
+            ctx.lineWidth = 1
           }
         }
       }
-      // The player.
-      const px = ox + (state.pos % SAFARI_SIZE) * cell
-      const py = oy + Math.floor(state.pos / SAFARI_SIZE) * cell
-      ctx.fillStyle = '#e6f2ff'
+      // Hairline grid for readability.
+      ctx.strokeStyle = 'rgba(255,255,255,0.045)'
       ctx.beginPath()
-      ctx.arc(px + cell / 2, py + cellH / 2, Math.min(cell, cellH) * 0.3, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.strokeStyle = '#8ef7b0'
+      for (let g = 1; g < SAFARI_SIZE; g += 1) {
+        ctx.moveTo(g * cell, 0)
+        ctx.lineTo(g * cell, height)
+        ctx.moveTo(0, g * cellH)
+        ctx.lineTo(width, g * cellH)
+      }
       ctx.stroke()
+      // The player: shadow, rounded body, eyes.
+      const px = (state.pos % SAFARI_SIZE) * cell
+      const py = Math.floor(state.pos / SAFARI_SIZE) * cellH
+      const cx = px + cell / 2
+      const cy = py + cellH / 2
+      const r = unit * 0.28
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'
+      ctx.beginPath()
+      ctx.ellipse(cx, cy + r * 0.85, r * 0.9, r * 0.32, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#e6f2ff'
+      ctx.strokeStyle = '#8ef7b0'
+      ctx.lineWidth = Math.max(1.5, unit * 0.05)
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      ctx.lineWidth = 1
+      ctx.fillStyle = '#0a0a0a'
+      for (const side of [-1, 1]) {
+        ctx.beginPath()
+        ctx.arc(cx + side * r * 0.35, cy - r * 0.12, r * 0.14, 0, Math.PI * 2)
+        ctx.fill()
+      }
     }
 
     /** Procedural sprite portrait — body shape × palette × pattern. */
