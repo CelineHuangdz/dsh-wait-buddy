@@ -20,7 +20,7 @@
 **建议先跑自动化**：
 
 ```bash
-npm test                 # 99 pass / 0 fail（纯逻辑 + 组件文案 + 五子棋 AI + 存在感/边界）
+npm test                 # 92 pass / 0 fail（纯逻辑 + 组件文案 + 五子棋 AI + 存在感/边界）
 npm run test:visual      # 4 个无头浏览器布局场景（含宿主 tab bar / Todo dock / composer）
 node --check index.js
 node --check client.js

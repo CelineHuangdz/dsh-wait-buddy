@@ -1,16 +1,5 @@
 # Changelog
 
-## 0.9.0 — 2026-11-11
-
-### Added
-
-- **D46 第三款游戏：扫雷**。难度三档（初级 9×9×10 / 中级 12×12×24 / 高级 16×16×40，全局设置 `msLevel`）；**首次点击必定安全**（雷在首击后布设，排除首击格及 8 邻域）；数字为 0 洪水展开并带出数字边环；单击/左键揭开、右键或「旗子模式」插旗（触屏友好、两表面共享）；胜利自动给剩余雷插旗，失败揭示全部雷。纯点击、回合制：`pauseOnLeave: false`、`keyboard: false`，不参与 M3 联动（Agent 信号仍只驱动贪吃蛇，红线不变）。这是 GameAdapter（D45）的首个验证案例——整个接入点是一个 registry 条目。
-- 新增 `src/client/08c-minesweeper.mjs`（纯逻辑 + store + Canvas 绘制 + 五个 adapter 组件）；`test/minesweeper.test.js` 7 个用例（总 **99 + 4 visual**）。
-
-### Fixed
-
-- 320px 窄窗：第三款游戏页签使控制行多占一行、被 Todo dock 盖住 3px；窄窗棋盘 140px → **128px**（flex 子元素会溢进滚动容器 padding 区，加大 padding 无效——沿用 D40 教训按最坏形态收缩内容）。
-
 ## 0.8.0 — 2026-11-11
 
 ### Changed
