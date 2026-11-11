@@ -164,7 +164,8 @@ Client (client.js)                    ▼
 pnpm install
 npx playwright install chromium   # 首次运行视觉测试需要
 
-npm run test:meta    # 版本一致性（package.json vs README/CHANGELOG/release.md）+ node --check
+npm run build:client  # 由 src/client/ 片段重新生成 client.js（改片段后必须执行）
+npm run test:meta    # 版本一致性 + node --check + 片段/产物漂移校验
 npm test             # 90 个纯逻辑/组件用例
 npm run test:visual  # 4 个无头布局场景（含宿主 tab bar / Todo dock / composer）
 npm run test:all     # 以上全部
@@ -184,14 +185,15 @@ npm run test:all     # 以上全部
 
 ```text
 index.js            Host 半：注册 waitbuddy 会话投影（纯 fold，只读日志）
-client.js           Client 半：conversation.view + 监控源 + 看板 + 游戏 + M3 信号消费
+client.js           Client 半（生成产物：src/client/*.mjs 按序拼接）
+src/client/         Client 源片段（工厂函数的 §1–§10 切片；npm run build:client 生成）
 cordis.patch.yml    Bundler 行：id = wait-buddy
 locale/*.json       插件管理页展示用标题/描述
 icon.svg            插件图标
 docs/               基线、界面规范、决策、评审、验收、发布文档
 test/               node:test 单元/组件测试
 test-support/       测试加载器（VM + 最小浏览器 stub）
-tools/              无头视觉布局检查
+tools/              构建脚本、无头视觉布局检查
 CHANGELOG.md        版本变更
 ```
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **D44 `client.js` 拆分落地（AR-02 前半）**：`client.js` 改为 `src/client/00-prologue.mjs … 10-registration.mjs` 十一个片段的**按序字节级拼接**（维持 D38 不引入打包器）；新增 `npm run build:client` 与 `tools/build-client.mjs --check` 漂移校验（接入 CI 与 `test:meta`）。首次拆分为零行为变更（仅文件头注释更新）；GameAdapter 抽取随后以独立 PR 进行。
+
 ## 0.7.0 — 2026-11-11
 
 ### Changed（加固，D41–D43）

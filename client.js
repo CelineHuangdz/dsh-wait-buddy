@@ -29,10 +29,11 @@
  *                                           `WaitBuddyView`
  *   §10 Module registration               — `inject: ['slots', 'sessions', 'locale']`
  *
- * Single-file note: the host loads exactly one client.js per plugin, so this
- * file intentionally stays one module. If it grows past ~4.5k lines or gains a
- * third game, introduce src/ + a concat build (see decisions D38) — not a
- * bundler.
+ * Generated file: client.js is the ordered concatenation of src/client/*.mjs
+ * (D44, the D38 concat plan — no bundler). Edit the fragments, then run
+ * `npm run build:client`; CI rejects drift between the fragments and the
+ * committed client.js. The fragments are slices of one factory function, not
+ * standalone modules: order matters, and they share the factory's scope.
  */
 window.__ModuleLoader__.load({
   id: 'dsh-wait-buddy',

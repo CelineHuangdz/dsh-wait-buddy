@@ -493,3 +493,15 @@
 2. RT-05：`uiSession` 声明进 `inject`；monitor source 订阅阶段对 `binding`/`face` 缺失做**限时重试**（500ms × 6），`refreshProjections` 失败允许重试（上限 3 次）。
 3. RT-03/AR-02：完整视图与胶囊包 React 错误边界，渲染崩溃显示兜底文案而非白屏。
 4. AT-07：CSS 增加 `@media (prefers-reduced-motion: reduce)` 关闭脉冲动画。
+
+## D44 client.js 拆分落地：src/ 分区片段 + 按序拼接（2026-11-11，已实现，0.8.0 前半）
+
+**问题（AR-02）**：`client.js` 3712 行单文件；D38 预案为"超过 ~4500 行或加第三款游戏时引入 src/ + 拼接构建"。0.7.0 后已达 3700+ 行且阶段 C 需要在此基础上抽 GameAdapter，先落基础设施。
+
+**结论**：
+1. **不用 esbuild/打包器**（维持 D38）：宿主按单文件加载插件客户端，引入打包器会让产物与源码失去直读对应关系。采用**按序拼接**：`client.js` = `src/client/00-prologue.mjs … 10-registration.mjs` 的字节级拼接（片段是工厂函数的切片，共享作用域，顺序敏感，非独立模块）。
+2. `tools/build-client.mjs`：拼接生成；`--check` 校验产物与已提交 `client.js` 一致，接入 CI meta job 与 `test:meta`——**改片段不重建无法通过 CI**。
+3. `client.js` 仍为提交产物（发布物不变，`files` 不含 `src/`）；首次落地为字节级一致拆分，无行为变更。
+4. GameAdapter 抽取（AR-02 剩余）在其上以独立 PR 进行，遵守"行为变更与挪文件不同 PR"纪律。
+
+**影响面**：`src/client/*.mjs`（新增 11 片段）、`tools/build-client.mjs`、CI、`package.json` scripts、`client.js`（仅头注释）、README。

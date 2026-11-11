@@ -47,8 +47,9 @@
   ],
   "author": "dzhuang",
   "scripts": {
+    "build:client": "node tools/build-client.mjs",
     "test": "node --test",
-    "test:meta": "node tools/check-version.mjs",
+    "test:meta": "node tools/check-version.mjs && node tools/build-client.mjs --check",
     "test:visual": "node tools/visual-layout.mjs",
     "test:all": "npm run test:meta && npm test && npm run test:visual"
   },

@@ -164,7 +164,8 @@ Client (client.js)                    ▼
 pnpm install
 npx playwright install chromium   # required for visual tests the first time
 
-npm run test:meta    # version consistency (package.json vs READMEs/CHANGELOG/release.md) + node --check
+npm run build:client  # regenerate client.js from src/client/ fragments (required after editing them)
+npm run test:meta    # version consistency + node --check + fragment/artifact drift check
 npm test             # 90 unit/component cases
 npm run test:visual  # 4 headless layout scenarios (with host tabs / Todo dock / composer)
 npm run test:all     # all of the above
@@ -184,14 +185,15 @@ npm run test:all     # all of the above
 
 ```text
 index.js            Host half: waitbuddy session projection (pure fold, read-only)
-client.js           Client half: conversation.view + monitor + UI + games + M3 signal consumer
+client.js           Client half (generated: ordered concat of src/client/*.mjs)
+src/client/         Client source fragments (§1–§10 slices of the factory; build with npm run build:client)
 cordis.patch.yml    Bundler entry: id = wait-buddy
 locale/*.json       Plugin manager title/description
 icon.svg            Plugin icon
 docs/               Baseline, UI spec, decisions, reviews, acceptance, release docs
 test/               node:test unit/component tests
 test-support/       Test loader (VM + minimal browser stubs)
-tools/              Headless visual layout checks
+tools/              Build script, headless visual layout checks
 CHANGELOG.md        Release notes
 ```
 

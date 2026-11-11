@@ -13,6 +13,7 @@ jobs:
         with:
           node-version: 22
       - run: node tools/check-version.mjs
+      - run: node tools/build-client.mjs --check
 
   test:
     runs-on: ubuntu-latest
