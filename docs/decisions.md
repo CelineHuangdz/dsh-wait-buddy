@@ -517,3 +517,5 @@
 4. 行为保持验证：92 单测 + 4 视觉全绿；新增 `test/games-registry.test.js` 锁定 adapter 契约面。**加第三款游戏 = 加一个 adapter 对象 + 一组组件**。
 
 **影响面**：`src/client/07/08/08b(新)/09/10`、`test/games-registry.test.js`、README、CHANGELOG。
+
+> **D46 废止（2026-11-11）**：扫雷未经产品讨论即实现（流程违规——D6「先文档后代码」包含选型共识），v0.9.1 整体移除。第三款游戏的选型重新开放，见迭代计划。

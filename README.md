@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.8.0-blue)
+![Version](https://img.shields.io/badge/version-0.9.1-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-92%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> Current version **0.8.0**: M1 status board + M2 games + M3 one-way signals + low-key presence, hardened — locale-neutral failure reason codes, notification permission on user gesture, disableable shortcut, visible fallback when the view-switch workaround fails, error boundaries. Tested on DSH `0.2.1-rc.5`.
+> Current version **0.9.1**: M1 status board + M2 games + M3 one-way signals + low-key presence, hardened — locale-neutral failure reason codes, notification permission on user gesture, disableable shortcut, visible fallback when the view-switch workaround fails, error boundaries. Tested on DSH `0.2.1-rc.5`.
 
 ## Table of Contents
 
