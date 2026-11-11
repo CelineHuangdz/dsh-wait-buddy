@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.4.1-blue)
+![Version](https://img.shields.io/badge/version-0.6.1-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
-![Tests](https://img.shields.io/badge/tests-59%20%2B%204%20visual-brightgreen)
+![Tests](https://img.shields.io/badge/tests-85%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 当前版本 **0.4.1**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 核心单向联动。已在 DSH `0.2.1-rc.5` 上测试。
+> 当前版本 **0.6.1**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式（胶囊 / 浮动小窗 / 后台模式，含系统通知与后台按钮）。已在 DSH `0.2.1-rc.5` 上测试。
 
 ## 目录
 
@@ -93,10 +93,9 @@ DSH 侧边栏 → **Plugins** → **Add plugin**，任选一种：
 
 | 方式 | 填入 | 说明 |
 |---|---|---|
-| Git（推荐，含 0.4.1） | `github:CelineHuangdz/dsh-wait-buddy` | 跟随仓库最新提交 |
+| Git（推荐） | `github:CelineHuangdz/dsh-wait-buddy` | 跟随仓库最新提交；唯一分发渠道 |
 | 本地目录 | `/abs/path/to/dsh-wait-buddy` | 开发调试用，需先 `pnpm install` |
-| tarball | `dist/dsh-wait-buddy-0.4.1.tgz` 的绝对路径 | `npm pack --pack-destination dist` 生成 |
-| npm | `dsh-wait-buddy` | npm 上的版本可能落后于本仓库 |
+| tarball | `dist/dsh-wait-buddy-x.y.z.tgz` 的绝对路径 | `npm pack --pack-destination dist` 生成 |
 
 安装后启用插件并刷新页面，在会话视图标签栏选择 **WaitBuddy**。
 
@@ -165,9 +164,10 @@ Client (client.js)                    ▼
 pnpm install
 npx playwright install chromium   # 首次运行视觉测试需要
 
-npm test             # 59 个纯逻辑/组件用例
+npm run test:meta    # 版本一致性（package.json vs README/CHANGELOG/release.md）+ node --check
+npm test             # 85 个纯逻辑/组件用例
 npm run test:visual  # 4 个无头布局场景（含宿主 tab bar / Todo dock / composer）
-npm run test:all     # 两者都跑
+npm run test:all     # 以上全部
 ```
 
 - CI：`.github/workflows/ci.yml`，push/PR 自动跑 `npm test` + `npm run test:visual`。
@@ -213,8 +213,10 @@ CHANGELOG.md        版本变更
 
 ## 路线图
 
-- **0.4.x**：修复真机回归；补 DSH 真机 E2E（审批、双实例、Canvas）。✅ question/plan-review 真机链路已于 2026-11-10 验证。
-- **下一步**：DSH 多版本兼容性——宿主 API 契约与逐版本核对清单见 [docs/compat.md](docs/compat.md)，新版本 DSH 发布后照单验证。M4 等待统计/导出已裁撤（2026-11-10 产品决策）。
+- **0.5.0**：低调模式——胶囊、可拖拽浮动小窗、`Ctrl/Cmd+Shift+W` 后台模式、窗口失焦系统通知（D28–D35）。
+- **0.6.0**：胶囊后台按钮、空格全状态控制（D36）。
+- **0.6.1**：五子棋高级难度封堵成四/双三（D39）、底部按 Todo dock 展开态预留（D40）、分发收敛为 GitHub-only（D37）、文档与验收对齐代码。
+- **下一步**：DSH 多版本兼容性——宿主 API 契约与逐版本核对清单见 [docs/compat.md](docs/compat.md)，新版本 DSH 发布后照单验证。加固 backlog（宿主耦合适配层、通知权限改为用户手势触发、RT-04/RT-05、错误边界）见 [docs/iteration-plan.md](docs/iteration-plan.md)。
 - **不做**：游戏内审批、自动审批、任何反向控制 Agent 的能力。
 
 ## 安全与隐私

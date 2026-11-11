@@ -5,7 +5,7 @@
 
 > **分发渠道（2026-11-10 产品决策）：仅 GitHub。** 不发布 npm——下文 npm 相关章节保留作参考，不再执行；发布 = git push + tag。安装方式见 README「Install」。
 
-## 0. 本次发布决定（2026-11-05，v0.4.1）
+## 0. 本次发布决定（2026-11-11，v0.6.1）
 
 - 包名：**`dsh-wait-buddy`**（不带 scope）。包名仍是 Client 模块 id，必须与 `cordis.patch.yml` / `client.js` 三处一致。
 - ~~发布形态：公共 npm 包~~（2026-11-10 起裁撤，仅 GitHub）。
@@ -35,7 +35,7 @@ DSH 的「插件」页（侧边栏 → Plugins → **Add plugin**）接受与 `p
 4. **`files` 必须覆盖运行时所需**：`index.js`、`client.js`、`cordis.patch.yml`、`locale/*.json`、`icon.svg`、`README.md`、`LICENSE`。
    用 `npm pack --dry-run` 核对，不要依赖“本地能跑”。
 5. **依赖声明**：Host 半用到 `zod`，必须留在 `dependencies`（不能是 devDependencies），发布后由用户的 pnpm 安装。
-6. **版本号**：目标发布版本 `0.4.1`（0.4.0 的 320px 修复 patch，待提交/打 tag）。之后遵循 semver。
+6. **版本号**：当前 `v0.6.1`（0.6.0 之后的文档对齐 patch，无行为变更）。发布流程 = git push + `git tag v0.6.1 && git push --tags`。之后遵循 semver。
 7. **兼容性**：当前针对 DSH `0.2.1-rc.5` 开发；先在 README 写清"测试过的 DSH 版本"。
    是否加 `engines.dsh` 要谨慎——管理器会用它做安装前校验，范围写错会直接挡住安装。
 
@@ -81,7 +81,7 @@ npm publish
 
 仓库已 `git init -b main` 并完成首个提交（14 个受版本控制的文件，`node_modules/`、`dist/`、`*.tgz` 已忽略）。
 
-**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；待发布 `v0.4.1`）。
+**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；已发布 `v0.4.1`–`v0.6.0`，待发布 `v0.6.1`）。
 
 **推送到远端**（首次流程，已执行过一遍）：
 
@@ -89,12 +89,12 @@ npm publish
 # GitHub
 git remote add origin https://github.com/<你的用户名>/dsh-wait-buddy.git
 git push -u origin main
-git tag v0.4.1 && git push --tags
+git tag v0.6.1 && git push --tags
 
 # 或 Gitee（国内网络更稳）
 git remote add origin https://gitee.com/<你的用户名>/dsh-wait-buddy.git
 git push -u origin main
-git tag v0.4.1 && git push --tags
+git tag v0.6.1 && git push --tags
 ```
 
 **对方安装**（Plugins → Add plugin 里填）：
@@ -123,7 +123,7 @@ npm 不是唯一通道。以下三种都不需要注册任何账号：
 
 | 方式 | 你做什么 | 对方填什么 |
 |---|---|---|
-| **tarball（最简单）** | `npm pack --pack-destination dist` 生成 `dist/dsh-wait-buddy-0.4.1.tgz`，把文件发给对方 | Plugins → Add plugin → 填该 `.tgz` 的**绝对路径**（或上传到任意可访问 URL 后填 URL） |
+| **tarball（最简单）** | `npm pack --pack-destination dist` 生成 `dist/dsh-wait-buddy-x.y.z.tgz`，把文件发给对方 | Plugins → Add plugin → 填该 `.tgz` 的**绝对路径**（或上传到任意可访问 URL 后填 URL） |
 | **源码目录** | 把整个目录打包成 zip 发给对方，对方解压 | 填解压后的**目录绝对路径** |
 | **Git 仓库** | 推送到 GitHub / Gitee / GitLab | 填完整 Git URL（`github:用户/仓库` 只对 GitHub 有效；其他站用 `https://...git`） |
 
@@ -137,7 +137,7 @@ npm 不是唯一通道。以下三种都不需要注册任何账号：
 
 ```bash
 npm pack --pack-destination dist
-tar -tzf dist/dsh-wait-buddy-0.4.1.tgz   # 核对内容
+tar -tzf dist/dsh-wait-buddy-0.6.1.tgz   # 核对内容
 ```
 
 ## 4. 用户怎么装
@@ -174,5 +174,5 @@ npm pack --dry-run
 
 - 插件代码在 DSH 进程内以当前用户权限运行，**没有沙箱**；发布前应让使用者知道这一点。
 - WaitBuddy 只读取当前会话的事件（投影 fold），不写会话日志、不注册审批应答、不发送网络请求。
-- 活动流中的"思考"是模型 reasoning 的截断文本，只在本地面板显示。
+- 活动流只显示 `tool/call` 的命令/工具条目；**不展示模型推理原文**（D27，2026-11-06 起）。
 - 设置只存本机 localStorage，不上传。

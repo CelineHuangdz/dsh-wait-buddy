@@ -1,7 +1,7 @@
 # WaitBuddy 界面规范（v13）
 
 > 状态：**先于实现**，代码必须与本文件一致；任何界面变更先改本文件，再改 `client.js`。
-> 适用范围：`conversation.view` 中的 WaitBuddy 视图（M1 监控 + M2 游戏），以及 §8 低调模式的三个新表面（状态点 / 侧栏面板 / 全局胶囊）。
+> 适用范围：`conversation.view` 中的 WaitBuddy 视图（M1 监控 + M2 游戏），以及 §8 低调模式的表面（完整视图 + 全局胶囊；状态点 / 侧栏面板已按 D31/D32 移除）。
 > 基线：[M0 定稿](baseline-m0.md) · 对照：[M0 对照与偏差](m0-compliance.md)
 
 ## 1. 设计原则
@@ -208,4 +208,4 @@
   - `notify`：布尔（默认 `true`），控制 §8.5 系统通知总开关。
   - `pillCorner`：`top-right` / `bottom-right` / `top-left`（默认 `top-right`，仅决定胶囊首次出现位置）。
   - `pillPos`：`{x,y}` 或 `null`（D30），胶囊/浮动小窗的拖拽位置。
-- 设置入口：看板（L3/L4）脚注行的「存在感」分段控件（隐身/状态点/胶囊）；角位在胶囊展开态内切换。`notify` 开关暂无界面入口（localStorage 直改），后续按需补。
+- 设置入口：看板脚注行的「存在感」分段控件（后台/胶囊，D32/D33 两态）。`notify` 开关暂无界面入口（localStorage 直改），后续按需补。

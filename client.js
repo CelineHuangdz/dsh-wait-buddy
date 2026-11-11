@@ -2448,9 +2448,10 @@ const CSS = `
 
 
     /**
-     * L1 status dot for the session header (D29 §8.2). The utilities slot
-     * provides `sessionId`; `openView` is unavailable there by contract, so
-     * "open the panel" is delegated to `ctx.sidebarRight.openTab` when present.
+     * Session picker for the presence pill (D29 §8.4; the L1 status dot was
+     * removed by D31, the sidebar panel by D32). The utilities slot provides
+     * `sessionId`; "open the panel" is delegated to `ctx.sidebarRight.openTab`
+     * when present.
      */
     /** The session currently shown in the main view; the pill follows it (§8.4). */
     function pickMainViewSession(snapshot) {

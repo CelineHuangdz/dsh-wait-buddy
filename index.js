@@ -6,8 +6,8 @@
  *
  *   status       idle | running | success | failed | aborted
  *   activity     last N real activities (command / tool), newest first
- *   stepCount    completed steps of the current turn (kept for M3 scoring,
- *                never displayed: an agent loop has no reliable total)
+ *   stepCount    completed steps of the current turn; shown as
+ *                "N steps completed" (no total, no fake percentage)
  *
  * Mapping to the M0 baseline event table (extended per decisions D1/D9):
  *   session.task.start            <- turn/start (also clears the activity feed)

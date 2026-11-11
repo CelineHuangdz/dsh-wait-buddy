@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.4.1-blue)
+![Version](https://img.shields.io/badge/version-0.6.1-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
-![Tests](https://img.shields.io/badge/tests-59%20%2B%204%20visual-brightgreen)
+![Tests](https://img.shields.io/badge/tests-85%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> Current version **0.4.1**: M1 status board + M2 games + M3 core one-way signals. Tested on DSH `0.2.1-rc.5`.
+> Current version **0.6.1**: M1 status board + M2 games + M3 one-way signals + low-key presence (pill / floating panel / background mode with system notifications and a background button). Tested on DSH `0.2.1-rc.5`.
 
 ## Table of Contents
 
@@ -164,9 +164,10 @@ Client (client.js)                    ▼
 pnpm install
 npx playwright install chromium   # required for visual tests the first time
 
-npm test             # 59 unit/component cases
+npm run test:meta    # version consistency (package.json vs READMEs/CHANGELOG/release.md) + node --check
+npm test             # 85 unit/component cases
 npm run test:visual  # 4 headless layout scenarios (with host tabs / Todo dock / composer)
-npm run test:all     # both
+npm run test:all     # all of the above
 ```
 
 - CI: `.github/workflows/ci.yml` runs `npm test` + `npm run test:visual` on push/PR.
@@ -212,8 +213,10 @@ CHANGELOG.md        Release notes
 
 ## Roadmap
 
-- **0.4.x**: fix real-device regressions; add DSH end-to-end coverage (approval, two instances, Canvas). ✅ question/plan-review real-device chain verified 2026-11-10.
-- **Next**: DSH multi-version compatibility — host API contract + per-version checklist in [docs/compat.md](docs/compat.md); verify against new DSH releases as they ship. M4 wait stats/export is dropped (product decision 2026-11-10).
+- **0.5.0**: low-key presence — pill, draggable floating panel, `Ctrl/Cmd+Shift+W` background mode, unfocused-window system notifications (D28–D35).
+- **0.6.0**: background button on the pill, Space controls all states (D36).
+- **0.6.1**: gomoku hard-AI fork/double-three blocking (D39), Todo-dock-aware bottom spacing (D40), GitHub-only distribution (D37), docs and acceptance realigned with code.
+- **Next**: DSH multi-version compatibility — host API contract + per-version checklist in [docs/compat.md](docs/compat.md); verify against new DSH releases as they ship. Hardening backlog (host-coupling adapter layer, notification permission on user gesture, RT-04/RT-05, error boundary) tracked in [docs/iteration-plan.md](docs/iteration-plan.md).
 - **Never**: in-game approval, auto-approval, or any reverse control over the Agent.
 
 ## Security and privacy

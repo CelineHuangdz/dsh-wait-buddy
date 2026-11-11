@@ -1,6 +1,6 @@
 {
   "name": "dsh-wait-buddy",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "WaitBuddy: a DSH session view that monitors long-running Agent tasks, with approval/failure alerts and lightweight games.",
   "type": "module",
   "exports": {
@@ -48,8 +48,9 @@
   "author": "dzhuang",
   "scripts": {
     "test": "node --test",
+    "test:meta": "node tools/check-version.mjs",
     "test:visual": "node tools/visual-layout.mjs",
-    "test:all": "npm test && npm run test:visual"
+    "test:all": "npm run test:meta && npm test && npm run test:visual"
   },
   "devDependencies": {
     "playwright": "1.64.1",

@@ -5,6 +5,15 @@ on:
   pull_request:
 
 jobs:
+  meta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/check-version.mjs
+
   test:
     runs-on: ubuntu-latest
     steps:
