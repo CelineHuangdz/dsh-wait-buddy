@@ -35,7 +35,7 @@ DSH 的「插件」页（侧边栏 → Plugins → **Add plugin**）接受与 `p
 4. **`files` 必须覆盖运行时所需**：`index.js`、`client.js`、`cordis.patch.yml`、`locale/*.json`、`icon.svg`、`README.md`、`LICENSE`。
    用 `npm pack --dry-run` 核对，不要依赖“本地能跑”。
 5. **依赖声明**：Host 半用到 `zod`，必须留在 `dependencies`（不能是 devDependencies），发布后由用户的 pnpm 安装。
-6. **版本号**：当前 `v0.10.0`（第三款游戏：探索抓精灵，D47）。发布流程 = git push + `git tag v0.10.0 && git push --tags`。之后遵循 semver。
+6. **版本号**：当前 `v0.10.0`（第三款游戏：抓精灵，D47）。发布流程 = git push + `git tag v0.10.0 && git push --tags`。之后遵循 semver。
 7. **兼容性**：当前针对 DSH `0.2.1-rc.5` 开发；先在 README 写清"测试过的 DSH 版本"。
    是否加 `engines.dsh` 要谨慎——管理器会用它做安装前校验，范围写错会直接挡住安装。
 
