@@ -67,14 +67,14 @@ test('maps are deterministic per region+shape and spawn is always walkable', () 
   }
 })
 
-test('grid shape follows the board aspect at ~24px cells', () => {
+test('grid shape follows the board aspect at ~18px cells', () => {
   const wide = sfFitDims(920, 420)
-  assert.equal(wide.cols, 38)
-  assert.equal(wide.rows, 18)
+  assert.equal(wide.cols, 51)
+  assert.equal(wide.rows, 23)
   const narrow = sfFitDims(320, 128)
-  assert.equal(narrow.cols, 13)
-  assert.equal(narrow.rows, 6)
-  assert.equal(sfFitDims(2000, 900).cols <= 44, true)
+  assert.equal(narrow.cols, 18)
+  assert.equal(narrow.rows, 7)
+  assert.equal(sfFitDims(2000, 900).cols <= 64, true)
 })
 
 test('sfPath finds a walkable route and refuses unwalkable targets', () => {
@@ -169,8 +169,8 @@ test('the store walks to a target, refits the board and round-trips the dex', ()
   assert.equal(store.getSnapshot().pos, Math.floor(snap.rows / 2) * snap.cols + Math.floor(snap.cols / 2))
   store.fitBoard(920, 420)
   const fitted = store.getSnapshot()
-  assert.deepEqual([fitted.cols, fitted.rows], [38, 18])
-  assert.equal(fitted.map.length, 38 * 18)
+  assert.deepEqual([fitted.cols, fitted.rows], [51, 23])
+  assert.equal(fitted.map.length, 51 * 23)
   store.toggleDex()
   assert.equal(store.getSnapshot().dexOpen, true)
   store.dispose()

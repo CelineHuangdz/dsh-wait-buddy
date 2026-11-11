@@ -7,7 +7,7 @@
 
     // D47b: cells stay ~36px; the grid shape follows the board's aspect ratio
     // (a wide board is e.g. 25×12), so tiles never stretch into bars.
-    const SF_CELL_TARGET = 24
+    const SF_CELL_TARGET = 18
     const SAFARI_GRASS_CHANCE = 0.18
     const SF_TERRAIN = { plain: 0, grass: 1, water: 2, rock: 3 }
     const SF_DEX_KEY = 'dsh-wait-buddy.dex.v1'
@@ -77,7 +77,7 @@
     function sfFitDims(width, height) {
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
       return {
-        cols: clamp(Math.round(width / SF_CELL_TARGET), 8, 44),
+        cols: clamp(Math.round(width / SF_CELL_TARGET), 8, 64),
         rows: clamp(Math.round(height / SF_CELL_TARGET), 6, 30),
       }
     }
