@@ -57,6 +57,7 @@
           return () => {
             stopSignals()
             gameStoreImpl?.dispose()
+            safariStoreImpl?.dispose()
             gameStoreImpl = null
             gomokuStoreImpl = null
             safariStoreImpl = null
@@ -236,6 +237,8 @@
         sfRollEncounter,
         sfRarityOf,
         sfSpeciesName,
+        sfFitDims,
+        sfPath,
         SF_SPECIES_TOTAL,
         drawSafariMap,
         createGameState,

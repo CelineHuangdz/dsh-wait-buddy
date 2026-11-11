@@ -2817,8 +2817,10 @@ const CSS = `
     // dex. Turn-based, click-only: pauseOnLeave false, keyboard false.
     // ---------------------------------------------------------------------
 
-    const SAFARI_SIZE = 12
-    const SAFARI_GRASS_CHANCE = 0.35
+    // D47b: cells stay ~36px; the grid shape follows the board's aspect ratio
+    // (a wide board is e.g. 25×12), so tiles never stretch into bars.
+    const SF_CELL_TARGET = 36
+    const SAFARI_GRASS_CHANCE = 0.18
     const SF_TERRAIN = { plain: 0, grass: 1, water: 2, rock: 3 }
     const SF_DEX_KEY = 'dsh-wait-buddy.dex.v1'
     /** Body × palette × pattern = 3 × 6 × 3 = 54 species. */
@@ -2858,26 +2860,70 @@ const CSS = `
       })
     }
 
-    /** Deterministic 12×12 terrain for one region number. */
-    function sfMapOf(region) {
-      let seed = (region * 2654435761) % 2147483647
+    /** Deterministic terrain for one region at a given grid shape. */
+    function sfMapOf(region, cols, rows) {
+      let seed = (region * 2654435761 + cols * 31 + rows) % 2147483647
       if (seed <= 0) seed += 2147483646
       const next = () => {
         seed = (seed * 16807) % 2147483647
         return seed / 2147483647
       }
-      const map = new Array(SAFARI_SIZE * SAFARI_SIZE).fill(SF_TERRAIN.plain)
+      const map = new Array(cols * rows).fill(SF_TERRAIN.plain)
       for (let i = 0; i < map.length; i += 1) {
         const roll = next()
         map[i] = roll < 0.42 ? SF_TERRAIN.grass : roll < 0.52 ? SF_TERRAIN.water : roll < 0.6 ? SF_TERRAIN.rock : SF_TERRAIN.plain
       }
       // The spawn cell and its cross neighbours are always walkable.
-      const mid = Math.floor(SAFARI_SIZE / 2)
-      const spawn = mid * SAFARI_SIZE + mid
-      for (const i of [spawn, spawn - 1, spawn + 1, spawn - SAFARI_SIZE, spawn + SAFARI_SIZE]) {
+      const spawn = sfSpawnOf(cols, rows)
+      for (const i of [spawn, spawn - 1, spawn + 1, spawn - cols, spawn + cols]) {
         map[i] = SF_TERRAIN.plain
       }
       return map
+    }
+
+    function sfSpawnOf(cols, rows) {
+      return Math.floor(rows / 2) * cols + Math.floor(cols / 2)
+    }
+
+    /** Grid shape that keeps cells ~36px on a board of this size. */
+    function sfFitDims(width, height) {
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+      return {
+        cols: clamp(Math.round(width / SF_CELL_TARGET), 8, 44),
+        rows: clamp(Math.round(height / SF_CELL_TARGET), 6, 30),
+      }
+    }
+
+    /** BFS over walkable cells; returns the path excluding the start. */
+    function sfPath(prev, target) {
+      if (target === prev.pos) return []
+      const total = prev.cols * prev.rows
+      const prevOf = new Array(total).fill(-1)
+      prevOf[prev.pos] = prev.pos
+      const queue = [prev.pos]
+      let head = 0
+      while (head < queue.length) {
+        const at = queue[head]
+        head += 1
+        if (at === target) break
+        const x = at % prev.cols
+        for (const d of [-1, 1, -prev.cols, prev.cols]) {
+          const n = at + d
+          if (n < 0 || n >= total) continue
+          if ((d === -1 && x === 0) || (d === 1 && x === prev.cols - 1)) continue
+          if (prevOf[n] !== -1 || !sfWalkable(prev.map[n])) continue
+          prevOf[n] = at
+          queue.push(n)
+        }
+      }
+      if (prevOf[target] === -1) return null
+      const path = []
+      let at = target
+      while (at !== prev.pos) {
+        path.unshift(at)
+        at = prevOf[at]
+      }
+      return path
     }
 
     /** Encounter roll: rarity first, then a uniform species of that tier. */
@@ -2911,11 +2957,14 @@ const CSS = `
       for (const key of Object.keys(dex.caught)) {
         if (Number.isInteger(dex.caught[key]) && dex.caught[key] > 0) caught += 1
       }
-      const mid = Math.floor(SAFARI_SIZE / 2)
+      const cols = 24
+      const rows = 12
       return {
         region: 1,
-        map: sfMapOf(1),
-        pos: mid * SAFARI_SIZE + mid,
+        cols,
+        rows,
+        map: sfMapOf(1, cols, rows),
+        pos: sfSpawnOf(cols, rows),
         encounter: null, // { species, rarity }
         lastResult: '', // 'caught' | 'fled' | 'released'
         dex,
@@ -2928,18 +2977,18 @@ const CSS = `
       return terrain === SF_TERRAIN.plain || terrain === SF_TERRAIN.grass
     }
 
-    function sfAdjacent(a, b) {
-      const ax = a % SAFARI_SIZE
-      const ay = Math.floor(a / SAFARI_SIZE)
-      const bx = b % SAFARI_SIZE
-      const by = Math.floor(b / SAFARI_SIZE)
+    function sfAdjacent(a, b, cols) {
+      const ax = a % cols
+      const ay = Math.floor(a / cols)
+      const bx = b % cols
+      const by = Math.floor(b / cols)
       return Math.abs(ax - bx) + Math.abs(ay - by) === 1
     }
 
     /** Try to step to a cell; grass may trigger an encounter. */
     function sfStep(prev, cell, random = Math.random) {
       if (prev.encounter !== null) return prev
-      if (!sfAdjacent(prev.pos, cell)) return prev
+      if (!sfAdjacent(prev.pos, cell, prev.cols)) return prev
       if (!sfWalkable(prev.map[cell])) return prev
       const stepped = { ...prev, pos: cell, lastResult: '' }
       if (prev.map[cell] !== SF_TERRAIN.grass) return stepped
@@ -2977,11 +3026,30 @@ const CSS = `
 
     function createSafariStore() {
       let state = createSafariState()
+      let path = []
+      let timer = null
       const listeners = new Set()
+      const stopWalk = () => {
+        if (timer !== null) {
+          clearInterval(timer)
+          timer = null
+        }
+        path = []
+      }
       const publish = (next) => {
         if (next === state) return
         state = next
+        if (state.encounter !== null) stopWalk()
         for (const listener of [...listeners]) listener()
+      }
+      const tick = () => {
+        if (path.length === 0) {
+          stopWalk()
+          return
+        }
+        const next = path.shift()
+        const stepped = sfStep(state, next)
+        if (stepped !== state) publish(stepped)
       }
       return {
         getSnapshot: () => state,
@@ -2989,8 +3057,31 @@ const CSS = `
           listeners.add(listener)
           return () => listeners.delete(listener)
         },
-        step(cell) {
-          publish(sfStep(state, cell))
+        /** Click-to-walk: BFS to the target, one step per tick; encounters stop. */
+        walkTo(cell) {
+          if (state.encounter !== null) return
+          const route = sfPath(state, cell)
+          if (route === null || route.length === 0) return
+          path = route
+          if (timer === null) {
+            timer = setInterval(tick, 140)
+            tick()
+          }
+        },
+        /** Re-fit the grid to the measured board; keeps region and dex. */
+        fitBoard(width, height) {
+          if (state.encounter !== null || path.length > 0) return
+          const { cols, rows } = sfFitDims(width, height)
+          if (cols === state.cols && rows === state.rows) return
+          stopWalk()
+          publish({
+            ...state,
+            cols,
+            rows,
+            map: sfMapOf(state.region, cols, rows),
+            pos: sfSpawnOf(cols, rows),
+            lastResult: '',
+          })
         },
         throwBall() {
           publish(sfThrowBall(state))
@@ -2999,12 +3090,22 @@ const CSS = `
           publish(sfRelease(state))
         },
         nextRegion() {
-          const region = state.region + 1
-          const mid = Math.floor(SAFARI_SIZE / 2)
-          publish({ ...state, region, map: sfMapOf(region), pos: mid * SAFARI_SIZE + mid, encounter: null, lastResult: '' })
+          stopWalk()
+          publish({
+            ...state,
+            region: state.region + 1,
+            map: sfMapOf(state.region + 1, state.cols, state.rows),
+            pos: sfSpawnOf(state.cols, state.rows),
+            encounter: null,
+            lastResult: '',
+          })
         },
         toggleDex() {
           publish({ ...state, dexOpen: !state.dexOpen })
+        },
+        dispose() {
+          stopWalk()
+          listeners.clear()
         },
       }
     }
@@ -3030,15 +3131,15 @@ const CSS = `
       if (ctx === null) return
       // D47b: the map fills the whole board box like the snake board — cells
       // stretch with the container instead of locking to a centered square.
-      const cell = width / SAFARI_SIZE
-      const cellH = height / SAFARI_SIZE
+      const cell = width / state.cols
+      const cellH = height / state.rows
       const unit = Math.min(cell, cellH)
       ctx.clearRect(0, 0, width, height)
       ctx.fillStyle = '#141f2e'
       ctx.fillRect(0, 0, width, height)
-      for (let y = 0; y < SAFARI_SIZE; y += 1) {
-        for (let x = 0; x < SAFARI_SIZE; x += 1) {
-          const i = y * SAFARI_SIZE + x
+      for (let y = 0; y < state.rows; y += 1) {
+        for (let x = 0; x < state.cols; x += 1) {
+          const i = y * state.cols + x
           const px = x * cell
           const py = y * cellH
           const terrain = state.map[i]
@@ -3140,16 +3241,18 @@ const CSS = `
       // Hairline grid for readability.
       ctx.strokeStyle = 'rgba(255,255,255,0.045)'
       ctx.beginPath()
-      for (let g = 1; g < SAFARI_SIZE; g += 1) {
+      for (let g = 1; g < state.cols; g += 1) {
         ctx.moveTo(g * cell, 0)
         ctx.lineTo(g * cell, height)
+      }
+      for (let g = 1; g < state.rows; g += 1) {
         ctx.moveTo(0, g * cellH)
         ctx.lineTo(width, g * cellH)
       }
       ctx.stroke()
       // The player: shadow, rounded body, eyes.
-      const px = (state.pos % SAFARI_SIZE) * cell
-      const py = Math.floor(state.pos / SAFARI_SIZE) * cellH
+      const px = (state.pos % state.cols) * cell
+      const py = Math.floor(state.pos / state.cols) * cellH
       const cx = px + cell / 2
       const cy = py + cellH / 2
       const r = unit * 0.28
@@ -3225,14 +3328,14 @@ const CSS = `
       ctx.restore()
     }
 
-    function sfPointAt(canvas, clientX, clientY) {
+    function sfPointAt(canvas, state, clientX, clientY) {
       const rect = canvas.getBoundingClientRect()
-      const cell = rect.width / SAFARI_SIZE
-      const cellH = rect.height / SAFARI_SIZE
+      const cell = rect.width / state.cols
+      const cellH = rect.height / state.rows
       const x = Math.floor((clientX - rect.left) / cell)
       const y = Math.floor((clientY - rect.top) / cellH)
-      if (x < 0 || y < 0 || x >= SAFARI_SIZE || y >= SAFARI_SIZE) return -1
-      return y * SAFARI_SIZE + x
+      if (x < 0 || y < 0 || x >= state.cols || y >= state.rows) return -1
+      return y * state.cols + x
     }
 
     // ---- adapter components -------------------------------------------------
@@ -3347,7 +3450,11 @@ const CSS = `
       React.useEffect(() => {
         const element = boardRef.current
         if (element === null) return undefined
-        const measure = () => drawSafariMap(canvasRef.current, safariStore.getSnapshot())
+        const measure = () => {
+          drawSafariMap(canvasRef.current, safariStore.getSnapshot())
+          const rect = element.getBoundingClientRect()
+          if (rect.width > 60 && rect.height > 60) safariStore.fitBoard(rect.width, rect.height)
+        }
         measure()
         if (typeof ResizeObserver !== 'function') return undefined
         const observer = new ResizeObserver(measure)
@@ -3364,8 +3471,8 @@ const CSS = `
           'aria-label': t('sf.title'),
           onClick: (event) => {
             if (canvasRef.current === null) return
-            const cell = sfPointAt(canvasRef.current, event.clientX, event.clientY)
-            if (cell >= 0) safariStore.step(cell)
+            const cell = sfPointAt(canvasRef.current, state, event.clientX, event.clientY)
+            if (cell >= 0) safariStore.walkTo(cell)
           },
         }),
         sfDexOverlay(t, state),
@@ -3450,8 +3557,8 @@ const CSS = `
           'aria-label': t('sf.title'),
           onClick: (event) => {
             if (canvasRef.current === null) return
-            const cell = sfPointAt(canvasRef.current, event.clientX, event.clientY)
-            if (cell >= 0) safariStore.step(cell)
+            const cell = sfPointAt(canvasRef.current, state, event.clientX, event.clientY)
+            if (cell >= 0) safariStore.walkTo(cell)
           },
         }),
         sfEncounterOverlay(t, state, undefined, true),
@@ -4392,6 +4499,7 @@ const CSS = `
           return () => {
             stopSignals()
             gameStoreImpl?.dispose()
+            safariStoreImpl?.dispose()
             gameStoreImpl = null
             gomokuStoreImpl = null
             safariStoreImpl = null
@@ -4571,6 +4679,8 @@ const CSS = `
         sfRollEncounter,
         sfRarityOf,
         sfSpeciesName,
+        sfFitDims,
+        sfPath,
         SF_SPECIES_TOTAL,
         drawSafariMap,
         createGameState,

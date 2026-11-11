@@ -13,6 +13,9 @@ const {
   sfRollEncounter,
   sfRarityOf,
   sfSpeciesName,
+  sfFitDims,
+  sfPath,
+  drawSafariMap,
   SF_SPECIES_TOTAL,
 } = client.__game
 
@@ -51,17 +54,42 @@ test('species names compose from dictionary parts', () => {
   assert.equal(sfSpeciesName(t, SF_SPECIES_TOTAL - 1), '青纹长宝')
 })
 
-test('maps are deterministic per region and spawn is always walkable', () => {
-  const a = sfMapOf(3)
-  const b = sfMapOf(3)
+test('maps are deterministic per region+shape and spawn is always walkable', () => {
+  const a = sfMapOf(3, 24, 12)
+  const b = sfMapOf(3, 24, 12)
   assert.deepEqual(a, b)
-  assert.notDeepEqual(a, sfMapOf(4))
-  const mid = Math.floor(12 / 2)
-  const spawn = mid * 12 + mid
-  for (const i of [spawn, spawn - 1, spawn + 1, spawn - 12, spawn + 12]) {
+  assert.notDeepEqual(a, sfMapOf(4, 24, 12))
+  assert.notDeepEqual(a, sfMapOf(3, 20, 12), 'shape feeds the seed')
+  const spawn = Math.floor(12 / 2) * 24 + 12
+  for (const i of [spawn, spawn - 1, spawn + 1, spawn - 24, spawn + 24]) {
     assert.notEqual(a[i], 2, `cell ${i} not water`)
     assert.notEqual(a[i], 3, `cell ${i} not rock`)
   }
+})
+
+test('grid shape follows the board aspect at ~36px cells', () => {
+  const wide = sfFitDims(920, 420)
+  assert.equal(wide.cols, 26)
+  assert.equal(wide.rows, 12)
+  const narrow = sfFitDims(320, 128)
+  assert.equal(narrow.cols, 9)
+  assert.equal(narrow.rows, 6)
+  assert.equal(sfFitDims(2000, 900).cols <= 44, true)
+})
+
+test('sfPath finds a walkable route and refuses unwalkable targets', () => {
+  let state = createSafariState()
+  // Force a known shape: clear a corridor.
+  const cols = state.cols
+  const target = state.pos + 3
+  state = { ...state, map: state.map.map((t, i) => (i >= state.pos && i <= target && Math.abs((i % cols) - state.pos % cols) <= 3 ? 0 : t)) }
+  const path = sfPath(state, target)
+  assert.ok(path !== null && path.length === 3)
+  assert.equal(path[0], state.pos + 1)
+  // Water target: no route.
+  const waterState = { ...state, map: state.map.slice() }
+  waterState.map[target + 1] = 2
+  assert.equal(sfPath(waterState, target + 1), null)
 })
 
 test('encounter roll tiers follow the rarity schedule', () => {
@@ -78,8 +106,8 @@ test('encounter roll tiers follow the rarity schedule', () => {
 
 test('steps only reach adjacent walkable cells; grass may trigger encounters', () => {
   const state = createSafariState()
-  const mid = Math.floor(12 / 2)
-  const spawn = mid * 12 + mid
+  const mid = Math.floor(state.rows / 2)
+  const spawn = mid * state.cols + Math.floor(state.cols / 2)
   // Non-adjacent and unwalkable cells are refused.
   assert.equal(sfStep(state, spawn + 20), state)
   // Left neighbour is forced plain (walkable): no encounter there.
@@ -129,17 +157,23 @@ test('release ends an encounter without touching the dex', () => {
   assert.equal(released.dexCaught, state.dexCaught)
 })
 
-test('the store drives step/throw/region and the dex round-trips storage', () => {
+test('the store walks to a target, refits the board and round-trips the dex', () => {
   const store = createSafariStore()
   const snap = store.getSnapshot()
-  const mid = Math.floor(12 / 2)
-  store.step(mid * 12 + mid - 1)
-  assert.equal(store.getSnapshot().pos, mid * 12 + mid - 1)
+  const spawn = snap.pos
+  store.walkTo(spawn - 1)
+  // The walk timer moves the avatar synchronously on the first tick.
+  assert.equal(store.getSnapshot().pos, spawn - 1)
   store.nextRegion()
   assert.equal(store.getSnapshot().region, snap.region + 1)
-  assert.equal(store.getSnapshot().pos, mid * 12 + mid)
+  assert.equal(store.getSnapshot().pos, Math.floor(snap.rows / 2) * snap.cols + Math.floor(snap.cols / 2))
+  store.fitBoard(920, 420)
+  const fitted = store.getSnapshot()
+  assert.deepEqual([fitted.cols, fitted.rows], [26, 12])
+  assert.equal(fitted.map.length, 26 * 12)
   store.toggleDex()
   assert.equal(store.getSnapshot().dexOpen, true)
+  store.dispose()
 })
 
 test('drawSafariMap paints on a stub canvas without throwing', () => {
@@ -162,7 +196,7 @@ test('drawSafariMap paints on a stub canvas without throwing', () => {
     },
   )
   const canvas = { clientWidth: 480, clientHeight: 360, getContext: () => ctx }
-  const state = createSafariState()
+  const state = { ...createSafariState(), cols: 24, rows: 12 }
   drawSafariMap(canvas, state)
   assert.ok(calls.fillRect > 100, `terrain tiles painted (${calls.fillRect})`)
   assert.ok(calls.arc >= 2, `player/rocks drawn (${calls.arc})`)
