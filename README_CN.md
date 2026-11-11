@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.7.0-blue)
+![Version](https://img.shields.io/badge/version-0.8.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-92%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 当前版本 **0.7.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式，并完成加固——失败原因码本地化、通知权限改为用户手势触发、快捷键可关闭、视图跳转失败可见反馈、错误边界。已在 DSH `0.2.1-rc.5` 上测试。
+> 当前版本 **0.8.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式，并完成加固——失败原因码本地化、通知权限改为用户手势触发、快捷键可关闭、视图跳转失败可见反馈、错误边界。已在 DSH `0.2.1-rc.5` 上测试。
 
 ## 目录
 
@@ -219,6 +219,7 @@ CHANGELOG.md        版本变更
 - **0.6.0**：胶囊后台按钮、空格全状态控制（D36）。
 - **0.6.1**：五子棋高级难度封堵成四/双三（D39）、底部按 Todo dock 展开态预留（D40）、分发收敛为 GitHub-only（D37）、文档与验收对齐代码。
 - **0.7.0**：加固——失败原因码本地化 + `stateVersion` 5（D41）、视图跳转失败可见反馈、通知权限用户手势触发、快捷键可关闭、store 生命周期随 apply、晚绑定重试、错误边界、reduced-motion（D42/D43）。
+- **0.8.0**：架构——client.js 拆分为按序拼接的 src/client/ 片段 + 构建与漂移防护（D44）；GameAdapter 注册表消除全部 `mode === 'snake'` 分支，第三款游戏只需一个 adapter 对象（D45）。
 - **下一步**：DSH 多版本兼容性——宿主 API 契约与逐版本核对清单见 [docs/compat.md](docs/compat.md)，新版本 DSH 发布后照单验证。加固 backlog（宿主耦合适配层、通知权限改为用户手势触发、RT-04/RT-05、错误边界）见 [docs/iteration-plan.md](docs/iteration-plan.md)。
 - **不做**：游戏内审批、自动审批、任何反向控制 Agent 的能力。
 

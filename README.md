@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.7.0-blue)
+![Version](https://img.shields.io/badge/version-0.8.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-92%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> Current version **0.7.0**: M1 status board + M2 games + M3 one-way signals + low-key presence, hardened — locale-neutral failure reason codes, notification permission on user gesture, disableable shortcut, visible fallback when the view-switch workaround fails, error boundaries. Tested on DSH `0.2.1-rc.5`.
+> Current version **0.8.0**: M1 status board + M2 games + M3 one-way signals + low-key presence, hardened — locale-neutral failure reason codes, notification permission on user gesture, disableable shortcut, visible fallback when the view-switch workaround fails, error boundaries. Tested on DSH `0.2.1-rc.5`.
 
 ## Table of Contents
 
@@ -219,6 +219,7 @@ CHANGELOG.md        Release notes
 - **0.6.0**: background button on the pill, Space controls all states (D36).
 - **0.6.1**: gomoku hard-AI fork/double-three blocking (D39), Todo-dock-aware bottom spacing (D40), GitHub-only distribution (D37), docs and acceptance realigned with code.
 - **0.7.0**: hardening — locale-neutral reason codes + `stateVersion` 5 (D41), host-adapter feedback for the view switch, notification permission on user gesture, disableable shortcut, store lifecycle per apply, late-binding retries, error boundaries, reduced-motion (D42/D43).
+- **0.8.0**: architecture — client.js split into ordered src/client/ fragments with a concat build + drift guard (D44); GameAdapter registry removes every `mode === 'snake'` branch — a third game is now one adapter object (D45).
 - **Next**: DSH multi-version compatibility — host API contract + per-version checklist in [docs/compat.md](docs/compat.md); verify against new DSH releases as they ship. Hardening backlog (host-coupling adapter layer, notification permission on user gesture, RT-04/RT-05, error boundary) tracked in [docs/iteration-plan.md](docs/iteration-plan.md).
 - **Never**: in-game approval, auto-approval, or any reverse control over the Agent.
 
