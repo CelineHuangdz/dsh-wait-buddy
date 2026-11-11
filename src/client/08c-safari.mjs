@@ -209,9 +209,12 @@
       if (width === 0 || height === 0) return
       const ctx = canvas.getContext('2d')
       if (ctx === null) return
-      const cell = Math.floor(Math.min(width, height) / SAFARI_SIZE)
-      const ox = Math.floor((width - cell * SAFARI_SIZE) / 2)
-      const oy = Math.floor((height - cell * SAFARI_SIZE) / 2)
+      // D47b: the map fills the whole board box like the snake board — cells
+      // stretch with the container instead of locking to a centered square.
+      const cell = width / SAFARI_SIZE
+      const cellH = height / SAFARI_SIZE
+      const ox = 0
+      const oy = 0
       ctx.clearRect(0, 0, width, height)
       for (let y = 0; y < SAFARI_SIZE; y += 1) {
         for (let x = 0; x < SAFARI_SIZE; x += 1) {
@@ -227,26 +230,26 @@
                 : terrain === SF_TERRAIN.rock
                   ? '#2a3546'
                   : '#1b2839'
-          ctx.fillRect(px, py, cell, cell)
+          ctx.fillRect(px, py, cell, cellH)
           if (terrain === SF_TERRAIN.grass) {
             ctx.strokeStyle = '#2f5d42'
             ctx.beginPath()
             for (let b = 1; b <= 3; b += 1) {
               const bx = px + (cell * b) / 4
-              ctx.moveTo(bx, py + cell * 0.7)
-              ctx.lineTo(bx + cell * 0.08, py + cell * 0.35)
+              ctx.moveTo(bx, py + cellH * 0.7)
+              ctx.lineTo(bx + cell * 0.08, py + cellH * 0.35)
             }
             ctx.stroke()
           } else if (terrain === SF_TERRAIN.rock) {
             ctx.fillStyle = '#3b4860'
             ctx.beginPath()
-            ctx.arc(px + cell / 2, py + cell / 2, cell * 0.24, 0, Math.PI * 2)
+            ctx.arc(px + cell / 2, py + cellH / 2, Math.min(cell, cellH) * 0.24, 0, Math.PI * 2)
             ctx.fill()
           }
           // Walkable-adjacent highlight (where the player may step).
           if (sfAdjacent(state.pos, i) && sfWalkable(terrain)) {
             ctx.strokeStyle = 'rgba(142,247,176,0.55)'
-            ctx.strokeRect(px + 1.5, py + 1.5, cell - 3, cell - 3)
+            ctx.strokeRect(px + 1.5, py + 1.5, cell - 3, cellH - 3)
           }
         }
       }
@@ -255,7 +258,7 @@
       const py = oy + Math.floor(state.pos / SAFARI_SIZE) * cell
       ctx.fillStyle = '#e6f2ff'
       ctx.beginPath()
-      ctx.arc(px + cell / 2, py + cell / 2, cell * 0.3, 0, Math.PI * 2)
+      ctx.arc(px + cell / 2, py + cellH / 2, Math.min(cell, cellH) * 0.3, 0, Math.PI * 2)
       ctx.fill()
       ctx.strokeStyle = '#8ef7b0'
       ctx.stroke()
@@ -315,11 +318,10 @@
 
     function sfPointAt(canvas, clientX, clientY) {
       const rect = canvas.getBoundingClientRect()
-      const cell = Math.min(rect.width, rect.height) / SAFARI_SIZE
-      const ox = (rect.width - cell * SAFARI_SIZE) / 2
-      const oy = (rect.height - cell * SAFARI_SIZE) / 2
-      const x = Math.floor((clientX - rect.left - ox) / cell)
-      const y = Math.floor((clientY - rect.top - oy) / cell)
+      const cell = rect.width / SAFARI_SIZE
+      const cellH = rect.height / SAFARI_SIZE
+      const x = Math.floor((clientX - rect.left) / cell)
+      const y = Math.floor((clientY - rect.top) / cellH)
       if (x < 0 || y < 0 || x >= SAFARI_SIZE || y >= SAFARI_SIZE) return -1
       return y * SAFARI_SIZE + x
     }
@@ -445,7 +447,7 @@
       }, [])
       return h(
         'div',
-        { className: 'wb-boardWrap wb-squareBoard', tabIndex: 0, ref: boardRef },
+        { className: 'wb-boardWrap', tabIndex: 0, ref: boardRef },
         h('canvas', {
           ref: canvasRef,
           className: 'wb-board',
