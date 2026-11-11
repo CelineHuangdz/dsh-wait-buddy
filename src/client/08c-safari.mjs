@@ -157,6 +157,7 @@
         lastResult: '', // 'caught' | 'fled' | 'released'
         target: null, // walk destination (click feedback, D47b)
         invalid: null, // clicked an unreachable cell (red cross flash)
+        route: [], // remaining walk path, drawn as dots (visibility at 14px)
         dex,
         dexCaught: caught,
         dexOpen: false,
@@ -236,12 +237,20 @@
       const tick = () => {
         if (path.length === 0) {
           stopWalk()
-          publish({ ...state, target: null })
+          publish({ ...state, target: null, route: [] })
           return
         }
         const next = path.shift()
         const stepped = sfStep(state, next)
-        if (stepped !== state) publish(stepped)
+        if (stepped !== state) {
+          const encounterHit = stepped.encounter !== null
+          publish({
+            ...stepped,
+            route: encounterHit ? [] : path.slice(),
+            // an encounter stop must not leave a stale target ring behind
+            target: encounterHit ? null : stepped.target,
+          })
+        }
       }
       return {
         getSnapshot: () => state,
@@ -273,7 +282,7 @@
             timer = setInterval(tick, 90)
             tick()
           }
-          publish({ ...state, target: cell, invalid: null })
+          publish({ ...state, target: cell, invalid: null, route: path.slice() })
         },
         /** Re-fit the grid to the measured board; keeps region and dex. */
         fitBoard(width, height) {
@@ -288,6 +297,7 @@
             map: sfMapOf(state.region, cols, rows),
             pos: sfSpawnOf(cols, rows),
             lastResult: '',
+            route: [],
           })
         },
         throwBall() {
@@ -307,6 +317,7 @@
             region: state.region + 1,
             target: null,
             invalid: null,
+            route: [],
             map: sfMapOf(state.region + 1, state.cols, state.rows),
             pos: sfSpawnOf(state.cols, state.rows),
             encounter: null,
@@ -464,6 +475,17 @@
         ctx.lineTo(width, g * cellH)
       }
       ctx.stroke()
+      // Remaining walk path: a trail of dots so long routes read at a glance.
+      if (state.route.length > 0) {
+        ctx.fillStyle = 'rgba(142,247,176,0.65)'
+        for (const at of state.route) {
+          const rx = (at % state.cols) * cell + cell / 2
+          const ry = Math.floor(at / state.cols) * cellH + cellH / 2
+          ctx.beginPath()
+          ctx.arc(rx, ry, Math.max(1.5, unit * 0.09), 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
       // Walk target ring / invalid cross (click feedback, D47b).
       if (state.target !== null) {
         const tx = (state.target % state.cols) * cell + cell / 2
@@ -498,7 +520,8 @@
       const py = Math.floor(state.pos / state.cols) * cellH
       const cx = px + cell / 2
       const cy = py + cellH / 2
-      const r = unit * 0.28
+      // D47b: never smaller than ~5px — a speck avatar reads as "no reaction".
+      const r = Math.max(unit * 0.28, 5)
       ctx.fillStyle = 'rgba(0,0,0,0.35)'
       ctx.beginPath()
       ctx.ellipse(cx, cy + r * 0.85, r * 0.9, r * 0.32, 0, 0, Math.PI * 2)
