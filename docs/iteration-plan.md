@@ -155,7 +155,7 @@
 | ID | 优先级 | 问题 | 代码证据 | 来源 | 状态 |
 |---|---|---|---|---|---|
 | AR-01 | P1 | 没有信号层，只有电平快照；无法表达"进入审批/本轮结束"这类边沿 | `client.js:342-346` | C/G/M | ✅ |
-| AR-02 | P1 | 单文件 1634 行；`mode === 'snake'` 三元分支；无 GameAdapter | `client.js:1289-1317` | C/G/M | ✅ |
+| AR-02 | P1 | 单文件 1634 行；`mode === 'snake'` 三元分支；无 GameAdapter | `client.js:1289-1317` | C/G/M | ✅ 0.8.0 已落地（D44 拆分 + D45 GameAdapter 注册表） |
 | QA-01 | P0 | 零测试；`__game` 导出未使用；`fold` 未导出，无法单测 | `package.json`；`client.js:1612-1631` | C/G/M | ✅ |
 | QA-02 | P2 | 无 `test` script/CI/文档一致性检查 | `package.json` | G/M | ✅ |
 | DOC-01 | P0 | M0 原文已补录（[baseline-m0.md](baseline-m0.md)），但 README/ui-spec/locale/decisions 与 M0 仍有多处漂移 | `README.md:18/24/35/89`；`ui-spec.md:10/36/125`；D16/D17 | C/G/M | ✅ |

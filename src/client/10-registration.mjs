@@ -197,6 +197,8 @@
       },
       /** Static UI pieces + stylesheet, exported for component tests. */
       __components: { AlertBanner, gameOverlay, gomokuOverlay, ErrorBoundary },
+      /** GameAdapter registry (D45), exported for tests and future games. */
+      __games: { GAMES, GAME_ORDER },
       __css: CSS,
       /** Full view, exported for static layout tests only. */
       __view: WaitBuddyView,

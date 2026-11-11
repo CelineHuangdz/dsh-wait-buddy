@@ -1545,7 +1545,8 @@ window.__ModuleLoader__.load({
     }
 
     function onGameKeyDown(event) {
-      if (modeStore.getSnapshot() !== 'snake') return
+      // D45: only keyboard-driven games (see GAMES.keyboard) consume keys.
+      if (!GAMES[modeStore.getSnapshot()].keyboard) return
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       const target = event.target
       if (
@@ -2223,191 +2224,28 @@ window.__ModuleLoader__.load({
         return gomokuStore.subscribe(sync)
       }, [])
 
-      React.useEffect(() => {
-        if (mode !== 'snake') return
-        drawGame(canvasRef.current, snake)
-      }, [mode, snake])
-      React.useEffect(() => {
-        if (mode !== 'gomoku') return
-        drawGomoku(gomokuCanvasRef.current, gomoku)
-      }, [mode, gomoku])
-      React.useEffect(() => {
-        if (mode !== 'snake') return undefined
-        const element = boardRef.current
-        if (element === null) return undefined
-        const measure = () => {
-          const rect = element.getBoundingClientRect()
-          if (rect.width < 60 || rect.height < 60) return
-          const grid = gridFor(rect.width, rect.height)
-          gameStore.setGrid(grid.cols, grid.rows)
-        }
-        measure()
-        if (typeof ResizeObserver !== 'function') return undefined
-        const observer = new ResizeObserver(measure)
-        observer.observe(element)
-        return () => observer.disconnect()
-      }, [mode])
-
-      React.useEffect(() => {
-        if (mode !== 'gomoku') return undefined
-        const element = boardRef.current
-        if (element === null) return undefined
-        const measure = () => drawGomoku(gomokuCanvasRef.current, gomokuStore.getSnapshot())
-        measure()
-        if (typeof ResizeObserver !== 'function') return undefined
-        const observer = new ResizeObserver(measure)
-        observer.observe(element)
-        return () => observer.disconnect()
-      }, [mode])
-
       const switchMode = (next) => {
         if (next === mode) return
         modeStore.set(next)
-        if (next === 'gomoku') gameStore.pause()
+        if (GAMES[mode].pauseOnLeave) GAMES[mode].store().pause()
         focusRoot()
       }
 
-      const segButton = (label, key, active, onPick) =>
-        h(
-          'button',
-          {
-            key,
-            type: 'button',
-            className: 'wb-segBtn',
-            'data-active': active ? 'true' : 'false',
-            onClick: onPick,
-          },
-          label,
-        )
-
-      const settingButtons = (labels, activeId, onPick) =>
-        Object.keys(labels).map((id) =>
-          segButton(t(labels[id]), id, activeId === id, () => onPick(id)),
-        )
-
-      const setting =
-        mode === 'snake'
-          ? h(
-              'div',
-              { className: 'wb-setting' },
-              h('span', { className: 'wb-settingLabel' }, t('game.speed')),
-              h(
-                'div',
-                { className: 'wb-seg' },
-                settingButtons(SPEED_LABEL, settings.speed, (id) => {
-                  settingsStore.setSpeed(id)
-                  gameStore.setSpeed(id)
-                }),
-              ),
-            )
-          : h(
-              'div',
-              { className: 'wb-setting' },
-              h('span', { className: 'wb-settingLabel' }, t('gomoku.level')),
-              h(
-                'div',
-                { className: 'wb-seg' },
-                settingButtons(LEVEL_LABEL, settings.level, (id) => settingsStore.setLevel(id)),
-              ),
-            )
-
-      const board =
-        mode === 'snake'
-          ? h(
-              'div',
-              { className: 'wb-boardWrap', tabIndex: 0, ref: boardRef },
-              h('canvas', {
-                ref: canvasRef,
-                className: 'wb-board',
-                role: 'img',
-                'aria-label': t('game.canvasLabel', { score: snake.score }),
-              }),
-              gameOverlay(t, snake, focusRoot, pendingKind),
-              snake.reward === null
-                ? null
-                : h(
-                    'div',
-                    { key: `reward-${snake.reward.id}`, className: 'wb-reward', 'aria-hidden': true },
-                    t('game.reward', { amount: snake.reward.amount }),
-                  ),
-              snake.notice === null
-                ? null
-                : h(
-                    'div',
-                    { key: `notice-${snake.notice.id}`, className: 'wb-notice', role: 'status' },
-                    t(`game.notice.${snake.notice.kind}`),
-                  ),
-            )
-          : h(
-              'div',
-              { className: 'wb-boardWrap wb-squareBoard', tabIndex: 0, ref: boardRef },
-              h('canvas', {
-                ref: gomokuCanvasRef,
-                className: 'wb-board',
-                role: 'img',
-                'aria-label': t('gomoku.canvasLabel', { moves: gomoku.moves }),
-                onClick: (event) => {
-                  if (gomokuCanvasRef.current === null) return
-                  const index = gomokuPointAt(gomokuCanvasRef.current, event.clientX, event.clientY)
-                  if (index >= 0) gomokuStore.place(index, settingsStore.getSnapshot().level)
-                },
-              }),
-              gomokuOverlay(t, gomoku, focusRoot),
-            )
-
-      const controls =
-        mode === 'snake'
-          ? h(
-              React.Fragment,
-              null,
-              h(
-                'div',
-                { className: 'wb-caption' },
-                `${t('game.score', { score: snake.score })} · ${t('game.best', { best: snake.best })}`,
-              ),
-              h(
-                'div',
-                { className: 'wb-gameActions' },
-                // D35: no Pause/Resume button — Space toggles, clicking the
-                // paused overlay resumes.
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-btn',
-                    onClick: () => gameStore.reset(settingsStore.getSnapshot().speed),
-                  },
-                  t('game.reset'),
-                ),
-              ),
-              h('div', { className: 'wb-hint' }, t('game.hint')),
-            )
-          : h(
-              React.Fragment,
-              null,
-              h(
-                'div',
-                { className: 'wb-caption' },
-                t('gomoku.moves', {
-                  you: Math.ceil(gomoku.moves / 2),
-                  ai: Math.floor(gomoku.moves / 2),
-                }),
-              ),
-              h(
-                'div',
-                { className: 'wb-gameActions' },
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-btn',
-                    onClick: () => gomokuStore.reset(),
-                  },
-                  t('game.reset'),
-                ),
-              ),
-              h('div', { className: 'wb-hint' }, t('gomoku.hint')),
-            )
+      // D45: everything below renders through the GameAdapter registry —
+      // no `mode === 'snake'` branches here.
+      const game = GAMES[mode]
+      const setting = h(game.Setting, { t, settings })
+      const board = h(game.Board, {
+        t,
+        snake,
+        gomoku,
+        focusRoot,
+        pendingKind,
+        boardRef,
+        canvasRef,
+        gomokuCanvasRef,
+      })
+      const controls = h(game.Controls, { t, snake, gomoku })
 
       // Presence mode control (D29 §8.7 / D31): quiet / pill.
       const presenceSetting = h(
@@ -2417,10 +2255,10 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'wb-seg' },
-          segButton(t('presence.quiet'), 'quiet', settings.presence === 'quiet', () =>
+          gameSegButton(t('presence.quiet'), 'quiet', settings.presence === 'quiet', () =>
             settingsStore.setPresence('quiet'),
           ),
-          segButton(t('presence.pill'), 'pill', settings.presence === 'pill', () =>
+          gameSegButton(t('presence.pill'), 'pill', settings.presence === 'pill', () =>
             settingsStore.setPresence('pill'),
           ),
         ),
@@ -2435,10 +2273,10 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'wb-seg' },
-          segButton(t('shortcut.on'), 'shortcut-on', settings.shortcut, () =>
+          gameSegButton(t('shortcut.on'), 'shortcut-on', settings.shortcut, () =>
             settingsStore.setShortcut(true),
           ),
-          segButton(t('shortcut.off'), 'shortcut-off', !settings.shortcut, () =>
+          gameSegButton(t('shortcut.off'), 'shortcut-off', !settings.shortcut, () =>
             settingsStore.setShortcut(false),
           ),
         ),
@@ -2466,8 +2304,9 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'wb-seg' },
-            segButton(t('game.title'), 'snake', mode === 'snake', () => switchMode('snake')),
-            segButton(t('gomoku.title'), 'gomoku', mode === 'gomoku', () => switchMode('gomoku')),
+            ...GAME_ORDER.map((id) =>
+              gameSegButton(t(GAMES[id].titleKey), id, mode === id, () => switchMode(id)),
+            ),
           ),
           setting,
           presenceSetting,
@@ -2597,6 +2436,320 @@ const CSS = `
 .wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
 @media (prefers-reduced-motion: reduce){.wb-pulseFill{animation:none}.wb-reward{animation:none;opacity:1}.wb-notice{animation:none;opacity:1}}
 `
+
+    // ---------------------------------------------------------------------
+    // §8b GameAdapter (D45): one entry per game. The full view and the
+    // floating panel render exclusively through this registry — adding a
+    // third game means adding an adapter object, not new mode branches.
+    // Components are hoisted function declarations, so the registry may be
+    // textually earlier than some of them (FloatGame & friends live in §9).
+    // ---------------------------------------------------------------------
+
+    /** Segmented-control button (shared by games and the board footer). */
+    function gameSegButton(label, key, active, onPick) {
+      return h(
+        'button',
+        {
+          key,
+          type: 'button',
+          className: 'wb-segBtn',
+          'data-active': active ? 'true' : 'false',
+          onClick: onPick,
+        },
+        label,
+      )
+    }
+
+    function gameSettingButtons(t, labels, activeId, onPick) {
+      return Object.keys(labels).map((id) =>
+        gameSegButton(t(labels[id]), id, activeId === id, () => onPick(id)),
+      )
+    }
+
+    /** Snake: speed presets (§4 settings row). */
+    function SnakeSetting({ t, settings }) {
+      return h(
+        'div',
+        { className: 'wb-setting' },
+        h('span', { className: 'wb-settingLabel' }, t('game.speed')),
+        h(
+          'div',
+          { className: 'wb-seg' },
+          gameSettingButtons(t, SPEED_LABEL, settings.speed, (id) => {
+            settingsStore.setSpeed(id)
+            gameStore.setSpeed(id)
+          }),
+        ),
+      )
+    }
+
+    /** Gomoku: difficulty presets. */
+    function GomokuSetting({ t, settings }) {
+      return h(
+        'div',
+        { className: 'wb-setting' },
+        h('span', { className: 'wb-settingLabel' }, t('gomoku.level')),
+        h(
+          'div',
+          { className: 'wb-seg' },
+          gameSettingButtons(t, LEVEL_LABEL, settings.level, (id) => settingsStore.setLevel(id)),
+        ),
+      )
+    }
+
+    /** Snake board: canvas + overlay + reward/notice floats (§7). */
+    function SnakeBoard({ t, snake, focusRoot, pendingKind, boardRef, canvasRef }) {
+      React.useEffect(() => {
+        drawGame(canvasRef.current, snake)
+      }, [snake])
+      React.useEffect(() => {
+        const element = boardRef.current
+        if (element === null) return undefined
+        const measure = () => {
+          const rect = element.getBoundingClientRect()
+          if (rect.width < 60 || rect.height < 60) return
+          const grid = gridFor(rect.width, rect.height)
+          gameStore.setGrid(grid.cols, grid.rows)
+        }
+        measure()
+        if (typeof ResizeObserver !== 'function') return undefined
+        const observer = new ResizeObserver(measure)
+        observer.observe(element)
+        return () => observer.disconnect()
+      }, [])
+      return h(
+        'div',
+        { className: 'wb-boardWrap', tabIndex: 0, ref: boardRef },
+        h('canvas', {
+          ref: canvasRef,
+          className: 'wb-board',
+          role: 'img',
+          'aria-label': t('game.canvasLabel', { score: snake.score }),
+        }),
+        gameOverlay(t, snake, focusRoot, pendingKind),
+        snake.reward === null
+          ? null
+          : h(
+              'div',
+              { key: `reward-${snake.reward.id}`, className: 'wb-reward', 'aria-hidden': true },
+              t('game.reward', { amount: snake.reward.amount }),
+            ),
+        snake.notice === null
+          ? null
+          : h(
+              'div',
+              { key: `notice-${snake.notice.id}`, className: 'wb-notice', role: 'status' },
+              t(`game.notice.${snake.notice.kind}`),
+            ),
+      )
+    }
+
+    /** Gomoku board: square canvas, click-to-place, terminal overlay. */
+    function GomokuBoard({ t, gomoku, focusRoot, boardRef, canvasRef }) {
+      React.useEffect(() => {
+        drawGomoku(canvasRef.current, gomoku)
+      }, [gomoku])
+      React.useEffect(() => {
+        const element = boardRef.current
+        if (element === null) return undefined
+        const measure = () => drawGomoku(canvasRef.current, gomokuStore.getSnapshot())
+        measure()
+        if (typeof ResizeObserver !== 'function') return undefined
+        const observer = new ResizeObserver(measure)
+        observer.observe(element)
+        return () => observer.disconnect()
+      }, [])
+      return h(
+        'div',
+        { className: 'wb-boardWrap wb-squareBoard', tabIndex: 0, ref: boardRef },
+        h('canvas', {
+          ref: canvasRef,
+          className: 'wb-board',
+          role: 'img',
+          'aria-label': t('gomoku.canvasLabel', { moves: gomoku.moves }),
+          onClick: (event) => {
+            if (canvasRef.current === null) return
+            const index = gomokuPointAt(canvasRef.current, event.clientX, event.clientY)
+            if (index >= 0) gomokuStore.place(index, settingsStore.getSnapshot().level)
+          },
+        }),
+        gomokuOverlay(t, gomoku, focusRoot),
+      )
+    }
+
+    /** Snake foot: score caption, reset, keyboard hint. */
+    function SnakeControls({ t, snake }) {
+      return h(
+        React.Fragment,
+        null,
+        h(
+          'div',
+          { className: 'wb-caption' },
+          `${t('game.score', { score: snake.score })} · ${t('game.best', { best: snake.best })}`,
+        ),
+        h(
+          'div',
+          { className: 'wb-gameActions' },
+          // D35: no Pause/Resume button — Space toggles, clicking the
+          // paused overlay resumes.
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-btn',
+              onClick: () => gameStore.reset(settingsStore.getSnapshot().speed),
+            },
+            t('game.reset'),
+          ),
+        ),
+        h('div', { className: 'wb-hint' }, t('game.hint')),
+      )
+    }
+
+    /** Gomoku foot: move counters, reset, hint. */
+    function GomokuControls({ t, gomoku }) {
+      return h(
+        React.Fragment,
+        null,
+        h(
+          'div',
+          { className: 'wb-caption' },
+          t('gomoku.moves', {
+            you: Math.ceil(gomoku.moves / 2),
+            ai: Math.floor(gomoku.moves / 2),
+          }),
+        ),
+        h(
+          'div',
+          { className: 'wb-gameActions' },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'wb-btn',
+              onClick: () => gomokuStore.reset(),
+            },
+            t('game.reset'),
+          ),
+        ),
+        h('div', { className: 'wb-hint' }, t('gomoku.hint')),
+      )
+    }
+
+    /** Floating-panel control row (snake): score, reset, background. */
+    function PillSnakeCtl({ t, store, goBackground }) {
+      const [game, setGame] = React.useState(() => store.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setGame(store.getSnapshot())
+        sync()
+        return store.subscribe(sync)
+      }, [store])
+      return h(
+        'div',
+        { className: 'wb-pillCtl' },
+        h('span', null, t('game.score', { score: game.score })),
+        // D35: no Pause/Resume button — Space or clicking the
+        // paused overlay handles both.
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'wb-pillCtlBtn',
+            onClick: () => {
+              store.setGrid(MINI_COLS, MINI_ROWS)
+              store.reset('normal')
+            },
+          },
+          t('game.reset'),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'wb-pillCtlBtn',
+            'aria-label': t('pill.background'),
+            onClick: goBackground,
+          },
+          t('pill.backgroundShort'),
+        ),
+      )
+    }
+
+    /** Floating-panel control row (gomoku): moves, play again, background. */
+    function PillGomokuCtl({ t, store, goBackground }) {
+      const [state, setState] = React.useState(() => store.getSnapshot())
+      React.useEffect(() => {
+        const sync = () => setState(store.getSnapshot())
+        sync()
+        return store.subscribe(sync)
+      }, [store])
+      return h(
+        'div',
+        { className: 'wb-pillCtl' },
+        h(
+          'span',
+          null,
+          t('gomoku.moves', {
+            you: Math.ceil(state.moves / 2),
+            ai: Math.floor(state.moves / 2),
+          }),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'wb-pillCtlBtn',
+            onClick: () => store.reset(),
+          },
+          t('gomoku.again'),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'wb-pillCtlBtn',
+            'aria-label': t('pill.background'),
+            onClick: goBackground,
+          },
+          t('pill.backgroundShort'),
+        ),
+      )
+    }
+
+    /**
+     * The registry (D45). `pauseOnLeave`: switching away from this game must
+     * pause its round (snake ticks; gomoku is turn-based and does not).
+     * `keyboard`: the game consumes arrow/space keys in the full view.
+     * `store` is a getter because store impls live per-apply (RT-04).
+     */
+    const GAMES = {
+      snake: {
+        id: 'snake',
+        titleKey: 'game.title',
+        store: () => gameStore,
+        pauseOnLeave: true,
+        keyboard: true,
+        Board: SnakeBoard,
+        Setting: SnakeSetting,
+        Controls: SnakeControls,
+        Float: FloatGame,
+        FloatCtl: PillSnakeCtl,
+      },
+      gomoku: {
+        id: 'gomoku',
+        titleKey: 'gomoku.title',
+        store: () => gomokuStore,
+        pauseOnLeave: false,
+        keyboard: false,
+        Board: GomokuBoard,
+        Setting: GomokuSetting,
+        Controls: GomokuControls,
+        Float: FloatGomoku,
+        FloatCtl: PillGomokuCtl,
+      },
+    }
+
+    const GAME_ORDER = ['snake', 'gomoku']
 
     // ---------------------------------------------------------------------
     // §9 Shared stores & UI components (full view, floating panel, pill).
@@ -3022,7 +3175,9 @@ const CSS = `
         sync()
         return gomoku.subscribe(sync)
       }, [])
-      const [pillMode, setPillMode] = React.useState('snake')
+      const [pillMode, setPillMode] = React.useState(GAME_ORDER[0])
+      // D45: the pill renders games exclusively through the adapter registry.
+      const pillGame = GAMES[pillMode]
       const cornerOrigin = () => {
         if (typeof window === 'undefined') return { x: 16, y: 14 }
         const vw = window.innerWidth
@@ -3230,89 +3385,28 @@ const CSS = `
               h(
                 'div',
                 { className: 'wb-pillTabs' },
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-pillTabBtn',
-                    'data-active': pillMode === 'snake' ? 'true' : 'false',
-                    onClick: () => setPillMode('snake'),
-                  },
-                  t('game.title'),
-                ),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-pillTabBtn',
-                    'data-active': pillMode === 'gomoku' ? 'true' : 'false',
-                    onClick: () => {
-                      setPillMode('gomoku')
-                      // Same rule as the full view: switching to gomoku pauses
-                      // the (shared) snake round.
-                      store.pause()
+                ...GAME_ORDER.map((id) =>
+                  h(
+                    'button',
+                    {
+                      key: id,
+                      type: 'button',
+                      className: 'wb-pillTabBtn',
+                      'data-active': pillMode === id ? 'true' : 'false',
+                      onClick: () => {
+                        if (pillMode === id) return
+                        // Same rule as the full view: leaving a ticking game
+                        // pauses its round (D45 pauseOnLeave).
+                        if (GAMES[pillMode].pauseOnLeave) GAMES[pillMode].store().pause()
+                        setPillMode(id)
+                      },
                     },
-                  },
-                  t('gomoku.title'),
+                    t(GAMES[id].titleKey),
+                  ),
                 ),
               ),
-              pillMode === 'snake'
-                ? h(FloatGame, { t, store })
-                : h(FloatGomoku, { t, store: gomoku }),
-              pillMode === 'snake'
-                ? h(
-                    'div',
-                    { className: 'wb-pillCtl' },
-                    h('span', null, t('game.score', { score: game.score })),
-                    // D35: no Pause/Resume button — Space or clicking the
-                    // paused overlay handles both.
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        onClick: () => {
-                          store.setGrid(MINI_COLS, MINI_ROWS)
-                          store.reset('normal')
-                        },
-                      },
-                      t('game.reset'),
-                    ),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        'aria-label': t('pill.background'),
-                        onClick: goBackground,
-                      },
-                      t('pill.backgroundShort'),
-                    ),
-                  )
-                : h(
-                    'div',
-                    { className: 'wb-pillCtl' },
-                    h('span', null, t('gomoku.moves', { you: Math.ceil(gomokuState.moves / 2), ai: Math.floor(gomokuState.moves / 2) })),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        onClick: () => gomoku.reset(),
-                      },
-                      t('gomoku.again'),
-                    ),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        'aria-label': t('pill.background'),
-                        onClick: goBackground,
-                      },
-                      t('pill.backgroundShort'),
-                    ),
-                  ),
+              h(pillGame.Float, { t, store: pillGame.store() }),
+              h(pillGame.FloatCtl, { t, store: pillGame.store(), goBackground }),
             )
           : null,
       )
@@ -3674,6 +3768,8 @@ const CSS = `
       },
       /** Static UI pieces + stylesheet, exported for component tests. */
       __components: { AlertBanner, gameOverlay, gomokuOverlay, ErrorBoundary },
+      /** GameAdapter registry (D45), exported for tests and future games. */
+      __games: { GAMES, GAME_ORDER },
       __css: CSS,
       /** Full view, exported for static layout tests only. */
       __view: WaitBuddyView,

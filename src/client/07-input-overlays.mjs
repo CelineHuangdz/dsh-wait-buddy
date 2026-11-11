@@ -15,7 +15,8 @@
     }
 
     function onGameKeyDown(event) {
-      if (modeStore.getSnapshot() !== 'snake') return
+      // D45: only keyboard-driven games (see GAMES.keyboard) consume keys.
+      if (!GAMES[modeStore.getSnapshot()].keyboard) return
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
       const target = event.target
       if (

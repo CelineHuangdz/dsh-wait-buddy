@@ -423,7 +423,9 @@
         sync()
         return gomoku.subscribe(sync)
       }, [])
-      const [pillMode, setPillMode] = React.useState('snake')
+      const [pillMode, setPillMode] = React.useState(GAME_ORDER[0])
+      // D45: the pill renders games exclusively through the adapter registry.
+      const pillGame = GAMES[pillMode]
       const cornerOrigin = () => {
         if (typeof window === 'undefined') return { x: 16, y: 14 }
         const vw = window.innerWidth
@@ -631,89 +633,28 @@
               h(
                 'div',
                 { className: 'wb-pillTabs' },
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-pillTabBtn',
-                    'data-active': pillMode === 'snake' ? 'true' : 'false',
-                    onClick: () => setPillMode('snake'),
-                  },
-                  t('game.title'),
-                ),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-pillTabBtn',
-                    'data-active': pillMode === 'gomoku' ? 'true' : 'false',
-                    onClick: () => {
-                      setPillMode('gomoku')
-                      // Same rule as the full view: switching to gomoku pauses
-                      // the (shared) snake round.
-                      store.pause()
+                ...GAME_ORDER.map((id) =>
+                  h(
+                    'button',
+                    {
+                      key: id,
+                      type: 'button',
+                      className: 'wb-pillTabBtn',
+                      'data-active': pillMode === id ? 'true' : 'false',
+                      onClick: () => {
+                        if (pillMode === id) return
+                        // Same rule as the full view: leaving a ticking game
+                        // pauses its round (D45 pauseOnLeave).
+                        if (GAMES[pillMode].pauseOnLeave) GAMES[pillMode].store().pause()
+                        setPillMode(id)
+                      },
                     },
-                  },
-                  t('gomoku.title'),
+                    t(GAMES[id].titleKey),
+                  ),
                 ),
               ),
-              pillMode === 'snake'
-                ? h(FloatGame, { t, store })
-                : h(FloatGomoku, { t, store: gomoku }),
-              pillMode === 'snake'
-                ? h(
-                    'div',
-                    { className: 'wb-pillCtl' },
-                    h('span', null, t('game.score', { score: game.score })),
-                    // D35: no Pause/Resume button — Space or clicking the
-                    // paused overlay handles both.
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        onClick: () => {
-                          store.setGrid(MINI_COLS, MINI_ROWS)
-                          store.reset('normal')
-                        },
-                      },
-                      t('game.reset'),
-                    ),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        'aria-label': t('pill.background'),
-                        onClick: goBackground,
-                      },
-                      t('pill.backgroundShort'),
-                    ),
-                  )
-                : h(
-                    'div',
-                    { className: 'wb-pillCtl' },
-                    h('span', null, t('gomoku.moves', { you: Math.ceil(gomokuState.moves / 2), ai: Math.floor(gomokuState.moves / 2) })),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        onClick: () => gomoku.reset(),
-                      },
-                      t('gomoku.again'),
-                    ),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'wb-pillCtlBtn',
-                        'aria-label': t('pill.background'),
-                        onClick: goBackground,
-                      },
-                      t('pill.backgroundShort'),
-                    ),
-                  ),
+              h(pillGame.Float, { t, store: pillGame.store() }),
+              h(pillGame.FloatCtl, { t, store: pillGame.store(), goBackground }),
             )
           : null,
       )

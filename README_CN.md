@@ -18,7 +18,7 @@
 
 ![Version](https://img.shields.io/badge/version-0.7.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
-![Tests](https://img.shields.io/badge/tests-90%20%2B%204%20visual-brightgreen)
+![Tests](https://img.shields.io/badge/tests-92%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > 当前版本 **0.7.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式，并完成加固——失败原因码本地化、通知权限改为用户手势触发、快捷键可关闭、视图跳转失败可见反馈、错误边界。已在 DSH `0.2.1-rc.5` 上测试。
@@ -166,7 +166,7 @@ npx playwright install chromium   # 首次运行视觉测试需要
 
 npm run build:client  # 由 src/client/ 片段重新生成 client.js（改片段后必须执行）
 npm run test:meta    # 版本一致性 + node --check + 片段/产物漂移校验
-npm test             # 90 个纯逻辑/组件用例
+npm test             # 92 个纯逻辑/组件用例
 npm run test:visual  # 4 个无头布局场景（含宿主 tab bar / Todo dock / composer）
 npm run test:all     # 以上全部
 ```

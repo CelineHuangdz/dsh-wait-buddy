@@ -548,191 +548,28 @@
         return gomokuStore.subscribe(sync)
       }, [])
 
-      React.useEffect(() => {
-        if (mode !== 'snake') return
-        drawGame(canvasRef.current, snake)
-      }, [mode, snake])
-      React.useEffect(() => {
-        if (mode !== 'gomoku') return
-        drawGomoku(gomokuCanvasRef.current, gomoku)
-      }, [mode, gomoku])
-      React.useEffect(() => {
-        if (mode !== 'snake') return undefined
-        const element = boardRef.current
-        if (element === null) return undefined
-        const measure = () => {
-          const rect = element.getBoundingClientRect()
-          if (rect.width < 60 || rect.height < 60) return
-          const grid = gridFor(rect.width, rect.height)
-          gameStore.setGrid(grid.cols, grid.rows)
-        }
-        measure()
-        if (typeof ResizeObserver !== 'function') return undefined
-        const observer = new ResizeObserver(measure)
-        observer.observe(element)
-        return () => observer.disconnect()
-      }, [mode])
-
-      React.useEffect(() => {
-        if (mode !== 'gomoku') return undefined
-        const element = boardRef.current
-        if (element === null) return undefined
-        const measure = () => drawGomoku(gomokuCanvasRef.current, gomokuStore.getSnapshot())
-        measure()
-        if (typeof ResizeObserver !== 'function') return undefined
-        const observer = new ResizeObserver(measure)
-        observer.observe(element)
-        return () => observer.disconnect()
-      }, [mode])
-
       const switchMode = (next) => {
         if (next === mode) return
         modeStore.set(next)
-        if (next === 'gomoku') gameStore.pause()
+        if (GAMES[mode].pauseOnLeave) GAMES[mode].store().pause()
         focusRoot()
       }
 
-      const segButton = (label, key, active, onPick) =>
-        h(
-          'button',
-          {
-            key,
-            type: 'button',
-            className: 'wb-segBtn',
-            'data-active': active ? 'true' : 'false',
-            onClick: onPick,
-          },
-          label,
-        )
-
-      const settingButtons = (labels, activeId, onPick) =>
-        Object.keys(labels).map((id) =>
-          segButton(t(labels[id]), id, activeId === id, () => onPick(id)),
-        )
-
-      const setting =
-        mode === 'snake'
-          ? h(
-              'div',
-              { className: 'wb-setting' },
-              h('span', { className: 'wb-settingLabel' }, t('game.speed')),
-              h(
-                'div',
-                { className: 'wb-seg' },
-                settingButtons(SPEED_LABEL, settings.speed, (id) => {
-                  settingsStore.setSpeed(id)
-                  gameStore.setSpeed(id)
-                }),
-              ),
-            )
-          : h(
-              'div',
-              { className: 'wb-setting' },
-              h('span', { className: 'wb-settingLabel' }, t('gomoku.level')),
-              h(
-                'div',
-                { className: 'wb-seg' },
-                settingButtons(LEVEL_LABEL, settings.level, (id) => settingsStore.setLevel(id)),
-              ),
-            )
-
-      const board =
-        mode === 'snake'
-          ? h(
-              'div',
-              { className: 'wb-boardWrap', tabIndex: 0, ref: boardRef },
-              h('canvas', {
-                ref: canvasRef,
-                className: 'wb-board',
-                role: 'img',
-                'aria-label': t('game.canvasLabel', { score: snake.score }),
-              }),
-              gameOverlay(t, snake, focusRoot, pendingKind),
-              snake.reward === null
-                ? null
-                : h(
-                    'div',
-                    { key: `reward-${snake.reward.id}`, className: 'wb-reward', 'aria-hidden': true },
-                    t('game.reward', { amount: snake.reward.amount }),
-                  ),
-              snake.notice === null
-                ? null
-                : h(
-                    'div',
-                    { key: `notice-${snake.notice.id}`, className: 'wb-notice', role: 'status' },
-                    t(`game.notice.${snake.notice.kind}`),
-                  ),
-            )
-          : h(
-              'div',
-              { className: 'wb-boardWrap wb-squareBoard', tabIndex: 0, ref: boardRef },
-              h('canvas', {
-                ref: gomokuCanvasRef,
-                className: 'wb-board',
-                role: 'img',
-                'aria-label': t('gomoku.canvasLabel', { moves: gomoku.moves }),
-                onClick: (event) => {
-                  if (gomokuCanvasRef.current === null) return
-                  const index = gomokuPointAt(gomokuCanvasRef.current, event.clientX, event.clientY)
-                  if (index >= 0) gomokuStore.place(index, settingsStore.getSnapshot().level)
-                },
-              }),
-              gomokuOverlay(t, gomoku, focusRoot),
-            )
-
-      const controls =
-        mode === 'snake'
-          ? h(
-              React.Fragment,
-              null,
-              h(
-                'div',
-                { className: 'wb-caption' },
-                `${t('game.score', { score: snake.score })} · ${t('game.best', { best: snake.best })}`,
-              ),
-              h(
-                'div',
-                { className: 'wb-gameActions' },
-                // D35: no Pause/Resume button — Space toggles, clicking the
-                // paused overlay resumes.
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-btn',
-                    onClick: () => gameStore.reset(settingsStore.getSnapshot().speed),
-                  },
-                  t('game.reset'),
-                ),
-              ),
-              h('div', { className: 'wb-hint' }, t('game.hint')),
-            )
-          : h(
-              React.Fragment,
-              null,
-              h(
-                'div',
-                { className: 'wb-caption' },
-                t('gomoku.moves', {
-                  you: Math.ceil(gomoku.moves / 2),
-                  ai: Math.floor(gomoku.moves / 2),
-                }),
-              ),
-              h(
-                'div',
-                { className: 'wb-gameActions' },
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'wb-btn',
-                    onClick: () => gomokuStore.reset(),
-                  },
-                  t('game.reset'),
-                ),
-              ),
-              h('div', { className: 'wb-hint' }, t('gomoku.hint')),
-            )
+      // D45: everything below renders through the GameAdapter registry —
+      // no `mode === 'snake'` branches here.
+      const game = GAMES[mode]
+      const setting = h(game.Setting, { t, settings })
+      const board = h(game.Board, {
+        t,
+        snake,
+        gomoku,
+        focusRoot,
+        pendingKind,
+        boardRef,
+        canvasRef,
+        gomokuCanvasRef,
+      })
+      const controls = h(game.Controls, { t, snake, gomoku })
 
       // Presence mode control (D29 §8.7 / D31): quiet / pill.
       const presenceSetting = h(
@@ -742,10 +579,10 @@
         h(
           'div',
           { className: 'wb-seg' },
-          segButton(t('presence.quiet'), 'quiet', settings.presence === 'quiet', () =>
+          gameSegButton(t('presence.quiet'), 'quiet', settings.presence === 'quiet', () =>
             settingsStore.setPresence('quiet'),
           ),
-          segButton(t('presence.pill'), 'pill', settings.presence === 'pill', () =>
+          gameSegButton(t('presence.pill'), 'pill', settings.presence === 'pill', () =>
             settingsStore.setPresence('pill'),
           ),
         ),
@@ -760,10 +597,10 @@
         h(
           'div',
           { className: 'wb-seg' },
-          segButton(t('shortcut.on'), 'shortcut-on', settings.shortcut, () =>
+          gameSegButton(t('shortcut.on'), 'shortcut-on', settings.shortcut, () =>
             settingsStore.setShortcut(true),
           ),
-          segButton(t('shortcut.off'), 'shortcut-off', !settings.shortcut, () =>
+          gameSegButton(t('shortcut.off'), 'shortcut-off', !settings.shortcut, () =>
             settingsStore.setShortcut(false),
           ),
         ),
@@ -791,8 +628,9 @@
           h(
             'div',
             { className: 'wb-seg' },
-            segButton(t('game.title'), 'snake', mode === 'snake', () => switchMode('snake')),
-            segButton(t('gomoku.title'), 'gomoku', mode === 'gomoku', () => switchMode('gomoku')),
+            ...GAME_ORDER.map((id) =>
+              gameSegButton(t(GAMES[id].titleKey), id, mode === id, () => switchMode(id)),
+            ),
           ),
           setting,
           presenceSetting,

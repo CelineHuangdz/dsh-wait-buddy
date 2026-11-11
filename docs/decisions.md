@@ -505,3 +505,15 @@
 4. GameAdapter 抽取（AR-02 剩余）在其上以独立 PR 进行，遵守"行为变更与挪文件不同 PR"纪律。
 
 **影响面**：`src/client/*.mjs`（新增 11 片段）、`tools/build-client.mjs`、CI、`package.json` scripts、`client.js`（仅头注释）、README。
+
+## D45 GameAdapter 注册表（2026-11-11，已实现，0.8.0 后半）
+
+**问题（AR-02 剩余）**：完整视图与浮动小窗各有 `mode === 'snake'` 硬编码分支（棋盘/设置/控制行/页签/键盘门控共 5 处），第三款游戏无处挂载。
+
+**结论**：
+1. 新增 `GAMES` 注册表（`src/client/08b-game-adapter.mjs`）：每个游戏一个 adapter 对象，字段为 `id / titleKey / store()（getter，RT-04）/ pauseOnLeave / keyboard / Board / Setting / Controls / Float / FloatCtl`。
+2. GameArea 与 PresencePill **只经注册表渲染**：页签由 `GAME_ORDER` 生成，切换离开时按 `pauseOnLeave` 暂停，键盘按 `keyboard` 门控；`mode === 'snake'` 分支全部删除（仅 modeStore 默认值保留字面量）。
+3. 各游戏的棋盘绘制/ResizeObserver 效果移入 Board 组件（只在挂载时存在，等价于原 mode 门控）；GameArea/Pill 保留对双 store 的订阅（D34 订阅计数暂停语义不变）。
+4. 行为保持验证：92 单测 + 4 视觉全绿；新增 `test/games-registry.test.js` 锁定 adapter 契约面。**加第三款游戏 = 加一个 adapter 对象 + 一组组件**。
+
+**影响面**：`src/client/07/08/08b(新)/09/10`、`test/games-registry.test.js`、README、CHANGELOG。
