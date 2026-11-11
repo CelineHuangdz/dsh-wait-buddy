@@ -52,12 +52,14 @@
           // keep older references pointing at the fresh impls).
           gameStoreImpl = createGameStore()
           gomokuStoreImpl = createGomokuStore()
+          safariStoreImpl = createSafariStore()
           const stopSignals = signalHub.subscribe((signal) => gameStore.handleSignal(signal))
           return () => {
             stopSignals()
             gameStoreImpl?.dispose()
             gameStoreImpl = null
             gomokuStoreImpl = null
+            safariStoreImpl = null
           }
         }, 'wait-buddy: game runtime')
         const t = ctx.locale.bind(NS)
@@ -210,6 +212,7 @@
       __installRuntime() {
         if (gameStoreImpl === null) gameStoreImpl = createGameStore()
         if (gomokuStoreImpl === null) gomokuStoreImpl = createGomokuStore()
+        if (safariStoreImpl === null) safariStoreImpl = createSafariStore()
       },
       /** Pure game transitions, exported for unit testing (not used at runtime). */
       __game: {
@@ -224,6 +227,16 @@
         gomokuAiMove,
         gomokuIsMajorThreat,
         GOMOKU_SIZE,
+        createSafariState,
+        createSafariStore,
+        sfMapOf,
+        sfStep,
+        sfThrowBall,
+        sfRelease,
+        sfRollEncounter,
+        sfRarityOf,
+        sfSpeciesName,
+        SF_SPECIES_TOTAL,
         createGameState,
         startGame,
         turnGame,

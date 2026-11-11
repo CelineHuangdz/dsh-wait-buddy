@@ -20,13 +20,20 @@ export function loadClient(options = {}) {
         definition = value
       },
     },
-    localStorage: {
-      getItem() {
-        return null
-      },
-      setItem() {},
-      removeItem() {},
-    },
+    localStorage: (() => {
+      const backing = new Map()
+      return {
+        getItem(key) {
+          return backing.has(key) ? backing.get(key) : null
+        },
+        setItem(key, value) {
+          backing.set(key, String(value))
+        },
+        removeItem(key) {
+          backing.delete(key)
+        },
+      }
+    })(),
   }
   const document = {
     hidden: false,

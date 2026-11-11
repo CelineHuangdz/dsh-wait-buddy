@@ -5,7 +5,7 @@
 
 > **分发渠道（2026-11-10 产品决策）：仅 GitHub。** 不发布 npm——下文 npm 相关章节保留作参考，不再执行；发布 = git push + tag。安装方式见 README「Install」。
 
-## 0. 本次发布决定（2026-11-11，v0.9.1）
+## 0. 本次发布决定（2026-11-11，v0.10.0）
 
 - 包名：**`dsh-wait-buddy`**（不带 scope）。包名仍是 Client 模块 id，必须与 `cordis.patch.yml` / `client.js` 三处一致。
 - ~~发布形态：公共 npm 包~~（2026-11-10 起裁撤，仅 GitHub）。
@@ -35,7 +35,7 @@ DSH 的「插件」页（侧边栏 → Plugins → **Add plugin**）接受与 `p
 4. **`files` 必须覆盖运行时所需**：`index.js`、`client.js`、`cordis.patch.yml`、`locale/*.json`、`icon.svg`、`README.md`、`LICENSE`。
    用 `npm pack --dry-run` 核对，不要依赖“本地能跑”。
 5. **依赖声明**：Host 半用到 `zod`，必须留在 `dependencies`（不能是 devDependencies），发布后由用户的 pnpm 安装。
-6. **版本号**：当前 `v0.9.1`（移除未经讨论的扫雷；第三款游戏选型重新开放）。发布流程 = git push + `git tag v0.9.1 && git push --tags`。之后遵循 semver。
+6. **版本号**：当前 `v0.10.0`（第三款游戏：探索抓精灵，D47）。发布流程 = git push + `git tag v0.10.0 && git push --tags`。之后遵循 semver。
 7. **兼容性**：当前针对 DSH `0.2.1-rc.5` 开发；先在 README 写清"测试过的 DSH 版本"。
    是否加 `engines.dsh` 要谨慎——管理器会用它做安装前校验，范围写错会直接挡住安装。
 
@@ -81,7 +81,7 @@ npm publish
 
 仓库已 `git init -b main` 并完成首个提交（14 个受版本控制的文件，`node_modules/`、`dist/`、`*.tgz` 已忽略）。
 
-**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；已发布 `v0.4.1`–`v0.7.0`，待发布 `v0.9.1`）。
+**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；已发布 `v0.4.1`–`v0.7.0`，待发布 `v0.10.0`）。
 
 **推送到远端**（首次流程，已执行过一遍）：
 
@@ -89,12 +89,12 @@ npm publish
 # GitHub
 git remote add origin https://github.com/<你的用户名>/dsh-wait-buddy.git
 git push -u origin main
-git tag v0.9.1 && git push --tags
+git tag v0.10.0 && git push --tags
 
 # 或 Gitee（国内网络更稳）
 git remote add origin https://gitee.com/<你的用户名>/dsh-wait-buddy.git
 git push -u origin main
-git tag v0.9.1 && git push --tags
+git tag v0.10.0 && git push --tags
 ```
 
 **对方安装**（Plugins → Add plugin 里填）：

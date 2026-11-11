@@ -19,7 +19,7 @@ const ADAPTER_SURFACE = [
 ]
 
 test('D45: every registered game exposes the full adapter surface', () => {
-  assert.deepEqual([...GAME_ORDER], ['snake', 'gomoku'])
+  assert.deepEqual([...GAME_ORDER], ['snake', 'gomoku', 'safari'])
   for (const id of GAME_ORDER) {
     const adapter = GAMES[id]
     assert.equal(adapter.id, id)

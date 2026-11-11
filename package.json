@@ -1,6 +1,6 @@
 {
   "name": "dsh-wait-buddy",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "WaitBuddy: a DSH session view that monitors long-running Agent tasks, with approval/failure alerts and lightweight games.",
   "type": "module",
   "exports": {
