@@ -100,7 +100,7 @@
       'notify.aborted': '会话 {session} 任务已中断',
       'game.hiddenPausedBody': '已一键隐藏（Ctrl+Shift+W），游戏保持暂停',
       'game.hiddenResumeBody': '已从隐藏中恢复，按空格或点击继续',
-      'sf.title': '探索抓精灵',
+      'sf.title': '抓精灵',
       'sf.name': '{color}{pattern}{body}',
       'sf.color.red': '红',
       'sf.color.blue': '蓝',
