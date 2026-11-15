@@ -479,7 +479,7 @@ test('pixel sprite painter: all 54 species paint and differ', () => {
   const signatures = new Set()
   for (let s = 0; s < SF_SPECIES_TOTAL; s += 1) {
     const ctx = makeCtx()
-    sfPaintSprite(ctx, s, 16)
+    sfPaintSprite(ctx, s, 24)
     assert.ok(ctx.rects.length >= 12, `species ${s} paints enough blocks (${ctx.rects.length})`)
     for (const rect of ctx.rects) {
       for (const v of rect.slice(0, 4)) {
@@ -551,7 +551,7 @@ test('D48: sprite painter bakes rarity flourishes deterministically', () => {
   const run = (species) => {
     const rects = []
     const ctx = { fillStyle: '', fillRect(x, y, w, h) { rects.push([x, y, w, h, this.fillStyle]) } }
-    sfPaintSprite(ctx, species, 16)
+    sfPaintSprite(ctx, species, 24)
     return rects
   }
   // A very-rare species paints the golden star sparkle (#ffd23f).

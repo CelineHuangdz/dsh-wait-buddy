@@ -946,139 +946,186 @@
       }
     }
 
+    /** Sprite pixel grid (D48e): 24×24 — enough pixel budget for dome
+     * silhouettes, 3px eyes and tone bands, matching the approved AI
+     * references that the old 16×16 rect pile could never reach. */
+    const SF_SPRITE_GRID = 24
+
+    // Per-body silhouette spans: [y, x0, x1] inclusive; multiple entries per
+    // row allowed. Authored against the approved references (dome blob with
+    // ears / squat block with tail / chibi big head with crest).
+    const SF_BODY_SPANS = [
+      [
+        [0, 6, 8], [0, 15, 17], [1, 6, 8], [1, 15, 17], [2, 6, 17], [3, 5, 18],
+        [4, 4, 19], [5, 3, 20], [6, 3, 20], [7, 3, 20], [8, 3, 20], [9, 3, 20],
+        [10, 3, 20], [11, 3, 20], [12, 3, 20], [13, 4, 19], [14, 4, 19],
+        [15, 5, 18], [16, 5, 18], [17, 6, 17], [18, 7, 16], [19, 8, 15],
+      ],
+      [
+        [4, 19, 21], [5, 5, 18], [5, 20, 21], [6, 4, 22], [7, 3, 20], [8, 3, 20],
+        [9, 3, 20], [10, 3, 20], [11, 3, 20], [12, 3, 20], [13, 3, 20], [14, 3, 20],
+        [15, 3, 20], [16, 3, 20], [17, 4, 19], [18, 5, 18], [19, 6, 8], [19, 14, 16],
+        [20, 6, 8], [20, 14, 16],
+      ],
+      [
+        [0, 11, 12], [1, 10, 13], [2, 8, 15], [3, 7, 16], [4, 6, 17], [5, 5, 18],
+        [6, 4, 19], [7, 4, 19], [8, 4, 19], [9, 4, 19], [10, 5, 18], [11, 5, 18],
+        [12, 6, 17], [13, 7, 16], [14, 8, 15], [15, 8, 15], [16, 9, 14],
+        [17, 9, 14], [18, 9, 10], [18, 13, 14], [19, 9, 10], [19, 13, 14],
+        [20, 9, 10], [20, 13, 14],
+      ],
+    ]
+
+    // Face/feature geometry per body: eye row + left/right eye x (3×3 eyes),
+    // mouth pixels, blush pixels, tone bands, belly rect, accent pixels.
+    const SF_BODY_FACE = [
+      {
+        eyeY: 9, eyeL: 6, eyeR: 15,
+        mouth: [[11, 13], [12, 13]],
+        blush: [[4, 13], [5, 13], [18, 13], [19, 13]],
+        light: [3, 5], dark: [16, 18],
+        belly: [9, 13, 14, 17],
+        accents: [[7, 1], [16, 1]],
+      },
+      {
+        eyeY: 11, eyeL: 6, eyeR: 14,
+        mouth: [[10, 15], [11, 15]],
+        blush: [[5, 14], [6, 14], [17, 14], [18, 14]],
+        light: [6, 7], dark: [15, 17],
+        belly: [9, 12, 14, 16],
+        accents: [[21, 4]],
+      },
+      {
+        eyeY: 6, eyeL: 6, eyeR: 15,
+        mouth: [[11, 10], [12, 10]],
+        blush: [[5, 10], [6, 10], [17, 10], [18, 10]],
+        light: [3, 5], dark: [16, 17],
+        belly: [10, 14, 13, 17],
+        accents: [[11, 0]],
+      },
+    ]
+
+    // Pattern pixel positions (2×2 spots) per body — kept off the face rows.
+    const SF_BODY_SPOTS = [
+      [[6, 7], [15, 6], [8, 14], [11, 12]],
+      [[5, 9], [16, 9], [9, 14], [12, 10]],
+      [[6, 4], [16, 4], [9, 14], [12, 11]],
+    ]
+
+    /**
+     * Pixel-art species painter (D48e): authors a 24×24 character grid per
+     * species — silhouette spans → 1px boundary outline → light/dark tone
+     * bands → pattern (belly / spots / stripes) → 3px eyes with pupils and
+     * catch-lights → blush / mouth / accent pixels → rarity flourish — then
+     * paints one solid rect per pixel. Zero assets, deterministic.
+     */
     function sfPaintSprite(ctx, species, u) {
       const body = Math.floor(species / (SF_PALETTES * SF_PATTERNS))
       const palette = Math.floor((species % (SF_PALETTES * SF_PATTERNS)) / SF_PATTERNS)
       const pattern = species % SF_PATTERNS
       const tone = sfTones(SF_PALETTE_COLORS[palette])
-      const put = (fx, fy, fw, fh, fill) => {
-        // Clamped to the canvas: outline rects grow one pixel past the
-        // silhouette and must be cropped, not drawn off-canvas.
-        const x0 = Math.max(0, Math.round(fx * u))
-        const y0 = Math.max(0, Math.round(fy * u))
-        const x1 = Math.min(u, Math.round((fx + fw) * u))
-        const y1 = Math.min(u, Math.round((fy + fh) * u))
-        if (x1 <= x0 || y1 <= y0) return
+      const px = u / SF_SPRITE_GRID
+      const put = (gx, gy, fill) => {
         ctx.fillStyle = fill
-        ctx.fillRect(x0, y0, x1 - x0, y1 - y0)
+        ctx.fillRect(Math.round(gx * px), Math.round(gy * px), Math.max(1, Math.ceil(px)), Math.max(1, Math.ceil(px)))
       }
-      // steps. Each entry: [x, y, w, h].
-      let rects
-      if (body === 0) {
-        // Round blob (D48d, tuned to the approved AI reference): dome
-        // silhouette — narrow top, widest upper-middle, tapering hem — with
-        // two upright ears.
-        rects = [
-          [0.19, 0.0, 0.12, 0.16], [0.44, 0.0, 0.12, 0.16],
-          [0.12, 0.12, 0.5, 0.26], [0.06, 0.34, 0.62, 0.3], [0.12, 0.62, 0.5, 0.22],
-        ]
-      } else if (body === 1) {
-        // Squat block: a curled tail on the right.
-        rects = [
-          [0.82, 0.24, 0.12, 0.12], [0.88, 0.34, 0.1, 0.14], [0.8, 0.46, 0.14, 0.1],
-          [0.12, 0.2, 0.62, 0.16], [0.06, 0.34, 0.74, 0.42], [0.12, 0.72, 0.62, 0.12],
-        ]
-      } else {
-        // Chibi upright (D48d, tuned to the approved AI reference): a big
-        // round head over a small body with stubby legs and a crest fin —
-        // not a uniform bean; the first AI tall reference read as bland.
-        rects = [
-          [0.44, 0.0, 0.12, 0.1], [0.38, 0.06, 0.24, 0.06],
-          [0.14, 0.1, 0.72, 0.34], [0.08, 0.3, 0.84, 0.3], [0.25, 0.6, 0.5, 0.24],
-        ]
+      const N = SF_SPRITE_GRID
+      const g = Array.from({ length: N }, () => Array(N).fill('.'))
+      for (const [y, x0, x1] of SF_BODY_SPANS[body]) {
+        for (let x = x0; x <= x1 && x < N; x += 1) g[y][x] = 'B'
       }
-      // Feet: two separate feet with a visible gap, stepping below the hem
-      // (the approved references all show separated feet, not a flat base).
-      if (body === 2) rects.push([0.32, 0.84, 0.14, 0.16], [0.54, 0.84, 0.14, 0.16])
-      else rects.push([0.22, 0.86, 0.16, 0.14], [0.5, 0.86, 0.16, 0.14])
-      const pad = 1 / 16
-      // 1) Outline pass: every silhouette rect expanded by one pixel (D48 S1).
-      for (const [x, y, w, hh] of rects) {
-        put(x - pad, y - pad, w + pad * 2, hh + pad * 2, tone.outline)
+      // Boundary outline: any interior pixel touching transparency.
+      const at = (x, y) => (x >= 0 && x < N && y >= 0 && y < N ? g[y][x] : '.')
+      const rim = []
+      for (let y = 0; y < N; y += 1) {
+        for (let x = 0; x < N; x += 1) {
+          if (g[y][x] === 'B' && (at(x - 1, y) === '.' || at(x + 1, y) === '.' || at(x, y - 1) === '.' || at(x, y + 1) === '.')) rim.push([x, y])
+        }
       }
-      // 2) Base pass.
-      for (const [x, y, w, hh] of rects) {
-        put(x, y, w, hh, tone.base)
+      for (const [x, y] of rim) g[y][x] = 'O'
+      const face = SF_BODY_FACE[body]
+      // Tone bands: light on the upper rows, dark on the lower rows.
+      for (let y = face.light[0]; y <= face.light[1]; y += 1) {
+        for (let x = 0; x < N; x += 1) if (g[y][x] === 'B') g[y][x] = 'L'
       }
-      // 3) Light top (upper ~30% of the body block) and dark under-edge.
-      if (body === 0) {
-        put(0.12, 0.12, 0.5, 0.12, tone.light)
-        put(0.06, 0.6, 0.62, 0.06, tone.dark)
-      } else if (body === 1) {
-        put(0.12, 0.2, 0.62, 0.1, tone.light)
-        put(0.06, 0.7, 0.74, 0.06, tone.dark)
-      } else {
-        put(0.14, 0.1, 0.72, 0.14, tone.light)
-        put(0.08, 0.54, 0.84, 0.06, tone.dark)
+      for (let y = face.dark[0]; y <= face.dark[1]; y += 1) {
+        for (let x = 0; x < N; x += 1) if (g[y][x] === 'B') g[y][x] = 'D'
       }
-      // Feet in the dark tone so the creature "stands".
-      if (body === 2) {
-        put(0.32, 0.84, 0.14, 0.16, tone.dark)
-        put(0.54, 0.84, 0.14, 0.16, tone.dark)
-      } else {
-        put(0.22, 0.86, 0.16, 0.14, tone.dark)
-        put(0.5, 0.86, 0.16, 0.14, tone.dark)
-      }
-      // 4) Pattern coverage ~35% of the body (D48 S2), solid tones.
+      // Pattern (S2): belly / spots / stripes, only into bare body pixels.
       if (pattern === 0) {
-        // Belly patch — generous, like the approved references.
-        if (body === 2) put(0.27, 0.64, 0.46, 0.18, tone.light)
-        else put(0.19, 0.44, 0.36, 0.26, tone.light)
+        for (let y = face.belly[1]; y <= face.belly[3]; y += 1) {
+          for (let x = face.belly[0]; x <= face.belly[2]; x += 1) {
+            if (x < N && g[y][x] === 'B') g[y][x] = 'F'
+          }
+        }
       } else if (pattern === 1) {
-        // Spots.
-        put(0.22, 0.34, 0.14, 0.14, tone.dark)
-        put(0.56, 0.44, 0.13, 0.13, tone.dark)
-        put(0.34, 0.58, 0.12, 0.12, tone.dark)
-        put(0.6, 0.26, 0.1, 0.1, tone.dark)
+        for (const [sx, sy] of SF_BODY_SPOTS[body]) {
+          for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+            const x = sx + dx
+            const y = sy + dy
+            if (x < N && y < N && g[y][x] === 'B') g[y][x] = 'D'
+          }
+        }
       } else {
-        // Stripes.
-        put(0.25, 0.28, 0.09, 0.44, tone.dark)
-        put(0.45, 0.26, 0.09, 0.46, tone.dark)
-        put(0.63, 0.32, 0.09, 0.38, tone.dark)
+        const cols = body === 0 ? [7, 12, 17] : body === 1 ? [7, 11, 15] : [8, 11, 14]
+        const rows = body === 0 ? [12, 15] : body === 1 ? [13, 16] : [10, 13]
+        for (const cx of cols) {
+          for (let y = rows[0]; y <= rows[1]; y += 1) {
+            if (cx < N && g[y][cx] === 'B') g[y][cx] = 'D'
+          }
+        }
       }
-      // 5) Eyes: bigger whites, pupil and a catch-light pixel (S1). Eye line
-      // sits at 38–44% height (D48d: the approved references place eyes at
-      // the vertical middle, not near the top).
-      const eyeY = body === 1 ? 0.42 : body === 2 ? 0.3 : 0.36
-      const eyeXs = body === 2 ? [0.28, 0.56] : body === 1 ? [0.2, 0.5] : [0.2, 0.44]
-      for (const ex of eyeXs) {
-        put(ex, eyeY, 0.15, 0.14, '#ffffff')
-        put(ex + 0.04, eyeY + 0.03, 0.08, 0.08, '#101014')
-        put(ex + 0.02, eyeY + 0.02, 0.04, 0.04, '#e8f4ff')
+      // Eyes (S1): 3×3 whites, 2×2 pupils looking inward, catch-light pixel.
+      const setEye = (ex, ey, lookRight) => {
+        for (let dy = 0; dy < 3; dy += 1) {
+          for (let dx = 0; dx < 3; dx += 1) g[ey + dy][ex + dx] = 'W'
+        }
+        const pxs = lookRight ? [ex + 1, ex + 2] : [ex, ex + 1]
+        for (const cxp of pxs) {
+          g[ey + 1][cxp] = 'P'
+          g[ey + 2][cxp] = 'P'
+        }
+        g[ey][lookRight ? ex + 2 : ex] = 'H'
       }
-      // 5b) Face details (D48c): blush cheeks, a tiny mouth, lighter ear
-      // inners — the last bits of "cute" come from these micro-accents.
-      const blush = sfMixHex(SF_PALETTE_COLORS[palette], 255, 0.5)
-      const cheekY = eyeY + 0.16
-      const cheekXs = body === 2 ? [0.2, 0.66] : body === 1 ? [0.14, 0.68] : [0.12, 0.6]
-      for (const cxp of cheekXs) {
-        put(cxp, cheekY, 0.09, 0.06, blush)
-      }
-      const mouthX = body === 2 ? 0.42 : body === 1 ? 0.38 : 0.34
-      put(mouthX, eyeY + 0.1, 0.1, 0.05, tone.dark)
-      if (body === 0) {
-        // Ear inners.
-        put(0.21, 0.02, 0.08, 0.08, tone.light)
-        put(0.46, 0.02, 0.08, 0.08, tone.light)
-      } else if (body === 1) {
-        // Tail tip highlight.
-        put(0.82, 0.24, 0.12, 0.06, tone.light)
-      } else {
-        // Crest stripe.
-        put(0.46, 0.0, 0.06, 0.08, tone.light)
-      }
-      // 6) Rarity flourish (D48 S3): deterministic from the species number.
+      setEye(face.eyeL, face.eyeY, false)
+      setEye(face.eyeR, face.eyeY, true)
+      // Face details (D48c) and accent pixels.
+      for (const [mx, my] of face.mouth) g[my][mx] = 'D'
+      for (const [cx2, cy2] of face.blush) g[cy2][cx2] = 'R'
+      for (const [ax, ay] of face.accents) g[ay][ax] = 'L'
+      // Rarity flourish (D48 S3), deterministic from the species number.
       const rarity = sfRarityOf(species)
       if (rarity === 'very') {
-        // Star sparkle, top-right.
-        put(0.7, 0.0, 0.08, 0.24, '#ffd23f')
-        put(0.62, 0.08, 0.24, 0.08, '#ffd23f')
-        put(0.7, 0.08, 0.08, 0.08, '#fff6c9')
+        // Gold star sparkle, top-right (free space on every body).
+        g[0][21] = 'G'
+        g[1][20] = 'G'
+        g[1][22] = 'G'
+        g[2][21] = 'G'
+        g[1][21] = 'S'
       } else if (rarity === 'rare') {
         // Light aura dots.
-        put(0.06, 0.06, 0.08, 0.08, tone.light)
-        put(0.84, 0.16, 0.07, 0.07, tone.light)
-        put(0.14, 0.0, 0.05, 0.05, tone.light)
+        g[2][2] = 'L'
+        g[8][22] = 'L'
+      }
+      // Paint one solid rect per grid pixel.
+      const colors = {
+        O: tone.outline,
+        B: tone.base,
+        L: tone.light,
+        D: tone.dark,
+        F: sfMixHex(SF_PALETTE_COLORS[palette], 250, 0.6),
+        W: '#ffffff',
+        P: '#101014',
+        H: '#e8f4ff',
+        R: sfMixHex(SF_PALETTE_COLORS[palette], 255, 0.5),
+        G: '#ffd23f',
+        S: '#fff6c9',
+      }
+      for (let y = 0; y < N; y += 1) {
+        for (let x = 0; x < N; x += 1) {
+          const ch = g[y][x]
+          if (ch !== '.') put(x, y, colors[ch])
+        }
       }
     }
 
@@ -1110,7 +1157,7 @@
       const { species, rarity } = state.encounter
       const portrait = mini
         ? null
-        : h(SfSpriteIcon, { species, size: 64 })
+        : h(SfSpriteIcon, { species, size: 72 })
       return h(
         'div',
         { className: mini ? 'wb-pillMiniOverlay' : 'wb-overlay' },
@@ -1164,15 +1211,15 @@
         const ctx = canvas.getContext('2d')
         if (ctx === null) return
         sfSafeDraw(() => {
-          ctx.clearRect(0, 0, 16, 16)
-          sfPaintSprite(ctx, species, 16)
+          ctx.clearRect(0, 0, SF_SPRITE_GRID, SF_SPRITE_GRID)
+          sfPaintSprite(ctx, species, SF_SPRITE_GRID)
         })
       }, [species])
-      // 16×16 pixel buffer, integer-scaled by CSS (pixelated) — crisp blocks.
+      // 24×24 pixel buffer, integer-scaled by CSS (pixelated) — crisp blocks.
       return h('canvas', {
         ref: canvasRef,
-        width: 16,
-        height: 16,
+        width: SF_SPRITE_GRID,
+        height: SF_SPRITE_GRID,
         style: { width: `${size}px`, height: `${size}px`, imageRendering: 'pixelated' },
         role: 'img',
         'aria-label': 'sprite',
@@ -1202,7 +1249,7 @@
                     className: 'wb-dexItem',
                     title: `#${String(Number(id) + 1).padStart(3, '0')} ${sfSpeciesName(t, Number(id))} ×${count}`,
                   },
-                  h(SfSpriteIcon, { species: Number(id), size: 32 }),
+                  h(SfSpriteIcon, { species: Number(id), size: 48 }),
                   h('span', { className: 'wb-dexCount' }, `×${count}`),
                 ),
               ),

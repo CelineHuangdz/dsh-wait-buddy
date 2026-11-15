@@ -68,14 +68,14 @@ await page.evaluate(() => {
     const cell = document.createElement('div')
     cell.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;margin:6px;color:#8b9bb5;font:9px monospace'
     const canvas = document.createElement('canvas')
-    canvas.width = 16
-    canvas.height = 16
+    canvas.width = 24
+    canvas.height = 24
     canvas.style.width = '64px'
     canvas.style.height = '64px'
     canvas.style.imageRendering = 'pixelated'
     canvas.style.background = '#141f2e'
     canvas.style.borderRadius = '4px'
-    api.__game.sfPaintSprite(canvas.getContext('2d'), s, 16)
+    api.__game.sfPaintSprite(canvas.getContext('2d'), s, 24)
     const label = document.createElement('span')
     label.textContent = '#' + String(s + 1).padStart(2, '0')
     cell.append(canvas, label)
