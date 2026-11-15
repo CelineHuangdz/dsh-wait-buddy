@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.11.0-blue)
+![Version](https://img.shields.io/badge/version-0.12.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
 ![Tests](https://img.shields.io/badge/tests-100%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 当前版本 **0.11.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式，并完成加固——失败原因码本地化、通知权限改为用户手势触发、快捷键可关闭、视图跳转失败可见反馈、错误边界。已在 DSH `0.2.1-rc.5` 上测试。
+> 当前版本 **0.12.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式并完成加固；抓精灵美术升级——区域主题色板、地形边缘感知、水面动画、轮廓+三段色阶像素精灵（D48）。已在 DSH `0.2.1-rc.5` 上测试。
 
 ## 目录
 

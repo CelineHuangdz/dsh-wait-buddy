@@ -254,6 +254,8 @@
         drawSafariMap,
         sfPaintPixels,
         sfPaintSprite,
+        sfThemeOf,
+        sfTones,
         sfEncounterOverlay,
         sfDexOverlay,
         createGameState,

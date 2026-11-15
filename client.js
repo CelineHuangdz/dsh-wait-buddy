@@ -179,6 +179,10 @@ window.__ModuleLoader__.load({
       'sf.dexBtn': '图鉴',
       'sf.dexCount': '图鉴 {caught}/{total}',
       'sf.region': '区域 {n}',
+      'sf.theme.grass': '草原',
+      'sf.theme.snow': '雪原',
+      'sf.theme.desert': '沙漠',
+      'sf.theme.volcano': '火山',
       'sf.nextRegion': '换区域',
       'sf.result.caught': '捕获成功！',
       'sf.result.fled': '逃跑了…',
@@ -330,6 +334,10 @@ window.__ModuleLoader__.load({
       'sf.dexBtn': 'Dex',
       'sf.dexCount': 'Dex {caught}/{total}',
       'sf.region': 'Region {n}',
+      'sf.theme.grass': 'Grassland',
+      'sf.theme.snow': 'Snowfield',
+      'sf.theme.desert': 'Desert',
+      'sf.theme.volcano': 'Volcano',
       'sf.nextRegion': 'New region',
       'sf.result.caught': 'Caught!',
       'sf.result.fled': 'It fled…',
@@ -3486,40 +3494,83 @@ const CSS = `
       return (h % 1000) / 1000
     }
 
-    /**
-     * Pixel-art painter: paints the map into a cols*U × rows*U offscreen
-     * pixel space (U device-ish pixels per cell), everything as flat 1px
-     * rects — no gradients, no smooth curves (feedback: the game should read
-     * as a pixel game, which is also the honest aesthetic for pure Canvas).
-     * Pure over a given 2d context so tests can drive it directly.
-     */
-    const SF_PIXEL_COLORS = {
-      plain: '#1b2634',
-      plainStar: '#2c3d55',
-      grass: '#20402c',
-      grassDark: '#1c3826',
-      blade1: '#3f7a52',
-      blade2: '#33613f',
-      water: '#16405f',
-      waterEdge: '#1d4d72',
-      wave: '#4a90c4',
-      rock: '#161d29',
-      boulder: '#46536b',
-      boulderLit: '#5b6a86',
+    /** Region theme palettes (D48 M5): cycled by `region % 4`; every theme
+     * keeps terrain-to-terrain base-colour contrast readable at a glance
+     * (D48 M3). All colours are flat solids — no gradients. */
+    const SF_THEMES = [
+      {
+        key: 'sf.theme.grass',
+        plain: '#232f3f', plainAlt: '#1e2937', plainStar: '#3a4a61',
+        grass: '#275432', grassAlt: '#214629', grassDark: '#193523',
+        blade1: '#54a568', blade2: '#3d7f50',
+        water: '#17537f', waterAlt: '#134869', waterEdge: '#3378ab', wave: '#6fbbe6',
+        rock: '#202a3b', boulder: '#4c5a74', boulderLit: '#68799c',
+        // Player colours per theme (D48b): white-on-dark default.
+        player: '#e6f2ff', playerEdge: '#8ef7b0',
+      },
+      {
+        key: 'sf.theme.snow',
+        plain: '#dfe7ef', plainAlt: '#d4dee9', plainStar: '#f4f8fb',
+        grass: '#9fc4a8', grassAlt: '#8fb89a', grassDark: '#75a081',
+        blade1: '#5f8f6d', blade2: '#4d7a5b',
+        water: '#4f8fc0', waterAlt: '#4483b4', waterEdge: '#79b2da', wave: '#cfe7f6',
+        rock: '#8d9bb0', boulder: '#5d6d86', boulderLit: '#7e8fa9',
+        // Deep blue body + red cap: a white player vanishes on snow (user report).
+        player: '#31435c', playerEdge: '#d9534f',
+      },
+      {
+        key: 'sf.theme.desert',
+        plain: '#d8b57c', plainAlt: '#cda972', plainStar: '#e8cd9e',
+        grass: '#a2b354', grassAlt: '#93a449', grassDark: '#79893b',
+        blade1: '#c3d06e', blade2: '#a8b659',
+        water: '#3f9fae', waterAlt: '#3691a0', waterEdge: '#63bcc8', wave: '#bfe9ee',
+        rock: '#a5713f', boulder: '#7c4e2a', boulderLit: '#9c6435',
+        // Dark brown body on sand; keep the green cap as the identity anchor.
+        player: '#4a3319', playerEdge: '#8ef7b0',
+      },
+      {
+        key: 'sf.theme.volcano',
+        plain: '#3a2c2c', plainAlt: '#332425', plainStar: '#5c4038',
+        grass: '#6e4a35', grassAlt: '#63412e', grassDark: '#4d3223',
+        blade1: '#c96a3b', blade2: '#a1542e',
+        water: '#8a3d20', waterAlt: '#7c351c', waterEdge: '#b4582f', wave: '#f0a35c',
+        rock: '#241d20', boulder: '#55474c', boulderLit: '#6f5d63',
+        player: '#e6f2ff', playerEdge: '#8ef7b0',
+      },
+    ]
+
+    function sfThemeOf(region) {
+      return SF_THEMES[(Math.max(1, region) - 1) % SF_THEMES.length]
+    }
+
+    /** Theme-independent marker colours (feedback/route/player). */
+    const SF_MARK_COLORS = {
       mark: '#8ef7b0',
       bad: '#e5484d',
       warn: '#e2a93b',
       player: '#e6f2ff',
       playerEdge: '#8ef7b0',
-      ink: '#0a0a0a',
+      rockShadow: 'rgba(0,0,0,0.38)',
     }
 
+    /**
+     * Pixel map painter (D48 M1–M4): fixed 8×8 offscreen pixels per cell,
+     * two-tone deterministic dithering per tile, neighbour-aware edges
+     * (water shoreline / rock drop shadow / grass fringe) and a two-frame
+     * water animation driven by `state.waveFrame` (0|1; absent = static,
+     * which keeps pure test calls deterministic).
+     * Pure over a given 2d context so tests can drive it directly.
+     */
     function sfPaintPixels(ctx, state, u) {
-      const C = SF_PIXEL_COLORS
+      const T = sfThemeOf(state.region || 1)
+      const C = SF_MARK_COLORS
+      const frame = state.waveFrame === 1 ? 1 : 0
       const put = (ox, oy, fx, fy, fw, fh, color) => {
         ctx.fillStyle = color
         ctx.fillRect(Math.round(ox + fx * u), Math.round(oy + fy * u), Math.max(1, Math.round(fw * u)), Math.max(1, Math.round(fh * u)))
       }
+      const at = (x, y) => (x < 0 || y < 0 || x >= state.cols || y >= state.rows ? -1 : state.map[y * state.cols + x])
+      const isLand = (t) => t !== SF_TERRAIN.water
       for (let y = 0; y < state.rows; y += 1) {
         for (let x = 0; x < state.cols; x += 1) {
           const i = y * state.cols + x
@@ -3528,22 +3579,52 @@ const CSS = `
           const j = (salt) => sfJitter(i, salt)
           const terrain = state.map[i]
           if (terrain === SF_TERRAIN.water) {
-            ctx.fillStyle = C.water
+            ctx.fillStyle = j(9) < 0.5 ? T.water : T.waterAlt
             ctx.fillRect(ox, oy, u, u)
-            put(ox, oy, 0, 0, 1, 0.25, C.waterEdge)
-            // Two wave dashes, deterministically placed.
+            // Shoreline (D48 M2): a lit edge on every side that touches land.
+            if (isLand(at(x, y - 1)) && at(x, y - 1) !== -1) put(ox, oy, 0, 0, 1, 0.125, T.waterEdge)
+            if (isLand(at(x, y + 1)) && at(x, y + 1) !== -1) put(ox, oy, 0, 0.875, 1, 0.125, T.waterEdge)
+            if (isLand(at(x - 1, y)) && at(x - 1, y) !== -1) put(ox, oy, 0, 0, 0.125, 1, T.waterEdge)
+            if (isLand(at(x + 1, y)) && at(x + 1, y) !== -1) put(ox, oy, 0.875, 0, 0.125, 1, T.waterEdge)
+            // Two wave dashes, deterministically placed; the frame shifts
+            // them by one tile-pixel and swaps which one is bright (M4).
             for (let wv = 0; wv < 2; wv += 1) {
-              put(ox, oy, 0.15 + j(wv + 1) * 0.4, 0.3 + wv * 0.35 + j(wv + 4) * 0.1, 0.35, 0.125, C.wave)
+              const bright = (wv + frame) % 2 === 0
+              put(
+                ox,
+                oy,
+                Math.min(0.5, 0.125 + j(wv + 1) * 0.375 + frame * 0.125),
+                0.3 + wv * 0.375 + j(wv + 4) * 0.1,
+                0.375,
+                0.125,
+                bright ? T.wave : T.waterEdge,
+              )
             }
+            // Rounded shore corners (D48c): where two perpendicular sides
+            // both touch land, the corner pixel of the lit edge fills in.
+            const nUp = at(x, y - 1) !== -1 && isLand(at(x, y - 1))
+            const nDn = at(x, y + 1) !== -1 && isLand(at(x, y + 1))
+            const nLf = at(x - 1, y) !== -1 && isLand(at(x - 1, y))
+            const nRt = at(x + 1, y) !== -1 && isLand(at(x + 1, y))
+            if (nUp && nLf) put(ox, oy, 0, 0, 0.125, 0.125, T.waterEdge)
+            if (nUp && nRt) put(ox, oy, 0.875, 0, 0.125, 0.125, T.waterEdge)
+            if (nDn && nLf) put(ox, oy, 0, 0.875, 0.125, 0.125, T.waterEdge)
+            if (nDn && nRt) put(ox, oy, 0.875, 0.875, 0.125, 0.125, T.waterEdge)
           } else if (terrain === SF_TERRAIN.rock) {
-            ctx.fillStyle = C.rock
+            ctx.fillStyle = T.rock
             ctx.fillRect(ox, oy, u, u)
-            // Chunky boulder: stacked blocks with a lit top-left face.
-            put(ox, oy, 0.2, 0.35, 0.6, 0.5, C.boulder)
-            put(ox, oy, 0.3, 0.15, 0.4, 0.3, C.boulder)
-            put(ox, oy, 0.3, 0.2, 0.15, 0.15, C.boulderLit)
+            // Chunky boulder with a lit top-left face (M3 tone steps).
+            put(ox, oy, 0.25, 0.375, 0.5, 0.5, T.boulder)
+            put(ox, oy, 0.375, 0.125, 0.25, 0.375, T.boulder)
+            put(ox, oy, 0.375, 0.25, 0.25, 0.125, T.boulderLit)
+            put(ox, oy, 0.25, 0.875, 0.5, 0.125, T.boulderLit)
+            // Drop shadow onto the walkable cell below (M2).
+            const below = at(x, y + 1)
+            if (below !== SF_TERRAIN.rock && below !== SF_TERRAIN.water && below !== -1) {
+              put(ox, oy, 0.125, 1, 0.75, 0.125, C.rockShadow)
+            }
           } else if (terrain === SF_TERRAIN.grass) {
-            ctx.fillStyle = C.grass
+            ctx.fillStyle = j(9) < 0.5 ? T.grass : T.grassAlt
             ctx.fillRect(ox, oy, u, u)
             const rustling = state.rustle === i
             if (rustling) put(ox, oy, 0, 0, 1, 1, 'rgba(142,247,176,0.14)')
@@ -3556,20 +3637,69 @@ const CSS = `
                 0.25 + j(b + 17) * 0.3,
                 0.125,
                 0.4 + j(b + 23) * 0.2,
-                b % 2 === 0 ? C.blade1 : C.blade2,
+                b % 2 === 0 ? T.blade1 : T.blade2,
               )
             }
-            put(ox, oy, 0, 0.8, 1, 0.2, C.grassDark)
+            put(ox, oy, 0, 0.8, 1, 0.2, T.grassDark)
+            // D48c: rare little flowers — visual anchors in the green.
+            if (j(61) < 0.08 && !rustling) {
+              const bloom = ['#e5484d', '#e2a93b', '#f4f8fb'][j(62) % 3]
+              const fxp = 0.2 + j(63) * 0.55
+              const fyp = 0.2 + j(64) * 0.45
+              put(ox, oy, fxp, fyp, 0.25, 0.125, bloom)
+              put(ox, oy, fxp + 0.06, fyp - 0.06, 0.125, 0.25, bloom)
+            }
+            // Grass fringe (M2): blades spill one tile-pixel into plain sides.
+            if (at(x - 1, y) === SF_TERRAIN.plain) put(ox, oy, -0.125, 0.3 + j(31) * 0.3, 0.125, 0.375, T.blade2)
+            if (at(x + 1, y) === SF_TERRAIN.plain) put(ox, oy, 1, 0.3 + j(32) * 0.3, 0.125, 0.375, T.blade2)
+            if (at(x, y + 1) === SF_TERRAIN.plain) put(ox, oy, 0.25 + j(33) * 0.4, 1, 0.375, 0.125, T.blade2)
             if (rustling) {
               // Warning: exclamation mark over the shaking cell.
               put(ox, oy, 0.45, -0.9, 0.14, 0.5, C.warn)
               put(ox, oy, 0.45, -0.3, 0.14, 0.14, C.warn)
             }
           } else {
-            ctx.fillStyle = C.plain
+            ctx.fillStyle = j(9) < 0.5 ? T.plain : T.plainAlt
             ctx.fillRect(ox, oy, u, u)
-            if (j(41) < 0.3) put(ox, oy, 0.2 + j(43) * 0.6, 0.2 + j(47) * 0.6, 0.125, 0.125, C.plainStar)
+            if (j(41) < 0.3) put(ox, oy, 0.2 + j(43) * 0.6, 0.2 + j(47) * 0.6, 0.125, 0.125, T.plainStar)
+            if (j(51) < 0.12) put(ox, oy, 0.3 + j(53) * 0.4, 0.5 + j(57) * 0.3, 0.25, 0.125, T.plainStar)
+            // D48c: volcano theme — glowing ember specks on the ash plain.
+            if (T.key === 'sf.theme.volcano' && j(71) < 0.1) {
+              put(ox, oy, 0.25 + j(72) * 0.5, 0.25 + j(73) * 0.5, 0.125, 0.125, j(74) < 0.5 ? '#f0a35c' : '#c96a3b')
+            }
           }
+        }
+      }
+      // D48c: dithered transition bands — where two different terrains meet,
+      // each side "bites" deterministic pixels into the other along the seam,
+      // so lakes and meadows get organic edges instead of straight grid lines.
+      const baseColorOf = (t) =>
+        t === SF_TERRAIN.water ? T.water : t === SF_TERRAIN.grass ? T.grass : t === SF_TERRAIN.rock ? T.rock : T.plain
+      for (let y = 0; y < state.rows; y += 1) {
+        for (let x = 0; x < state.cols; x += 1) {
+          const i = y * state.cols + x
+          const ox = x * u
+          const oy = y * u
+          const here = state.map[i]
+          const bite = (side, nT) => {
+            const nBase = baseColorOf(nT)
+            for (let k = 0; k < 4; k += 1) {
+              if (sfJitter(i * 4 + k, side + 91) >= 0.45) continue
+              const p = 0.125 + k * 0.25
+              if (side === 0) put(ox, oy, p, 0, 0.125, 0.125, nBase)
+              else if (side === 1) put(ox, oy, p, 0.875, 0.125, 0.125, nBase)
+              else if (side === 2) put(ox, oy, 0, p, 0.125, 0.125, nBase)
+              else put(ox, oy, 0.875, p, 0.125, 0.125, nBase)
+            }
+          }
+          const up = at(x, y - 1)
+          const dn = at(x, y + 1)
+          const lf = at(x - 1, y)
+          const rt = at(x + 1, y)
+          if (up !== -1 && up !== here) bite(0, up)
+          if (dn !== -1 && dn !== here) bite(1, dn)
+          if (lf !== -1 && lf !== here) bite(2, lf)
+          if (rt !== -1 && rt !== here) bite(3, rt)
         }
       }
       // Remaining walk path: one green pixel per cell.
@@ -3607,19 +3737,25 @@ const CSS = `
         }
       }
       // The player: a tiny pixel person (head/body/legs), always readable.
+      // D48b: theme-aware body/cap colours plus a dark halo + ground shadow —
+      // the white default player vanished on the snow theme's pale plain.
       const pxp = (state.pos % state.cols) * u
       const pyp = Math.floor(state.pos / state.cols) * u
+      const P = T.player || C.player
+      const PE = T.playerEdge || C.playerEdge
+      put(pxp, pyp, 0.18, 0.02, 0.64, 0.98, 'rgba(8,12,20,0.55)') // dark halo backdrop
       if (u >= 6) {
-        put(pxp, pyp, 0.3, 0.08, 0.4, 0.3, C.player) // head
-        put(pxp, pyp, 0.25, 0.4, 0.5, 0.3, C.player) // body
-        put(pxp, pyp, 0.3, 0.72, 0.14, 0.28, C.player) // legs
-        put(pxp, pyp, 0.56, 0.72, 0.14, 0.28, C.player)
-        put(pxp, pyp, 0.3, 0.08, 0.4, 0.1, C.playerEdge) // cap
-        put(pxp, pyp, 0.25, 0.4, 0.5, 0.08, C.playerEdge) // belt
+        put(pxp, pyp, 0.3, 0.08, 0.4, 0.3, P) // head
+        put(pxp, pyp, 0.25, 0.4, 0.5, 0.3, P) // body
+        put(pxp, pyp, 0.3, 0.72, 0.14, 0.28, P) // legs
+        put(pxp, pyp, 0.56, 0.72, 0.14, 0.28, P)
+        put(pxp, pyp, 0.3, 0.08, 0.4, 0.1, PE) // cap
+        put(pxp, pyp, 0.25, 0.4, 0.5, 0.08, PE) // belt
       } else {
-        put(pxp, pyp, 0.25, 0.15, 0.5, 0.7, C.player)
-        put(pxp, pyp, 0.25, 0.15, 0.5, 0.15, C.playerEdge)
+        put(pxp, pyp, 0.25, 0.15, 0.5, 0.7, P)
+        put(pxp, pyp, 0.25, 0.15, 0.5, 0.15, PE)
       }
+      put(pxp, pyp, 0.2, 1, 0.6, 0.06, 'rgba(0,0,0,0.4)') // ground shadow
     }
 
     /**
@@ -3662,10 +3798,10 @@ const CSS = `
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, width, height)
       ctx.imageSmoothingEnabled = false
-      // Offscreen pixel resolution: 2-8 offscreen pixels per cell, always
-      // below the device-pixel budget so blocks stay chunky, never blurry.
-      const devPerCell = (width * dpr) / state.cols
-      const u = Math.max(2, Math.min(8, Math.floor(devPerCell / 2)))
+      // D48 M1: fixed 8×8 offscreen pixels per cell — every tile has enough
+      // pixel budget for texture and edge detail at any board size; the
+      // offscreen buffer is blitted up with smoothing disabled (crisp blocks).
+      const u = 8
       const off =
         typeof document !== 'undefined' && typeof document.createElement === 'function'
           ? document.createElement('canvas')
@@ -3687,66 +3823,155 @@ const CSS = `
     }
 
     /**
-     * Pixel-art species painter: fills a size×size box with u-pixel blocks.
-     * 54 species read from silhouette (round blob + ears / squat block + tail
-     * / tall bean + crest) × palette colour × pattern (belly / spots /
-     * stripes) — no ellipses, no "circle with eyes" (feedback P0).
+     * Pixel-art species painter (D48 S1–S3): fills a size×size box with
+     * u-pixel blocks. 54 species read from silhouette (round blob + ears /
+     * squat block + tail / tall bean + crest) × palette colour × pattern
+     * (belly / spots / stripes) — no ellipses, no "circle with eyes"
+     * (feedback P0). Each species gets a 1px dark outline, three solid tone
+     * steps (base/dark/light derived from the palette colour), bigger
+     * pattern coverage, and a deterministic rarity flourish (very = star
+     * sparkle, rare = light aura dots) since rarity is a pure function of
+     * the species number.
      */
+    /** Deterministic tone steps for a palette hex: solid colours, no rgba
+     * overlays — pixel-art shading reads through shape, not translucency. */
+    function sfMixHex(hex, target, k) {
+      const n = hex.replace('#', '')
+      const part = (s) => parseInt(n.slice(s, s + 2), 16)
+      const mix = (v) => Math.round(v + (target - v) * k)
+      const h2 = (v) => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')
+      return `#${h2(mix(part(0)))}${h2(mix(part(2)))}${h2(mix(part(4)))}`
+    }
+
+    function sfTones(hex) {
+      return {
+        base: hex,
+        dark: sfMixHex(hex, 10, 0.45),
+        light: sfMixHex(hex, 250, 0.38),
+        outline: sfMixHex(hex, 6, 0.72),
+      }
+    }
+
     function sfPaintSprite(ctx, species, u) {
       const body = Math.floor(species / (SF_PALETTES * SF_PATTERNS))
       const palette = Math.floor((species % (SF_PALETTES * SF_PATTERNS)) / SF_PATTERNS)
       const pattern = species % SF_PATTERNS
-      const color = SF_PALETTE_COLORS[palette]
+      const tone = sfTones(SF_PALETTE_COLORS[palette])
       const put = (fx, fy, fw, fh, fill) => {
+        // Clamped to the canvas: outline rects grow one pixel past the
+        // silhouette and must be cropped, not drawn off-canvas.
+        const x0 = Math.max(0, Math.round(fx * u))
+        const y0 = Math.max(0, Math.round(fy * u))
+        const x1 = Math.min(u, Math.round((fx + fw) * u))
+        const y1 = Math.min(u, Math.round((fy + fh) * u))
+        if (x1 <= x0 || y1 <= y0) return
         ctx.fillStyle = fill
-        ctx.fillRect(Math.round(fx * u), Math.round(fy * u), Math.max(1, Math.round(fw * u)), Math.max(1, Math.round(fh * u)))
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0)
       }
-      const shade = 'rgba(0,0,0,0.28)'
-      const lite = 'rgba(255,255,255,0.3)'
-      // Body silhouettes.
+      // steps. Each entry: [x, y, w, h].
+      let rects
       if (body === 0) {
-        // Round blob with ears.
-        put(0.14, 0.02, 0.14, 0.16, color)
-        put(0.72, 0.02, 0.14, 0.16, color)
-        put(0.2, 0.16, 0.6, 0.62, color)
-        put(0.1, 0.36, 0.8, 0.44, color)
-        put(0.28, 0.06, 0.44, 0.12, color)
+        // Round blob: two upright ears on a wide head.
+        rects = [
+          [0.19, 0.0, 0.12, 0.19], [0.44, 0.0, 0.12, 0.19],
+          [0.12, 0.16, 0.5, 0.31], [0.06, 0.38, 0.62, 0.34], [0.19, 0.7, 0.38, 0.14],
+        ]
       } else if (body === 1) {
-        // Squat block with a tail.
-        put(0.88, 0.42, 0.12, 0.1, color)
-        put(0.8, 0.3, 0.12, 0.16, color)
-        put(0.2, 0.2, 0.6, 0.16, color)
-        put(0.1, 0.34, 0.8, 0.5, color)
+        // Squat block: a curled tail on the right.
+        rects = [
+          [0.82, 0.24, 0.12, 0.12], [0.88, 0.34, 0.1, 0.14], [0.8, 0.46, 0.14, 0.1],
+          [0.12, 0.2, 0.62, 0.16], [0.06, 0.34, 0.74, 0.42], [0.12, 0.72, 0.62, 0.12],
+        ]
       } else {
-        // Tall bean with a crest.
-        put(0.44, 0.0, 0.12, 0.12, color)
-        put(0.4, 0.06, 0.2, 0.08, color)
-        put(0.34, 0.12, 0.32, 0.72, color)
-        put(0.28, 0.2, 0.44, 0.56, color)
+        // Tall bean: a crest fin on top.
+        rects = [
+          [0.44, 0.0, 0.12, 0.12], [0.38, 0.08, 0.24, 0.06],
+          [0.31, 0.12, 0.38, 0.66], [0.25, 0.2, 0.5, 0.5],
+        ]
       }
-      // Feet.
-      put(0.28, 0.86, 0.16, 0.12, color)
-      put(0.56, 0.86, 0.16, 0.12, color)
-      // Belly / spots / stripes.
+      // Feet (shared silhouette base).
+      rects.push([0.28, 0.84, 0.16, 0.14], [0.56, 0.84, 0.16, 0.14])
+      const pad = 1 / 16
+      // 1) Outline pass: every silhouette rect expanded by one pixel (D48 S1).
+      for (const [x, y, w, hh] of rects) {
+        put(x - pad, y - pad, w + pad * 2, hh + pad * 2, tone.outline)
+      }
+      // 2) Base pass.
+      for (const [x, y, w, hh] of rects) {
+        put(x, y, w, hh, tone.base)
+      }
+      // 3) Light top (upper ~30% of the body block) and dark under-edge.
+      if (body === 0) {
+        put(0.12, 0.16, 0.5, 0.12, tone.light)
+        put(0.06, 0.66, 0.62, 0.06, tone.dark)
+      } else if (body === 1) {
+        put(0.12, 0.2, 0.62, 0.1, tone.light)
+        put(0.06, 0.7, 0.74, 0.06, tone.dark)
+      } else {
+        put(0.31, 0.12, 0.38, 0.16, tone.light)
+        put(0.25, 0.64, 0.5, 0.06, tone.dark)
+      }
+      // Feet in the dark tone so the creature "stands".
+      put(0.28, 0.84, 0.16, 0.14, tone.dark)
+      put(0.56, 0.84, 0.16, 0.14, tone.dark)
+      // 4) Pattern coverage ~35% of the body (D48 S2), solid tones.
       if (pattern === 0) {
-        put(0.36, 0.52, 0.28, 0.28, lite)
+        // Belly patch.
+        if (body === 2) put(0.31, 0.42, 0.38, 0.3, tone.light)
+        else put(0.19, 0.48, 0.44, 0.26, tone.light)
       } else if (pattern === 1) {
-        put(0.32, 0.42, 0.1, 0.1, shade)
-        put(0.56, 0.52, 0.09, 0.09, shade)
-        put(0.42, 0.66, 0.08, 0.08, shade)
+        // Spots.
+        put(0.22, 0.34, 0.14, 0.14, tone.dark)
+        put(0.56, 0.44, 0.13, 0.13, tone.dark)
+        put(0.34, 0.58, 0.12, 0.12, tone.dark)
+        put(0.6, 0.26, 0.1, 0.1, tone.dark)
       } else {
-        put(0.32, 0.24, 0.08, 0.55, shade)
-        put(0.52, 0.24, 0.08, 0.55, shade)
-        put(0.68, 0.3, 0.08, 0.45, shade)
+        // Stripes.
+        put(0.25, 0.28, 0.09, 0.44, tone.dark)
+        put(0.45, 0.26, 0.09, 0.46, tone.dark)
+        put(0.63, 0.32, 0.09, 0.38, tone.dark)
       }
-      // Bottom shade for weight.
-      put(0.14, 0.78, 0.72, 0.08, shade)
-      // Eyes (white + pupil), placed inside each silhouette.
-      const eyeY = body === 1 ? 0.4 : 0.34
-      const eyeXs = body === 2 ? [0.4, 0.52] : [0.3, 0.58]
+      // 5) Eyes: bigger whites, pupil and a catch-light pixel (S1).
+      const eyeY = body === 1 ? 0.36 : body === 2 ? 0.3 : 0.28
+      const eyeXs = body === 2 ? [0.36, 0.5] : body === 1 ? [0.22, 0.5] : [0.22, 0.44]
       for (const ex of eyeXs) {
-        put(ex, eyeY, 0.12, 0.11, '#ffffff')
-        put(ex + 0.04, eyeY + 0.03, 0.06, 0.06, '#0a0a0a')
+        put(ex, eyeY, 0.15, 0.14, '#ffffff')
+        put(ex + 0.04, eyeY + 0.03, 0.08, 0.08, '#101014')
+        put(ex + 0.02, eyeY + 0.02, 0.04, 0.04, '#e8f4ff')
+      }
+      // 5b) Face details (D48c): blush cheeks, a tiny mouth, lighter ear
+      // inners — the last bits of "cute" come from these micro-accents.
+      const blush = sfMixHex(SF_PALETTE_COLORS[palette], 255, 0.5)
+      const cheekY = eyeY + 0.14
+      const cheekXs = body === 2 ? [0.31, 0.58] : body === 1 ? [0.16, 0.68] : [0.14, 0.6]
+      for (const cxp of cheekXs) {
+        put(cxp, cheekY, 0.09, 0.06, blush)
+      }
+      const mouthX = body === 2 ? 0.44 : body === 1 ? 0.38 : 0.36
+      put(mouthX, eyeY + 0.1, 0.1, 0.05, tone.dark)
+      if (body === 0) {
+        // Ear inners.
+        put(0.21, 0.03, 0.08, 0.1, tone.light)
+        put(0.46, 0.03, 0.08, 0.1, tone.light)
+      } else if (body === 1) {
+        // Tail tip highlight.
+        put(0.82, 0.24, 0.12, 0.06, tone.light)
+      } else {
+        // Crest stripe.
+        put(0.44, 0.0, 0.06, 0.1, tone.light)
+      }
+      // 6) Rarity flourish (D48 S3): deterministic from the species number.
+      const rarity = sfRarityOf(species)
+      if (rarity === 'very') {
+        // Star sparkle, top-right.
+        put(0.7, 0.0, 0.08, 0.24, '#ffd23f')
+        put(0.62, 0.08, 0.24, 0.08, '#ffd23f')
+        put(0.7, 0.08, 0.08, 0.08, '#fff6c9')
+      } else if (rarity === 'rare') {
+        // Light aura dots.
+        put(0.06, 0.06, 0.08, 0.08, tone.light)
+        put(0.84, 0.16, 0.07, 0.07, tone.light)
+        put(0.14, 0.0, 0.05, 0.05, tone.light)
       }
     }
 
@@ -3898,6 +4123,18 @@ const CSS = `
       React.useEffect(() => {
         sfSafeDraw(() => drawSafariMap(canvasRef.current, state))
       }, [state])
+      // D48 M4: two-frame water animation. Static under reduced motion (D43
+      // spirit) and where matchMedia is unavailable.
+      React.useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+        let frame = 0
+        const timer = setInterval(() => {
+          frame = 1 - frame
+          sfSafeDraw(() => drawSafariMap(canvasRef.current, { ...safariStore.getSnapshot(), waveFrame: frame }))
+        }, 640)
+        return () => clearInterval(timer)
+      }, [])
       // When an encounter window closes, its buttons unmount and focus falls
       // back to <body> — steering keys would die mid-play. Refocus the board.
       const prevEncounterRef = React.useRef(null)
@@ -3986,7 +4223,7 @@ const CSS = `
         h(
           'div',
           { className: 'wb-caption' },
-          `${t('sf.dexCount', { caught: state.dexCaught, total: SF_SPECIES_TOTAL })} · ${t('sf.region', { n: state.region })}`,
+          `${t('sf.dexCount', { caught: state.dexCaught, total: SF_SPECIES_TOTAL })} · ${t('sf.region', { n: state.region })} · ${t(sfThemeOf(state.region).key)}`,
         ),
         h(
           'div',
@@ -4034,6 +4271,17 @@ const CSS = `
       React.useEffect(() => {
         sfSafeDraw(() => drawSafariMap(canvasRef.current, state))
       }, [state])
+      // D48 M4: pill board gets the same two-frame water, same guards.
+      React.useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+        let frame = 0
+        const timer = setInterval(() => {
+          frame = 1 - frame
+          sfSafeDraw(() => drawSafariMap(canvasRef.current, { ...safariStore.getSnapshot(), waveFrame: frame }))
+        }, 640)
+        return () => clearInterval(timer)
+      }, [])
       return h(
         'div',
         { className: 'wb-pillGomoku' },
@@ -5319,6 +5567,8 @@ const CSS = `
         drawSafariMap,
         sfPaintPixels,
         sfPaintSprite,
+        sfThemeOf,
+        sfTones,
         sfEncounterOverlay,
         sfDexOverlay,
         createGameState,
@@ -5334,4 +5584,4 @@ const CSS = `
   },
 })
 
-;window.__WB_BUILD_ID__ = 'fe8a9918';
+;window.__WB_BUILD_ID__ = 'add7c7e8';

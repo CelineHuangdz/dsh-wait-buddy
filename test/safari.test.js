@@ -503,3 +503,69 @@ test('encounter key map: F throws, Q/Esc release, Space stays off the keys', () 
   assert.equal(sfEncounterKey('Enter', 'Enter'), null)
   assert.equal(sfEncounterKey('ArrowUp', 'ArrowUp'), null)
 })
+
+test('D48: region themes cycle four distinct palettes', () => {
+  const { sfThemeOf } = client.__game
+  const keys = [sfThemeOf(1).key, sfThemeOf(2).key, sfThemeOf(3).key, sfThemeOf(4).key, sfThemeOf(5).key]
+  assert.deepEqual(keys, [
+    'sf.theme.grass',
+    'sf.theme.snow',
+    'sf.theme.desert',
+    'sf.theme.volcano',
+    'sf.theme.grass',
+  ], 'themes cycle by region % 4')
+  // Each theme is a complete, distinct colour set.
+  const sigs = new Set([1, 2, 3, 4].map((r) => JSON.stringify(sfThemeOf(r))))
+  assert.equal(sigs.size, 4)
+  for (const r of [1, 2, 3, 4]) {
+    const T = sfThemeOf(r)
+    for (const k of ['plain', 'plainAlt', 'grass', 'water', 'waterEdge', 'wave', 'rock', 'boulder', 'boulderLit', 'player', 'playerEdge']) {
+      assert.match(T[k], /^#[0-9a-f]{6}$/i, `theme ${r} key ${k} is a hex colour`)
+    }
+  }
+  // D48b: the snow theme must not keep the near-white player (it vanished on
+  // the pale plain — user screenshot report).
+  assert.notEqual(sfThemeOf(2).player, sfThemeOf(1).player, 'snow player colour differs from the dark-theme default')
+})
+
+test('D48: water waves animate across two frames; painter stays deterministic', () => {
+  const { sfPaintPixels } = client.__game
+  const run = (state) => {
+    const rects = []
+    const ctx = { fillStyle: '', fillRect(x, y, w, h) { rects.push([x, y, w, h, this.fillStyle]) } }
+    sfPaintPixels(ctx, state, 8)
+    return rects
+  }
+  const base = createSafariState()
+  const still = run({ ...base })
+  const still2 = run({ ...base })
+  assert.deepEqual(still, still2, 'no waveFrame → deterministic (static) paint')
+  const animated = run({ ...base, waveFrame: 1 })
+  assert.notDeepEqual(still, animated, 'frame 1 changes the paint')
+  assert.equal(run({ ...base, waveFrame: 1 }).length, animated.length, 'frame change keeps rect count stable')
+})
+
+test('D48: sprite painter bakes rarity flourishes deterministically', () => {
+  const { sfPaintSprite, sfRarityOf } = client.__game
+  assert.ok(sfRarityOf, 'sfRarityOf exported via __game')
+  const run = (species) => {
+    const rects = []
+    const ctx = { fillStyle: '', fillRect(x, y, w, h) { rects.push([x, y, w, h, this.fillStyle]) } }
+    sfPaintSprite(ctx, species, 16)
+    return rects
+  }
+  // A very-rare species paints the golden star sparkle (#ffd23f).
+  const very = Array.from({ length: 54 }, (_, s) => s).find((s) => sfRarityOf(s) === 'very')
+  const rare = Array.from({ length: 54 }, (_, s) => s).find((s) => sfRarityOf(s) === 'rare')
+  const rectsVery = run(very)
+  assert.ok(
+    rectsVery.some((r) => r[4] === '#ffd23f'),
+    'very-rare species carries the star sparkle colour',
+  )
+  // Outline pass: the dark outline tone differs from every palette base.
+  const bases = new Set(rectsVery.map((r) => r[4]))
+  assert.ok(bases.size >= 4, `sprite uses multiple tone steps (${bases.size})`)
+  assert.ok(run(rare).length > 0)
+  // Deterministic: same species twice paints identically.
+  assert.deepEqual(run(very), run(very))
+})
