@@ -553,5 +553,6 @@
 **修订（D48b，2026-11-15 真机截图反馈）**：雪原主题下默认白色玩家小人消失在浅色空地上。结论：`player`/`playerEdge` 纳入主题色表——雪原用深蓝身 + 红帽、沙漠用深棕身 + 绿帽、草原/火山维持白身绿帽；玩家绘制统一加深色光环底 + 地面落影，保证任意底色上可读。
 
 **打磨（D48c，2026-11-15 第二轮"再美化"反馈）**：①地形交界按确定性抖动互相咬入 1px（`sfJitter(i*4+k, side+91)`），湖泊/草地边缘变有机曲线而非直线网格；②水岸两垂直方向同时临陆时补角落像素（圆角湖泊）；③草地稀有开 2px 小花（红/黄/白确定性取色）；④火山主题空地撒橙红余烬像素；⑤精灵加腮红/嘴部/耳内浅色（或尾尖/冠纹高光）微细节。全部仍为零素材、确定性、纯 Canvas。
+**比例调优（D48d，2026-11-15）**：用 Sprite AI MCP（本会话接入的 `@local/sprite-ai-mcp` bundle，streamable-http）生成 4 张参考稿并获产品确认（圆胖/方块/两版 chibi），逐像素分析后修正 `sfPaintSprite`：圆胖型改穹顶剪影（窄顶→上中最宽→收窄下摆）、长条型改 chibi 大头小身短腿（原均匀豆形偏平淡）、眼睛下移至 38–44% 高度、双脚分离留缝并伸出下缘、白肚皮花纹扩大。参考稿存 `test-results/art-ref/`。
 
 **影响面**：`src/client/08c-safari.mjs`（SF_THEMES/sfThemeOf、sfPaintPixels、sfPaintSprite、drawSafariMap、双 Board 波纹动画 effect、页脚主题名）、`src/client/01-dictionaries.mjs`（sf.theme.* 8 键）、`test/safari.test.js`、`tools/sprite-sheet.mjs` 验收图、ui-spec §6.4。
