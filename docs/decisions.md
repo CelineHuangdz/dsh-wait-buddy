@@ -555,5 +555,16 @@
 **打磨（D48c，2026-11-15 第二轮"再美化"反馈）**：①地形交界按确定性抖动互相咬入 1px（`sfJitter(i*4+k, side+91)`），湖泊/草地边缘变有机曲线而非直线网格；②水岸两垂直方向同时临陆时补角落像素（圆角湖泊）；③草地稀有开 2px 小花（红/黄/白确定性取色）；④火山主题空地撒橙红余烬像素；⑤精灵加腮红/嘴部/耳内浅色（或尾尖/冠纹高光）微细节。全部仍为零素材、确定性、纯 Canvas。
 **比例调优（D48d，2026-11-15）**：用 Sprite AI MCP（本会话接入的 `@local/sprite-ai-mcp` bundle，streamable-http）生成 4 张参考稿并获产品确认（圆胖/方块/两版 chibi），逐像素分析后修正 `sfPaintSprite`：圆胖型改穹顶剪影（窄顶→上中最宽→收窄下摆）、长条型改 chibi 大头小身短腿（原均匀豆形偏平淡）、眼睛下移至 38–44% 高度、双脚分离留缝并伸出下缘、白肚皮花纹扩大。参考稿存 `test-results/art-ref/`。
 **网格重制（D48e，2026-11-15 真机"还是丑"反馈）**：16×16 矩形拼块的信息量上限到头了。`sfPaintSprite` 重写为 **24×24 逐像素网格**绘制——每物种先构建字符网格（剪影 spans → 1px 邻接边界轮廓 → 上/下色阶带 → 花纹 → 3×3 眼睛含瞳孔与高光 → 腮红/嘴/耳内点缀 → 稀有度星形闪光），再逐像素上实色。剪影 spans/五官几何按已确认的 AI 参考稿手工测定（`SF_BODY_SPANS`/`SF_BODY_FACE`）。图鉴头像 32→48px、遇怪立绘 64→72px。
+## D49 精灵图集：放开"零素材"红线的一寸边界（2026-11-15，产品确认）
+
+**问题**：D48d/D48e 三轮程序化迭代证明，手工 mask 的质感到不了 AI 参考稿水准（产品复测"还是很丑"）。Sprite AI MCP 生成的参考稿已获产品确认（round/block/tall2，存 `assets/sprite-src/`）。
+
+**结论**：有边界地放开 D9"零外部素材"——**只允许一张由已确认参考稿构成的精灵图集**：
+1. **构建期**：3 只基础精灵（每体型一只，64×64 PNG，共 ~8KB）以 data URI 内嵌进 client 片段（`08b5-sprite-atlas.mjs`，由 `tools/embed-sprite-atlas.mjs` 从 `assets/sprite-src/` 生成）；
+2. **运行时**：首只精灵渲染前在离屏 canvas 确定性合成 54 种变体——对基础稿做 HSL 色相重着色（体色像素映射到 6 色板，保留明暗/轮廓/白眼）+ 花纹叠加（素/点/纹，只作用于体色像素）→ 576×192 图集；无网络请求、无新依赖；
+3. **降级**：图集未就绪/无 DOM 环境（测试、node --test）回退到 D48e 程序化绘制（`sfPaintSprite` 保留）；稀有度星形闪光/光环仍在绘制层动态叠加；
+4. **红线其余部分不变**：仍不引入字体/引擎/网络素材；图集仅为已确认参考稿的机械重着色，不含任何新增手工美术。
+
+**影响面**：`assets/sprite-src/`（新）、`tools/embed-sprite-atlas.mjs`（新）、`src/client/08b5-sprite-atlas.mjs`（新）、`src/client/08c-safari.mjs`（SfSpriteIcon 走图集 + 回退）、ui-spec §6.4。
 
 **影响面**：`src/client/08c-safari.mjs`（SF_THEMES/sfThemeOf、sfPaintPixels、sfPaintSprite、drawSafariMap、双 Board 波纹动画 effect、页脚主题名）、`src/client/01-dictionaries.mjs`（sf.theme.* 8 键）、`test/safari.test.js`、`tools/sprite-sheet.mjs` 验收图、ui-spec §6.4。

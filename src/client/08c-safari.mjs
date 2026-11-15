@@ -1205,6 +1205,12 @@
     /** Pixel sprite icon: one small canvas per species. */
     function SfSpriteIcon({ species, size = 64 }) {
       const canvasRef = React.useRef(null)
+      const [atlasTick, setAtlasTick] = React.useState(0)
+      React.useEffect(() => {
+        sfAtlasEnsure()
+        // Re-render once the atlas finishes composing (D49).
+        return sfAtlasOnReady(() => setAtlasTick((t) => t + 1))
+      }, [])
       React.useEffect(() => {
         const canvas = canvasRef.current
         if (canvas === null) return
@@ -1212,9 +1218,12 @@
         if (ctx === null) return
         sfSafeDraw(() => {
           ctx.clearRect(0, 0, SF_SPRITE_GRID, SF_SPRITE_GRID)
+          // D49: the composed AI-reference atlas is the primary look; the
+          // procedural painter remains as the ready-fallback (tests, no-DOM).
+          if (sfAtlasDraw(ctx, species, SF_SPRITE_GRID)) return
           sfPaintSprite(ctx, species, SF_SPRITE_GRID)
         })
-      }, [species])
+      }, [species, atlasTick])
       // 24×24 pixel buffer, integer-scaled by CSS (pixelated) — crisp blocks.
       return h('canvas', {
         ref: canvasRef,
