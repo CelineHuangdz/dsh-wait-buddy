@@ -720,13 +720,22 @@ const CSS = `
 .wb-statusText{flex:0 1 auto;min-width:0;font-size:15px;font-weight:600;line-height:22px}
 .wb-meta{flex:none;font-size:11px;line-height:18px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
 .wb-disclaimer{font-size:10px;line-height:14px;color:var(--dsw-alias-label-secondary)}
-.wb-pulse{position:relative;height:2px;border-radius:999px;overflow:hidden;background:var(--dsw-alias-bg-layer-2)}
+.wb-pulse{display:flex;gap:2px;height:3px;align-items:stretch;border-radius:999px}
+.wb-pulseSeg{flex:1;min-width:2px;border-radius:999px;background:var(--dsw-alias-bg-layer-2)}
+.wb-pulseSeg[data-on="true"]{background:var(--dsw-alias-state-warn-primary)}
 .wb-pulseFill{position:absolute;top:0;bottom:0;width:32%;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-alias-state-warn-primary),transparent);animation:wb-sweep 1.6s linear infinite}
 @keyframes wb-sweep{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
 .wb-feed{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:2px}
 .wb-feedRow{display:flex;align-items:baseline;gap:8px;min-width:0}
 .wb-feedKind{flex:none;width:30px;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary)}
 .wb-feedText{flex:1;min-width:0;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dsw-alias-label-primary)}
+.wb-feedCopy{flex:none;appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;padding:0 2px;cursor:pointer;border-radius:4px}
+.wb-feedCopy:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.wb-feedCopy:focus-visible{outline:2px solid var(--dsw-alias-brand-primary)}
+.wb-feedCopied{flex:none;font-size:10px;line-height:16px;color:var(--dsw-alias-state-success-primary)}
+.wb-dexGrid{display:flex;flex-wrap:wrap;gap:6px;max-width:300px;max-height:44vh;overflow:auto;whiteSpace:normal}
+.wb-dexItem{display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border-radius:6px;background:rgba(255,255,255,0.04)}
+.wb-dexCount{font-size:9px;line-height:11px;color:rgba(230,242,255,.76)}
 .wb-feedEmpty{font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary)}
 .wb-game{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px}
 .wb-boardWrap{position:relative;flex:1 1 auto;width:100%;height:min(46vh,480px);min-height:200px;max-height:520px;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;overflow:hidden;background:#0d1624}
@@ -757,6 +766,13 @@ const CSS = `
 .wb-settingLabel{margin-right:2px;font-size:12px;line-height:20px;color:var(--dsw-alias-label-secondary)}
 .wb-squareBoard{flex:0 1 auto;width:min(100%,max(200px,min(46vh,520px)));max-width:100%;height:auto;min-height:0;max-height:520px;aspect-ratio:1/1;border:0;background:transparent;align-self:center;margin:0 auto}
 @container (max-width:480px){.wb-inner{padding:8px 12px 176px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-disclaimer{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:128px;min-height:128px;max-height:128px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
-.wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
+.wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
+.wb-keyHints{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+.wb-keyHint{display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:18px;color:var(--dsw-alias-label-primary)}
+.wb-kbd{display:inline-block;min-width:18px;padding:1px 7px;border:1px solid var(--dsw-alias-border-l2);border-bottom-width:2px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:11px;line-height:17px;text-align:center}
+.wb-overlay .wb-keyHint{color:#e6f2ff}
+.wb-hintNote{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
+.wb-buildId{color:var(--dsw-alias-label-tertiary,rgba(230,242,255,.45));font-variant-numeric:tabular-nums}
+.wb-crashDetail{max-width:100%;overflow-wrap:anywhere;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:11px;line-height:15px;color:var(--dsw-alias-state-error-primary);text-align:center}
 @media (prefers-reduced-motion: reduce){.wb-pulseFill{animation:none}.wb-reward{animation:none;opacity:1}.wb-notice{animation:none;opacity:1}}
 `

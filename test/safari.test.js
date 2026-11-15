@@ -15,6 +15,7 @@ const {
   sfSpeciesName,
   sfFitDims,
   sfPath,
+  sfWalkable,
   drawSafariMap,
   SF_SPECIES_TOTAL,
 } = client.__game
@@ -178,14 +179,11 @@ test('the store walks to a target, refits the board and round-trips the dex', ()
 
 test('drawSafariMap paints on a stub canvas without throwing', () => {
   const { drawSafariMap } = client.__game
-  const calls = { fillRect: 0, arc: 0, stroke: 0 }
+  const calls = { fillRect: 0, drawImage: 0 }
   const ctx = new Proxy(
     {},
     {
       get(_t, prop) {
-        if (prop === 'createLinearGradient') {
-          return () => ({ addColorStop() {} })
-        }
         if (prop in calls) {
           return () => {
             calls[prop] += 1
@@ -195,15 +193,32 @@ test('drawSafariMap paints on a stub canvas without throwing', () => {
       },
     },
   )
-  const canvas = { clientWidth: 480, clientHeight: 360, getContext: () => ctx }
+  const canvas = { clientWidth: 480, clientHeight: 360, getContext: () => ctx, width: 0, height: 0 }
   const state = { ...createSafariState(), cols: 24, rows: 12 }
   drawSafariMap(canvas, state)
+  // Fallback path (no DOM in the loader): pixels painted straight onto ctx.
   assert.ok(calls.fillRect > 100, `terrain tiles painted (${calls.fillRect})`)
-  assert.ok(calls.arc >= 2, `player/rocks drawn (${calls.arc})`)
-  assert.ok(calls.stroke >= 2, `grid/details stroked (${calls.stroke})`)
   // Degenerate sizes are ignored, not crashed.
   drawSafariMap({ clientWidth: 0, clientHeight: 0, getContext: () => ctx }, state)
   drawSafariMap(null, state)
+})
+
+test('sfPaintPixels covers the whole pixel map; encounters/targets draw marks', () => {
+  const { sfPaintPixels } = client.__game
+  let fillRects = 0
+  const ctx = { fillStyle: '', fillRect(x, y, w, h) { void x; void y; void w; void h; fillRects += 1 } }
+  const base = createSafariState()
+  const water = base.map.indexOf(2)
+  const state = {
+    ...base,
+    rustle: base.map.indexOf(1),
+    route: [base.pos + 1, base.pos + 2],
+    target: base.pos + 3,
+    invalid: water,
+  }
+  sfPaintPixels(ctx, state, 8)
+  // 24×12 cells × (base + details) — comfortably over 288 rects.
+  assert.ok(fillRects > 288, `pixel painter coverage (${fillRects})`)
 })
 
 test('D47b: clicking an unreachable cell flashes feedback instead of silence', () => {
@@ -254,4 +269,237 @@ test('D47b: a walk sets a visible target marker that clears on arrival', async (
   assert.equal(done.pos, targetCell)
   assert.equal(done.target, null)
   store.dispose()
+})
+
+test('value-noise terrain: contiguous patches, no isolated specks, all terrains present', () => {
+  const shapes = [
+    [1, 24, 12],
+    [2, 24, 12],
+    [3, 45, 20],
+    [1, 66, 30],
+    [5, 90, 44],
+    [1, 10, 8],
+    [1, 23, 9],
+  ]
+  for (const [region, cols, rows] of shapes) {
+    const map = sfMapOf(region, cols, rows)
+    const counts = [0, 0, 0, 0]
+    map.forEach((t) => {
+      counts[t] += 1
+    })
+    // Every map still has lake, rocks and grass.
+    assert.ok(counts[2] >= 2, `region ${region} ${cols}x${rows} has water`)
+    assert.ok(counts[3] >= 2, `region ${region} ${cols}x${rows} has rock`)
+    assert.ok(counts[1] >= 2, `region ${region} ${cols}x${rows} has grass`)
+    // No water/rock cell is fully isolated (8-dir) — no "sesame" specks.
+    for (let y = 0; y < rows; y += 1) {
+      for (let x = 0; x < cols; x += 1) {
+        const t = map[y * cols + x]
+        if (t !== 2 && t !== 3) continue
+        let same = 0
+        for (let dy = -1; dy <= 1; dy += 1) {
+          for (let dx = -1; dx <= 1; dx += 1) {
+            if (dx === 0 && dy === 0) continue
+            const nx = x + dx
+            const ny = y + dy
+            if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue
+            if (map[ny * cols + nx] === t) same += 1
+          }
+        }
+        assert.ok(same > 0, `region ${region} ${cols}x${rows} cell ${x},${y} is not isolated`)
+      }
+    }
+  }
+})
+
+test('sfMigratePos maps proportionally and escapes unwalkable landings', () => {
+  const { sfMigratePos, sfSpawnOf } = client.__game
+  const cols = 24
+  const rows = 12
+  const bigCols = 66
+  const bigRows = 30
+  const bigMap = sfMapOf(1, bigCols, bigRows)
+  const center = Math.floor(rows / 2) * cols + Math.floor(cols / 2)
+  const migrated = sfMigratePos(center, cols, rows, bigCols, bigRows, bigMap)
+  assert.ok(sfWalkable(bigMap[migrated]))
+  const mx = migrated % bigCols
+  const my = Math.floor(migrated / bigCols)
+  assert.ok(Math.abs(mx - 33) <= 3, `x stays central (${mx})`)
+  assert.ok(Math.abs(my - 15) <= 3, `y stays central (${my})`)
+  // Unwalkable landing: an all-water map except one island → nearest island.
+  const drowned = new Array(66 * 30).fill(2)
+  drowned[7 * 66 + 8] = 0
+  const escaped = sfMigratePos(center, cols, rows, 66, 30, drowned)
+  assert.equal(escaped, 7 * 66 + 8)
+  // Nothing walkable at all: fall back to spawn.
+  const flooded = new Array(66 * 30).fill(2)
+  assert.equal(sfMigratePos(center, cols, rows, 66, 30, flooded), sfSpawnOf(66, 30))
+})
+
+test('feedback P0-new: a fit during an encounter is deferred, then applied', async () => {
+  const store = createSafariStore()
+  const fresh = createSafariState()
+  const spawn = fresh.pos
+  // A grass cell a few steps out whose route is plain except for the final
+  // grass step — shuttling onto it eventually triggers an encounter.
+  let grass = -1
+  let grassRouteLen = 0
+  const sx = spawn % fresh.cols
+  const sy = Math.floor(spawn / fresh.cols)
+  outer: for (let d = 1; d <= 4; d += 1) {
+    for (const [dx, dy] of [[d, 0], [-d, 0], [0, d], [0, -d]]) {
+      const gx = sx + dx
+      const gy = sy + dy
+      if (gx < 0 || gy < 0 || gx >= fresh.cols || gy >= fresh.rows) continue
+      const g = gy * fresh.cols + gx
+      if (fresh.map[g] !== 1) continue
+      const route = sfPath(fresh, g)
+      if (route !== null && route.slice(0, -1).every((i) => fresh.map[i] === 0)) {
+        grass = g
+        grassRouteLen = route.length
+        break outer
+      }
+    }
+  }
+  assert.ok(grass >= 0, 'a plain-routed grass cell exists near spawn')
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+  const walkMs = grassRouteLen * 90 + 140
+  let sawEncounter = false
+  for (let attempt = 0; attempt < 60 && !sawEncounter; attempt += 1) {
+    store.walkTo(grass)
+    await sleep(walkMs)
+    const snap = store.getSnapshot()
+    if (snap.rustle !== null) {
+      assert.equal(snap.encounter, null, 'the encounter waits out the rustle window')
+      await sleep(400)
+    }
+    if (store.getSnapshot().encounter !== null) sawEncounter = true
+    else store.walkTo(spawn)
+    await sleep(walkMs)
+  }
+  assert.ok(sawEncounter, 'grass eventually triggered an encounter')
+  const met = store.getSnapshot()
+  assert.ok(met.encounter !== null, 'the encounter window opened after the warning')
+  assert.equal(met.rustle, null)
+  // Busy board: the fit is parked, not dropped and not applied mid-encounter.
+  store.fitBoard(920, 420)
+  assert.equal(store.getSnapshot().cols, met.cols, 'fit deferred while encountering')
+  store.release()
+  const fitted = store.getSnapshot()
+  assert.deepEqual([fitted.cols, fitted.rows], [66, 30], 'parked fit applied after release')
+  store.dispose()
+})
+
+test('feedback P0-new: a fit during a walk applies when the walk ends', async () => {
+  const store = createSafariStore()
+  const fresh = createSafariState()
+  const spawn = fresh.pos
+  // Reuse the plain-route search: a reachable target whose route is all plain.
+  let targetCell = null
+  let routeLen = 0
+  const sx = spawn % fresh.cols
+  const sy = Math.floor(spawn / fresh.cols)
+  outer: for (let d = 3; d <= 10; d += 1) {
+    for (let ry = sy - d; ry <= sy + d; ry += 1) {
+      for (let rx = sx - d; rx <= sx + d; rx += 1) {
+        if (rx < 0 || ry < 0 || rx >= fresh.cols || ry >= fresh.rows) continue
+        if (Math.abs(rx - sx) + Math.abs(ry - sy) < 3) continue
+        const c = ry * fresh.cols + rx
+        const route = sfPath(fresh, c)
+        if (route !== null && route.length >= 3 && route.every((i) => fresh.map[i] === 0)) {
+          targetCell = c
+          routeLen = route.length
+          break outer
+        }
+      }
+    }
+  }
+  assert.ok(targetCell !== null)
+  store.walkTo(targetCell)
+  store.fitBoard(920, 420)
+  assert.equal(store.getSnapshot().cols, fresh.cols, 'fit deferred mid-walk')
+  await new Promise((resolve) => setTimeout(resolve, routeLen * 90 + 260))
+  const fitted = store.getSnapshot()
+  assert.deepEqual([fitted.cols, fitted.rows], [66, 30], 'parked fit applied after arrival')
+  store.dispose()
+})
+
+test('keyboard steering: one cell per keypress, blocks flash, edges are safe', () => {
+  const store = createSafariStore()
+  const fresh = createSafariState()
+  const spawn = fresh.pos
+  // A walkable neighbour exists by construction (spawn cross is plain).
+  const dir = sfWalkable(fresh.map[spawn + 1])
+    ? 'right'
+    : sfWalkable(fresh.map[spawn - 1])
+      ? 'left'
+      : 'down'
+  store.stepDir(dir)
+  let snap = store.getSnapshot()
+  assert.ok(snap.pos !== spawn, 'the explorer moved one cell')
+  assert.equal(snap.encounter === null || snap.rustle === null, true)
+  // Back to spawn, then step into water/rock: red cross, no movement.
+  const back = { up: 'down', down: 'up', left: 'right', right: 'left' }[dir]
+  store.stepDir(back)
+  snap = store.getSnapshot()
+  assert.equal(snap.pos, spawn)
+  const blockedDir = ['up', 'down', 'left', 'right'].find((name) => {
+    const deltas = { up: -fresh.cols, down: fresh.cols, left: -1, right: 1 }
+    const cell = spawn + deltas[name]
+    if (cell < 0 || cell >= fresh.map.length) return false
+    if ((name === 'left' && spawn % fresh.cols === 0) || (name === 'right' && spawn % fresh.cols === fresh.cols - 1)) return false
+    return !sfWalkable(fresh.map[cell])
+  })
+  if (blockedDir !== undefined) {
+    store.stepDir(blockedDir)
+    snap = store.getSnapshot()
+    assert.equal(snap.pos, spawn, 'unwalkable cell refused')
+    assert.ok(snap.invalid !== null, 'red cross flashed instead of silence')
+  }
+  // Board edges never wrap around rows (row middle: left/up are safe calls).
+  assert.doesNotThrow(() => {
+    store.stepDir('left')
+    store.stepDir('up')
+  })
+  store.dispose()
+})
+
+test('pixel sprite painter: all 54 species paint and differ', () => {
+  const { sfPaintSprite, SF_SPECIES_TOTAL, SF_PALETTE_COLORS } = client.__game
+  const makeCtx = () => {
+    const rects = []
+    return {
+      fillStyle: '',
+      fillRect(x, y, w, h) {
+        rects.push([x, y, w, h, this.fillStyle])
+      },
+      rects,
+    }
+  }
+  const signatures = new Set()
+  for (let s = 0; s < SF_SPECIES_TOTAL; s += 1) {
+    const ctx = makeCtx()
+    sfPaintSprite(ctx, s, 16)
+    assert.ok(ctx.rects.length >= 12, `species ${s} paints enough blocks (${ctx.rects.length})`)
+    for (const rect of ctx.rects) {
+      for (const v of rect.slice(0, 4)) {
+        assert.ok(Number.isFinite(v) && v >= 0, `species ${s} rect inside canvas`)
+      }
+    }
+    signatures.add(JSON.stringify(ctx.rects))
+  }
+  assert.equal(signatures.size, SF_SPECIES_TOTAL, 'every species has a distinct pixel signature')
+})
+
+test('encounter key map: F throws, Q/Esc release, Space stays off the keys', () => {
+  const { sfEncounterKey } = client.__game
+  assert.equal(sfEncounterKey('f', 'KeyF'), 'throw')
+  assert.equal(sfEncounterKey('F', undefined), 'throw')
+  assert.equal(sfEncounterKey('', 'KeyF'), 'throw', 'IME-mangled key still matches via code')
+  assert.equal(sfEncounterKey('q', 'KeyQ'), 'release')
+  assert.equal(sfEncounterKey('Escape', 'Escape'), 'release')
+  assert.equal(sfEncounterKey('Escape', undefined), 'release')
+  assert.equal(sfEncounterKey(' ', 'Space'), null, 'space is deliberately not a throw key')
+  assert.equal(sfEncounterKey('Enter', 'Enter'), null)
+  assert.equal(sfEncounterKey('ArrowUp', 'ArrowUp'), null)
 })

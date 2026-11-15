@@ -660,10 +660,144 @@
       )
     }
 
+    /**
+     * One activity feed row. The Host folds consecutive same-tool calls into
+     * `count`; render "text ×N" and offer one-click copy of the full text
+     * (feedback P1: a wall of tool lines is unscannable).
+     */
+    function FeedRow({ t, item }) {
+      const [copied, setCopied] = React.useState(false)
+      React.useEffect(() => {
+        if (!copied) return undefined
+        const id = setTimeout(() => setCopied(false), 1400)
+        return () => clearTimeout(id)
+      }, [copied])
+      const copy = async () => {
+        try {
+          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(item.text)
+          setCopied(true)
+        } catch (error) {
+          console.warn('[wait-buddy] copy failed', error)
+        }
+      }
+      const label = item.count > 1 ? `${item.text} ×${item.count}` : item.text
+      return h(
+        'div',
+        { className: 'wb-feedRow' },
+        h(
+          'span',
+          { className: 'wb-feedKind', 'data-kind': item.kind },
+          t(FEED_LABEL[item.kind] || FEED_LABEL.tool),
+        ),
+        h('span', { className: 'wb-feedText', title: item.text }, label),
+        copied
+          ? h('span', { className: 'wb-feedCopied', role: 'status' }, t('feed.copied'))
+          : h(
+              'button',
+              {
+                type: 'button',
+                className: 'wb-feedCopy',
+                'aria-label': t('feed.copy'),
+                title: t('feed.copy'),
+                onClick: copy,
+              },
+              '⧉',
+            ),
+      )
+    }
+
+    /** 12 segments × 5s: which recent buckets saw tool activity. */
+    const PULSE_SEGMENTS = 12
+    const PULSE_BUCKET_MS = 5000
+
+    /**
+     * Activity pulse strip (feedback P1): a real sparkline over the last
+     * minute — lit segments mean the feed head changed in that bucket, so
+     * "quiet but working" and "stuck" are distinguishable at a glance.
+     */
+    function ActivityPulse({ t, activity }) {
+      const pulses = React.useRef([])
+      const [, bump] = React.useState(0)
+      const head = activity[0]
+      const headKey = head === undefined ? '' : `${head.kind}:${head.text}`
+      React.useEffect(() => {
+        if (headKey === '') return
+        const now = Date.now()
+        pulses.current = [...pulses.current, now].filter((at) => now - at < 60000).slice(-40)
+      }, [headKey])
+      React.useEffect(() => {
+        const id = setInterval(() => bump((value) => value + 1), PULSE_BUCKET_MS)
+        return () => clearInterval(id)
+      }, [])
+      const now = Date.now()
+      const marks = pulses.current
+      const segments = []
+      for (let i = 0; i < PULSE_SEGMENTS; i += 1) {
+        const from = now - (PULSE_SEGMENTS - i) * PULSE_BUCKET_MS
+        const to = from + PULSE_BUCKET_MS
+        const on = marks.some((at) => at >= from && at < to)
+        segments.push(
+          h('span', {
+            key: i,
+            className: 'wb-pulseSeg',
+            'data-on': on ? 'true' : 'false',
+          }),
+        )
+      }
+      const live = marks.some((at) => now - at < 60000)
+      return h(
+        'div',
+        { className: 'wb-pulse', 'aria-hidden': true, title: t(live ? 'feed.pulseLive' : 'feed.pulseIdle') },
+        segments,
+      )
+    }
+
     function WaitBuddyView(props) {
       const t = typeof props.t === 'function' ? props.t : boundT
       const rootRef = React.useRef(null)
       const innerRef = React.useRef(null)
+      // Window-level fallback for game keys (feedback: Space scrolled the
+      // page). The React onKeyDown only fires while focus is inside the view
+      // — after an encounter closes, focus falls back to <body> and the
+      // browser scrolls instead of playing. Two more details make it stick:
+      //   1. capture phase — a host that scrolls from its own capture
+      //      listener would otherwise act before our bubble-phase handler;
+      //   2. stopPropagation on consumed keys — the host's handlers must not
+      //      run at all for a key the game consumed.
+      React.useEffect(() => {
+        const onWindowKeyDown = (event) => {
+          const root = rootRef.current
+          let visible = false
+          if (root !== null) {
+            const rect = root.getBoundingClientRect()
+            visible = rect.width !== 0 && rect.height !== 0
+          }
+          if (event.defaultPrevented) return
+          if (root === null) return
+          if (!visible) return
+          const consumed = onGameKeyDown(event)
+          if (!consumed) return
+          event.preventDefault()
+          // stopImmediate: same-node host listeners registered earlier must
+          // not act on a key the game consumed either.
+          event.stopImmediatePropagation()
+          // The conversation's follow-tail animation interrupts on Space /
+          // arrows "unless a child has prevented the key's default action" —
+          // our preventDefault would silently KEEP the tail following, i.e.
+          // the page keeps scrolling while a session streams. The host
+          // interrupts unconditionally on wheel: dispatch a synthetic wheel
+          // pulse (untrusted → no native scroll of its own) to release it.
+          try {
+            document.dispatchEvent(
+              new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true }),
+            )
+          } catch (error) {
+            void error
+          }
+        }
+        window.addEventListener('keydown', onWindowKeyDown, true)
+        return () => window.removeEventListener('keydown', onWindowKeyDown, true)
+      }, [])
       React.useEffect(() => {
         const scrollTop = () => {
           if (innerRef.current !== null) innerRef.current.scrollTop = 0
@@ -786,13 +920,25 @@
                   : null,
               ),
               status === 'running' && state.health === 'ready'
-                ? h(
-                    'div',
-                    { className: 'wb-pulse', 'aria-hidden': true },
-                    h('div', { className: 'wb-pulseFill' }),
-                  )
+                ? h(ActivityPulse, { t, activity: state.activity })
                 : null,
-              h('div', { className: 'wb-disclaimer' }, t('footer.line')),
+              h(
+                'div',
+                {
+                  className: 'wb-disclaimer',
+                  title:
+                    typeof window !== 'undefined' && window.__WB_BUILD_ID__ !== undefined
+                      ? `build ${window.__WB_BUILD_ID__}`
+                      : undefined,
+                },
+                t('footer.line'),
+                // Visible build id: the host serves plugin clients from an
+                // activation-time snapshot, so a page refresh can deliver a
+                // stale bundle — the footer must tell which build is live.
+                typeof window !== 'undefined' && window.__WB_BUILD_ID__ !== undefined
+                  ? h('span', { className: 'wb-buildId' }, ` · ${window.__WB_BUILD_ID__}`)
+                  : null,
+              ),
             ),
             h(
               'div',
@@ -800,16 +946,7 @@
               state.activity.length === 0
                 ? h('div', { className: 'wb-feedEmpty' }, t('feed.empty'))
                 : state.activity.map((item, index) =>
-                    h(
-                      'div',
-                      { className: 'wb-feedRow', key: `${item.kind}-${index}` },
-                      h(
-                        'span',
-                        { className: 'wb-feedKind', 'data-kind': item.kind },
-                        t(FEED_LABEL[item.kind] || FEED_LABEL.tool),
-                      ),
-                      h('span', { className: 'wb-feedText', title: item.text }, item.text),
-                    ),
+                    h(FeedRow, { key: `${item.kind}-${index}`, t, item }),
                   ),
             ),
           ),

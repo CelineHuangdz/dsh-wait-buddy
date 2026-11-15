@@ -11,6 +11,7 @@
  * non-zero on drift (wired into CI so a fragment edit without a rebuild
  * cannot ship).
  */
+import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -32,10 +33,18 @@ for (const name of fragments) {
   built += text
 }
 
+// Content-derived build id, appended after the factory: identical fragments
+// always produce the identical id, so `--check` stays deterministic. The id
+// is readable as window.__WB_BUILD_ID__ at runtime — the host serves plugin
+// clients from an activation-time snapshot, so a page refresh can deliver a
+// stale bundle; this id lets anyone verify which build is actually live.
+const buildId = createHash('sha256').update(built).digest('hex').slice(0, 8)
+built += `\n;window.__WB_BUILD_ID__ = '${buildId}';\n`
+
 if (process.argv.includes('--check')) {
   const committed = readFileSync(OUTPUT, 'utf8')
   if (committed === built) {
-    console.log(`[build:client] OK — ${OUTPUT} matches ${fragments.length} fragments`)
+    console.log(`[build:client] OK — ${OUTPUT} matches ${fragments.length} fragments (build ${buildId})`)
   } else {
     console.error(
       `[build:client] DRIFT — ${OUTPUT} differs from the ${fragments.length} fragments in ${FRAGMENTS_DIR}. Run: npm run build:client`,
@@ -44,5 +53,5 @@ if (process.argv.includes('--check')) {
   }
 } else {
   writeFileSync(OUTPUT, built)
-  console.log(`[build:client] wrote ${OUTPUT} from ${fragments.length} fragments`)
+  console.log(`[build:client] wrote ${OUTPUT} from ${fragments.length} fragments (build ${buildId})`)
 }

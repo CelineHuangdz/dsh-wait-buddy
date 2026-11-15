@@ -14,10 +14,17 @@
       store.togglePause()
     }
 
+    /**
+     * Returns true when the key was consumed (prevented / handled) so the
+     * window-capture fallback knows to stop the host's own key handlers —
+     * a host that scrolls the page from a capture-phase listener would
+     * otherwise race ahead of our bubble-phase preventDefault.
+     */
     function onGameKeyDown(event) {
       // D45: only keyboard-driven games (see GAMES.keyboard) consume keys.
-      if (!GAMES[modeStore.getSnapshot()].keyboard) return
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+      const mode = modeStore.getSnapshot()
+      if (!GAMES[mode].keyboard) return false
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return false
       const target = event.target
       if (
         target !== null &&
@@ -25,25 +32,72 @@
         typeof target.closest === 'function' &&
         target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]') !== null
       ) {
-        return
+        return false
       }
       if (event.key === ' ' || event.key === 'Spacebar') {
+        // Space stays snake-only: start / pause / resume.
+        if (mode !== 'snake') return false
         if (
           target !== null &&
           target !== undefined &&
           typeof target.closest === 'function' &&
           target.closest('button, a[href], [role="button"]') !== null
         ) {
-          return
+          return false
         }
         event.preventDefault()
         snakeSpace()
-        return
+        return true
+      }
+      if (mode === 'safari') {
+        // D48: arrows/WASD steer the explorer one cell, and an open encounter
+        // window is keyboard-operable: Space/Enter throws, Escape releases.
+        // Space and arrows NEVER fall through to the browser inside the
+        // safari view — the default would scroll the page mid-play.
+        const isSpace =
+          event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space'
+        const snap = safariStore.getSnapshot()
+        if (snap.encounter !== null) {
+          const action = sfEncounterKey(event.key, event.code)
+          const steering =
+            SF_KEY_DIRECTIONS[event.code] !== undefined || SF_KEY_DIRECTIONS[event.key] !== undefined
+          if (action === null) {
+            if (isSpace || steering) event.preventDefault()
+            return isSpace || steering
+          }
+          const onButton =
+            target !== null &&
+            target !== undefined &&
+            typeof target.closest === 'function' &&
+            target.closest('button, a[href], [role="button"]') !== null
+          if (onButton && event.key !== 'Escape') return false
+          event.preventDefault()
+          if (action === 'throw') safariStore.throwBall()
+          else safariStore.release()
+          return true
+        }
+        if (isSpace) {
+          // No encounter yet: swallow the scroll default.
+          event.preventDefault()
+          return true
+        }
+        // N = next region (换区域), matching the board's key-hint chips.
+        if (event.code === 'KeyN' || event.key === 'n' || event.key === 'N') {
+          event.preventDefault()
+          safariStore.nextRegion()
+          return true
+        }
+        const dir = SF_KEY_DIRECTIONS[event.code] ?? SF_KEY_DIRECTIONS[event.key]
+        if (dir === undefined) return false
+        event.preventDefault()
+        safariStore.stepDir(dir)
+        return true
       }
       const dir = ARROW_DIRECTIONS[event.key]
-      if (dir === undefined) return
+      if (dir === undefined) return false
       event.preventDefault()
       gameStore.turn(dir)
+      return true
     }
 
     function snakeSpace() {

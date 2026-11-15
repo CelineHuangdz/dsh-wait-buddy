@@ -81,6 +81,10 @@ window.__ModuleLoader__.load({
       'feed.command': '命令',
       'feed.tool': '工具',
       'feed.empty': '等待 Agent 活动',
+      'feed.copy': '复制全文',
+      'feed.copied': '已复制',
+      'feed.pulseIdle': '近 1 分钟无工具活动',
+      'feed.pulseLive': '近 1 分钟工具活动',
       'alert.approval.title': '【重要】等待你审批工具调用',
       'alert.approval.tool': '工具 {tool}',
       'alert.question.title': '【重要】Agent 有问题等你回答',
@@ -162,6 +166,11 @@ window.__ModuleLoader__.load({
       'sf.rarity.common': '常见',
       'sf.rarity.rare': '稀有',
       'sf.rarity.very': '珍稀',
+      'sf.catchRate': '捕获率 {rate}%',
+      'sf.hint.move': '移动',
+      'sf.hint.throw': '投球',
+      'sf.hint.region': '换区域',
+      'sf.hint.grass': '点击自动寻路；踩草可能遇到精灵',
       'sf.throw': '精灵球',
       'sf.release': '放过',
       'sf.dex': '图鉴 {caught}/{total}',
@@ -171,7 +180,6 @@ window.__ModuleLoader__.load({
       'sf.dexCount': '图鉴 {caught}/{total}',
       'sf.region': '区域 {n}',
       'sf.nextRegion': '换区域',
-      'sf.hint': '点击相邻格移动；踩草可能遇到精灵',
       'sf.result.caught': '捕获成功！',
       'sf.result.fled': '逃跑了…',
       'sf.result.released': '已放过',
@@ -224,6 +232,10 @@ window.__ModuleLoader__.load({
       'feed.command': 'Command',
       'feed.tool': 'Tool',
       'feed.empty': 'Waiting for agent activity',
+      'feed.copy': 'Copy full text',
+      'feed.copied': 'Copied',
+      'feed.pulseIdle': 'No tool activity in the last minute',
+      'feed.pulseLive': 'Tool activity in the last minute',
       'alert.approval.title': 'Important: a tool call is waiting for your approval',
       'alert.approval.tool': 'tool {tool}',
       'alert.question.title': 'Important: the agent has a question for you',
@@ -305,6 +317,11 @@ window.__ModuleLoader__.load({
       'sf.rarity.common': 'Common',
       'sf.rarity.rare': 'Rare',
       'sf.rarity.very': 'Very rare',
+      'sf.catchRate': 'Catch rate {rate}%',
+      'sf.hint.move': 'Move',
+      'sf.hint.throw': 'Throw',
+      'sf.hint.region': 'Next region',
+      'sf.hint.grass': 'Click to auto-walk; grass hides sprites.',
       'sf.throw': 'Throw ball',
       'sf.release': 'Release',
       'sf.dex': 'Dex {caught}/{total}',
@@ -314,7 +331,6 @@ window.__ModuleLoader__.load({
       'sf.dexCount': 'Dex {caught}/{total}',
       'sf.region': 'Region {n}',
       'sf.nextRegion': 'New region',
-      'sf.hint': 'Click an adjacent cell to move; grass hides sprites.',
       'sf.result.caught': 'Caught!',
       'sf.result.fled': 'It fled…',
       'sf.result.released': 'Released',
@@ -1604,10 +1620,17 @@ window.__ModuleLoader__.load({
       store.togglePause()
     }
 
+    /**
+     * Returns true when the key was consumed (prevented / handled) so the
+     * window-capture fallback knows to stop the host's own key handlers —
+     * a host that scrolls the page from a capture-phase listener would
+     * otherwise race ahead of our bubble-phase preventDefault.
+     */
     function onGameKeyDown(event) {
       // D45: only keyboard-driven games (see GAMES.keyboard) consume keys.
-      if (!GAMES[modeStore.getSnapshot()].keyboard) return
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+      const mode = modeStore.getSnapshot()
+      if (!GAMES[mode].keyboard) return false
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return false
       const target = event.target
       if (
         target !== null &&
@@ -1615,25 +1638,72 @@ window.__ModuleLoader__.load({
         typeof target.closest === 'function' &&
         target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]') !== null
       ) {
-        return
+        return false
       }
       if (event.key === ' ' || event.key === 'Spacebar') {
+        // Space stays snake-only: start / pause / resume.
+        if (mode !== 'snake') return false
         if (
           target !== null &&
           target !== undefined &&
           typeof target.closest === 'function' &&
           target.closest('button, a[href], [role="button"]') !== null
         ) {
-          return
+          return false
         }
         event.preventDefault()
         snakeSpace()
-        return
+        return true
+      }
+      if (mode === 'safari') {
+        // D48: arrows/WASD steer the explorer one cell, and an open encounter
+        // window is keyboard-operable: Space/Enter throws, Escape releases.
+        // Space and arrows NEVER fall through to the browser inside the
+        // safari view — the default would scroll the page mid-play.
+        const isSpace =
+          event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space'
+        const snap = safariStore.getSnapshot()
+        if (snap.encounter !== null) {
+          const action = sfEncounterKey(event.key, event.code)
+          const steering =
+            SF_KEY_DIRECTIONS[event.code] !== undefined || SF_KEY_DIRECTIONS[event.key] !== undefined
+          if (action === null) {
+            if (isSpace || steering) event.preventDefault()
+            return isSpace || steering
+          }
+          const onButton =
+            target !== null &&
+            target !== undefined &&
+            typeof target.closest === 'function' &&
+            target.closest('button, a[href], [role="button"]') !== null
+          if (onButton && event.key !== 'Escape') return false
+          event.preventDefault()
+          if (action === 'throw') safariStore.throwBall()
+          else safariStore.release()
+          return true
+        }
+        if (isSpace) {
+          // No encounter yet: swallow the scroll default.
+          event.preventDefault()
+          return true
+        }
+        // N = next region (换区域), matching the board's key-hint chips.
+        if (event.code === 'KeyN' || event.key === 'n' || event.key === 'N') {
+          event.preventDefault()
+          safariStore.nextRegion()
+          return true
+        }
+        const dir = SF_KEY_DIRECTIONS[event.code] ?? SF_KEY_DIRECTIONS[event.key]
+        if (dir === undefined) return false
+        event.preventDefault()
+        safariStore.stepDir(dir)
+        return true
       }
       const dir = ARROW_DIRECTIONS[event.key]
-      if (dir === undefined) return
+      if (dir === undefined) return false
       event.preventDefault()
       gameStore.turn(dir)
+      return true
     }
 
     function snakeSpace() {
@@ -2456,13 +2526,22 @@ const CSS = `
 .wb-statusText{flex:0 1 auto;min-width:0;font-size:15px;font-weight:600;line-height:22px}
 .wb-meta{flex:none;font-size:11px;line-height:18px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
 .wb-disclaimer{font-size:10px;line-height:14px;color:var(--dsw-alias-label-secondary)}
-.wb-pulse{position:relative;height:2px;border-radius:999px;overflow:hidden;background:var(--dsw-alias-bg-layer-2)}
+.wb-pulse{display:flex;gap:2px;height:3px;align-items:stretch;border-radius:999px}
+.wb-pulseSeg{flex:1;min-width:2px;border-radius:999px;background:var(--dsw-alias-bg-layer-2)}
+.wb-pulseSeg[data-on="true"]{background:var(--dsw-alias-state-warn-primary)}
 .wb-pulseFill{position:absolute;top:0;bottom:0;width:32%;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-alias-state-warn-primary),transparent);animation:wb-sweep 1.6s linear infinite}
 @keyframes wb-sweep{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
 .wb-feed{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:2px}
 .wb-feedRow{display:flex;align-items:baseline;gap:8px;min-width:0}
 .wb-feedKind{flex:none;width:30px;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary)}
 .wb-feedText{flex:1;min-width:0;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dsw-alias-label-primary)}
+.wb-feedCopy{flex:none;appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;padding:0 2px;cursor:pointer;border-radius:4px}
+.wb-feedCopy:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.wb-feedCopy:focus-visible{outline:2px solid var(--dsw-alias-brand-primary)}
+.wb-feedCopied{flex:none;font-size:10px;line-height:16px;color:var(--dsw-alias-state-success-primary)}
+.wb-dexGrid{display:flex;flex-wrap:wrap;gap:6px;max-width:300px;max-height:44vh;overflow:auto;whiteSpace:normal}
+.wb-dexItem{display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border-radius:6px;background:rgba(255,255,255,0.04)}
+.wb-dexCount{font-size:9px;line-height:11px;color:rgba(230,242,255,.76)}
 .wb-feedEmpty{font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary)}
 .wb-game{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px}
 .wb-boardWrap{position:relative;flex:1 1 auto;width:100%;height:min(46vh,480px);min-height:200px;max-height:520px;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;overflow:hidden;background:#0d1624}
@@ -2493,7 +2572,14 @@ const CSS = `
 .wb-settingLabel{margin-right:2px;font-size:12px;line-height:20px;color:var(--dsw-alias-label-secondary)}
 .wb-squareBoard{flex:0 1 auto;width:min(100%,max(200px,min(46vh,520px)));max-width:100%;height:auto;min-height:0;max-height:520px;aspect-ratio:1/1;border:0;background:transparent;align-self:center;margin:0 auto}
 @container (max-width:480px){.wb-inner{padding:8px 12px 176px}.wb-top{gap:12px}.wb-status{min-width:0}.wb-setting{display:none}.wb-hint{display:none}.wb-disclaimer{display:none}.wb-caption{font-size:13px}.wb-gameFoot{gap:10px}.wb-boardWrap{height:128px;min-height:128px;max-height:128px}.wb-alert{padding:8px 10px;margin:12px 12px 0}.wb-statusText{overflow-wrap:anywhere}}
-.wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
+.wb-crash{box-sizing:border-box;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;margin:12px}
+.wb-keyHints{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+.wb-keyHint{display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:18px;color:var(--dsw-alias-label-primary)}
+.wb-kbd{display:inline-block;min-width:18px;padding:1px 7px;border:1px solid var(--dsw-alias-border-l2);border-bottom-width:2px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:11px;line-height:17px;text-align:center}
+.wb-overlay .wb-keyHint{color:#e6f2ff}
+.wb-hintNote{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
+.wb-buildId{color:var(--dsw-alias-label-tertiary,rgba(230,242,255,.45));font-variant-numeric:tabular-nums}
+.wb-crashDetail{max-width:100%;overflow-wrap:anywhere;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:11px;line-height:15px;color:var(--dsw-alias-state-error-primary);text-align:center}
 @media (prefers-reduced-motion: reduce){.wb-pulseFill{animation:none}.wb-reward{animation:none;opacity:1}.wb-notice{animation:none;opacity:1}}
 `
 
@@ -2814,8 +2900,42 @@ const CSS = `
     // ---------------------------------------------------------------------
     // §8c Sprite Safari (D47): explore a grid map, encounter procedural
     // sprites in the grass, catch them with one click, fill a persistent
-    // dex. Turn-based, click-only: pauseOnLeave false, keyboard false.
+    // dex. Turn-based; pauseOnLeave false.
     // ---------------------------------------------------------------------
+
+    // D47b/D48: click-to-walk plus arrow/WASD one-cell steering.
+    const SF_KEY_DIRECTIONS = {
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      w: 'up',
+      s: 'down',
+      a: 'left',
+      d: 'right',
+      W: 'up',
+      S: 'down',
+      A: 'left',
+      D: 'right',
+      KeyW: 'up',
+      KeyS: 'down',
+      KeyA: 'left',
+      KeyD: 'right',
+    }
+
+    /**
+     * Encounter-window key map: F throws, Q releases (Esc also releases).
+     * Space is deliberately NOT a throw key — the host page scrolls on it
+     * (feedback), so the encounter keys stay off the scroll key entirely.
+     * Matched by `code` (physical) with a `key` fallback for IME safety.
+     */
+    function sfEncounterKey(key, code) {
+      const k = key === 'Process' || key === 'Unidentified' ? '' : key
+      if (k === 'f' || k === 'F' || code === 'KeyF') return 'throw'
+      if (k === 'q' || k === 'Q' || code === 'KeyQ') return 'release'
+      if (k === 'Escape' || code === 'Escape') return 'release'
+      return null
+    }
 
     // D47b: cells stay ~36px; the grid shape follows the board's aspect ratio
     // (a wide board is e.g. 25×12), so tiles never stretch into bars.
@@ -2860,7 +2980,14 @@ const CSS = `
       })
     }
 
-    /** Deterministic terrain for one region at a given grid shape. */
+    /**
+     * Deterministic terrain for one region at a given grid shape.
+     * Feedback P1: i.i.d. per-cell dice read as "sesame noise", so the map is
+     * built from smooth value noise — a coarse random lattice bilinearly
+     * interpolated, normalised per map, then sliced into contiguous terrain
+     * bands. The seed stays `region × cols × rows`, so shapes remain fully
+     * deterministic.
+     */
     function sfMapOf(region, cols, rows) {
       let seed = (region * 2654435761 + cols * 31 + rows) % 2147483647
       if (seed <= 0) seed += 2147483646
@@ -2868,16 +2995,107 @@ const CSS = `
         seed = (seed * 16807) % 2147483647
         return seed / 2147483647
       }
-      const map = new Array(cols * rows).fill(SF_TERRAIN.plain)
-      for (let i = 0; i < map.length; i += 1) {
-        const roll = next()
-        map[i] = roll < 0.42 ? SF_TERRAIN.grass : roll < 0.52 ? SF_TERRAIN.water : roll < 0.6 ? SF_TERRAIN.rock : SF_TERRAIN.plain
+      const scale = 5
+      const gw = Math.ceil(cols / scale) + 2
+      const gh = Math.ceil(rows / scale) + 2
+      const grid = new Array(gw * gh)
+      for (let i = 0; i < grid.length; i += 1) grid[i] = next()
+      const at = (x, y) => grid[Math.min(gh - 1, y) * gw + Math.min(gw - 1, x)]
+      const values = new Array(cols * rows).fill(0)
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const fx = x / scale
+          const fy = y / scale
+          const x0 = Math.floor(fx)
+          const y0 = Math.floor(fy)
+          const tx = fx - x0
+          const ty = fy - y0
+          // Smoothstep weights keep the lattice interpolation C1-continuous.
+          const wx = tx * tx * (3 - 2 * tx)
+          const wy = ty * ty * (3 - 2 * ty)
+          const top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * wx
+          const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * wx
+          let v = top + (bottom - top) * wy
+          // A light per-cell jitter roughens band edges without breaking
+          // spatial correlation (still deterministic via position hash).
+          v = v * 0.92 + sfJitter(y * cols + x, region) * 0.08
+          values[y * cols + x] = v
+        }
       }
-      // The spawn cell and its cross neighbours are always walkable.
+      // Normalise per map, then slice into fixed bands: every region gets
+      // ~16% water / 16% rock / 30% grass in contiguous patches regardless of
+      // lattice luck (interpolated values otherwise cluster around 0.5).
+      let lo = 1
+      let hi = 0
+      for (const v of values) {
+        if (v < lo) lo = v
+        if (v > hi) hi = v
+      }
+      const span = hi - lo < 1e-9 ? 1 : hi - lo
+      const map = values.map((v) => {
+        const u = (v - lo) / span
+        return u < 0.18
+          ? SF_TERRAIN.water
+          : u < 0.34
+            ? SF_TERRAIN.rock
+            : u < 0.64
+              ? SF_TERRAIN.grass
+              : SF_TERRAIN.plain
+      })
+      // Despeckle helper: a water/rock cell with no same-terrain neighbour at
+      // all is band-edge jitter, not a feature — demote it to plain.
+      const despeckle = () => {
+        for (let y = 0; y < rows; y += 1) {
+          for (let x = 0; x < cols; x += 1) {
+            const i = y * cols + x
+            const t = map[i]
+            if (t !== SF_TERRAIN.water && t !== SF_TERRAIN.rock) continue
+            let same = 0
+            for (let dy = -1; dy <= 1; dy += 1) {
+              for (let dx = -1; dx <= 1; dx += 1) {
+                if (dx === 0 && dy === 0) continue
+                const nx = x + dx
+                const ny = y + dy
+                if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue
+                if (map[ny * cols + nx] === t) same += 1
+              }
+            }
+            if (same === 0) map[i] = SF_TERRAIN.plain
+          }
+        }
+      }
+      // Tiny boards can miss a band entirely; carve a 2×2 patch at the
+      // extreme-value corner so every map still has water and rock. Kept away
+      // from the spawn cross and the board edge so it never clips.
       const spawn = sfSpawnOf(cols, rows)
+      const sx = spawn % cols
+      const sy = Math.floor(spawn / cols)
+      const carve = (terrain, pickHigh) => {
+        if (map.includes(terrain)) return
+        let best = null
+        for (let y = 1; y < rows - 2; y += 1) {
+          for (let x = 1; x < cols - 2; x += 1) {
+            if (Math.abs(x - sx) <= 2 && Math.abs(y - sy) <= 2) continue
+            if (best === null) best = { x, y }
+            else if (pickHigh ? values[y * cols + x] > values[best.y * cols + best.x] : values[y * cols + x] < values[best.y * cols + best.x]) best = { x, y }
+          }
+        }
+        if (best === null) return
+        for (let dy = 0; dy < 2; dy += 1) {
+          for (let dx = 0; dx < 2; dx += 1) {
+            map[(best.y + dy) * cols + best.x + dx] = terrain
+          }
+        }
+      }
+      // Clean band-edge specks first so the carve check below is meaningful.
+      despeckle()
+      carve(SF_TERRAIN.water, false)
+      carve(SF_TERRAIN.rock, true)
+      // The spawn cell and its cross neighbours are always walkable.
       for (const i of [spawn, spawn - 1, spawn + 1, spawn - cols, spawn + cols]) {
         map[i] = SF_TERRAIN.plain
       }
+      despeckle()
       return map
     }
 
@@ -2966,6 +3184,7 @@ const CSS = `
         map: sfMapOf(1, cols, rows),
         pos: sfSpawnOf(cols, rows),
         encounter: null, // { species, rarity }
+        rustle: null, // grass cell shaking before an encounter pops (feedback P1)
         lastResult: '', // 'caught' | 'fled' | 'released'
         target: null, // walk destination (click feedback, D47b)
         invalid: null, // clicked an unreachable cell (red cross flash)
@@ -3027,12 +3246,56 @@ const CSS = `
       return { ...prev, encounter: null, lastResult: 'released' }
     }
 
+    /** 320ms grass-shake warning before an encounter window pops (feedback P1). */
+    const SF_RUSTLE_MS = 320
+
+    /**
+     * Map the player's cell onto a refitted grid proportionally; if the new
+     * cell is unwalkable, walk outward to the nearest walkable cell instead
+     * of silently teleporting to spawn (feedback P0-new).
+     */
+    function sfMigratePos(pos, oldCols, oldRows, cols, rows, map) {
+      const x = Math.min(cols - 1, Math.max(0, Math.round(((pos % oldCols) + 0.5) * (cols / oldCols) - 0.5)))
+      const y = Math.min(rows - 1, Math.max(0, Math.round((Math.floor(pos / oldCols) + 0.5) * (rows / oldRows) - 0.5)))
+      const start = y * cols + x
+      if (sfWalkable(map[start])) return start
+      const total = cols * rows
+      const seen = new Uint8Array(total)
+      const queue = [start]
+      seen[start] = 1
+      let head = 0
+      while (head < queue.length) {
+        const at = queue[head]
+        head += 1
+        if (sfWalkable(map[at])) return at
+        const ax = at % cols
+        for (const d of [-1, 1, -cols, cols]) {
+          const n = at + d
+          if (n < 0 || n >= total || seen[n]) continue
+          if ((d === -1 && ax === 0) || (d === 1 && ax === cols - 1)) continue
+          seen[n] = 1
+          queue.push(n)
+        }
+      }
+      return sfSpawnOf(cols, rows)
+    }
+
     function createSafariStore() {
       let state = createSafariState()
       let path = []
       let timer = null
       let invalidTimer = null
+      let rustleTimer = null
+      // A fit requested while walking / rustling / encountering is applied as
+      // soon as the board goes quiet again — never dropped (feedback P0-new).
+      let pendingFit = null
       const listeners = new Set()
+      const clearRustle = () => {
+        if (rustleTimer !== null) {
+          clearTimeout(rustleTimer)
+          rustleTimer = null
+        }
+      }
       const stopWalk = () => {
         if (timer !== null) {
           clearInterval(timer)
@@ -3040,29 +3303,66 @@ const CSS = `
         }
         path = []
       }
+      /** True while a refit would tear an in-flight walk or encounter. */
+      const busy = () => path.length > 0 || rustleTimer !== null || state.encounter !== null
+      const applyFit = () => {
+        if (pendingFit === null || busy()) return
+        const { width, height } = pendingFit
+        pendingFit = null
+        const { cols, rows } = sfFitDims(width, height)
+        if (cols === state.cols && rows === state.rows) return
+        const map = sfMapOf(state.region, cols, rows)
+        publish({
+          ...state,
+          cols,
+          rows,
+          map,
+          pos: sfMigratePos(state.pos, state.cols, state.rows, cols, rows, map),
+          lastResult: '',
+          route: [],
+        })
+      }
       const publish = (next) => {
         if (next === state) return
         state = next
         if (state.encounter !== null) stopWalk()
         for (const listener of [...listeners]) listener()
       }
+      const flashInvalid = (cell) => {
+        publish({ ...state, invalid: cell })
+        if (invalidTimer !== null) clearTimeout(invalidTimer)
+        invalidTimer = setTimeout(() => {
+          invalidTimer = null
+          if (state.invalid === cell) publish({ ...state, invalid: null })
+        }, 800)
+      }
+      /** Feedback P1: warn first — shake the grass ~300ms before the
+       * encounter window pops, so a stop feels foreshadowed. */
+      const startEncounter = (stepped, cell) => {
+        stopWalk()
+        const rolled = stepped.encounter
+        publish({ ...stepped, encounter: null, rustle: cell, target: null, route: [] })
+        rustleTimer = setTimeout(() => {
+          rustleTimer = null
+          publish({ ...state, rustle: null, encounter: rolled })
+          applyFit()
+        }, SF_RUSTLE_MS)
+      }
       const tick = () => {
         if (path.length === 0) {
           stopWalk()
           publish({ ...state, target: null, route: [] })
+          applyFit()
           return
         }
         const next = path.shift()
         const stepped = sfStep(state, next)
-        if (stepped !== state) {
-          const encounterHit = stepped.encounter !== null
-          publish({
-            ...stepped,
-            route: encounterHit ? [] : path.slice(),
-            // an encounter stop must not leave a stale target ring behind
-            target: encounterHit ? null : stepped.target,
-          })
+        if (stepped === state) return
+        if (stepped.encounter !== null) {
+          startEncounter(stepped, next)
+          return
         }
+        publish({ ...stepped, route: path.slice(), target: stepped.target })
       }
       return {
         getSnapshot: () => state,
@@ -3072,7 +3372,7 @@ const CSS = `
         },
         /** Click-to-walk: BFS to the target, one step per tick; encounters stop. */
         walkTo(cell) {
-          if (state.encounter !== null) return
+          if (state.encounter !== null || state.rustle !== null) return
           if (invalidTimer !== null) {
             clearTimeout(invalidTimer)
             invalidTimer = null
@@ -3080,13 +3380,7 @@ const CSS = `
           const route = sfPath(state, cell)
           if (route === null || route.length === 0) {
             // D47b: never a silent no-op — flash a red cross on the cell.
-            if (route === null) {
-              publish({ ...state, invalid: cell })
-              invalidTimer = setTimeout(() => {
-                invalidTimer = null
-                if (state.invalid === cell) publish({ ...state, invalid: null })
-              }, 450)
-            }
+            if (route === null) flashInvalid(cell)
             return
           }
           path = route
@@ -3094,42 +3388,74 @@ const CSS = `
             timer = setInterval(tick, 90)
             tick()
           }
-          publish({ ...state, target: cell, invalid: null, route: path.slice() })
+          // The first tick may already have hit grass and started a rustle
+          // (or finished the walk) — never stamp a stale target over that.
+          if (timer !== null && path.length > 0 && state.rustle === null && state.encounter === null) {
+            publish({ ...state, target: cell, invalid: null, route: path.slice() })
+          }
         },
-        /** Re-fit the grid to the measured board; keeps region and dex. */
-        fitBoard(width, height) {
-          if (state.encounter !== null || path.length > 0) return
-          const { cols, rows } = sfFitDims(width, height)
-          if (cols === state.cols && rows === state.rows) return
-          stopWalk()
-          publish({
-            ...state,
-            cols,
-            rows,
-            map: sfMapOf(state.region, cols, rows),
-            pos: sfSpawnOf(cols, rows),
-            lastResult: '',
-            route: [],
-          })
-        },
-        throwBall() {
-          publish(sfThrowBall(state))
-        },
-        release() {
-          publish(sfRelease(state))
-        },
-        nextRegion() {
-          stopWalk()
+        /**
+         * Keyboard step (arrows / WASD): one cell in a cardinal direction.
+         * Manual steering cancels an auto-walk; water/rock flash the same red
+         * cross as an unreachable click.
+         */
+        stepDir(name) {
+          if (state.encounter !== null || state.rustle !== null) return
+          const deltas = { up: -state.cols, down: state.cols, left: -1, right: 1 }
+          const delta = deltas[name]
+          if (delta === undefined) return
+          const x = state.pos % state.cols
+          if ((delta === -1 && x === 0) || (delta === 1 && x === state.cols - 1)) return
+          const cell = state.pos + delta
+          if (cell < 0 || cell >= state.cols * state.rows) return
           if (invalidTimer !== null) {
             clearTimeout(invalidTimer)
             invalidTimer = null
           }
+          stopWalk()
+          const stepped = sfStep(state, cell)
+          if (stepped === state) {
+            flashInvalid(cell)
+            return
+          }
+          if (stepped.encounter !== null) {
+            startEncounter(stepped, cell)
+            return
+          }
+          publish({ ...stepped, target: null, invalid: null, route: [] })
+        },
+        /**
+         * Re-fit the grid to the measured board; keeps region and dex. When
+         * the board is busy the request is parked and applied later — a fit
+         * may never be silently skipped (feedback P0-new).
+         */
+        fitBoard(width, height) {
+          pendingFit = { width, height }
+          applyFit()
+        },
+        throwBall() {
+          publish(sfThrowBall(state))
+          applyFit()
+        },
+        release() {
+          publish(sfRelease(state))
+          applyFit()
+        },
+        nextRegion() {
+          stopWalk()
+          clearRustle()
+          if (invalidTimer !== null) {
+            clearTimeout(invalidTimer)
+            invalidTimer = null
+          }
+          pendingFit = null
           publish({
             ...state,
             region: state.region + 1,
             target: null,
             invalid: null,
             route: [],
+            rustle: null,
             map: sfMapOf(state.region + 1, state.cols, state.rows),
             pos: sfSpawnOf(state.cols, state.rows),
             encounter: null,
@@ -3141,6 +3467,7 @@ const CSS = `
         },
         dispose() {
           stopWalk()
+          clearRustle()
           if (invalidTimer !== null) clearTimeout(invalidTimer)
           listeners.clear()
         },
@@ -3159,6 +3486,162 @@ const CSS = `
       return (h % 1000) / 1000
     }
 
+    /**
+     * Pixel-art painter: paints the map into a cols*U × rows*U offscreen
+     * pixel space (U device-ish pixels per cell), everything as flat 1px
+     * rects — no gradients, no smooth curves (feedback: the game should read
+     * as a pixel game, which is also the honest aesthetic for pure Canvas).
+     * Pure over a given 2d context so tests can drive it directly.
+     */
+    const SF_PIXEL_COLORS = {
+      plain: '#1b2634',
+      plainStar: '#2c3d55',
+      grass: '#20402c',
+      grassDark: '#1c3826',
+      blade1: '#3f7a52',
+      blade2: '#33613f',
+      water: '#16405f',
+      waterEdge: '#1d4d72',
+      wave: '#4a90c4',
+      rock: '#161d29',
+      boulder: '#46536b',
+      boulderLit: '#5b6a86',
+      mark: '#8ef7b0',
+      bad: '#e5484d',
+      warn: '#e2a93b',
+      player: '#e6f2ff',
+      playerEdge: '#8ef7b0',
+      ink: '#0a0a0a',
+    }
+
+    function sfPaintPixels(ctx, state, u) {
+      const C = SF_PIXEL_COLORS
+      const put = (ox, oy, fx, fy, fw, fh, color) => {
+        ctx.fillStyle = color
+        ctx.fillRect(Math.round(ox + fx * u), Math.round(oy + fy * u), Math.max(1, Math.round(fw * u)), Math.max(1, Math.round(fh * u)))
+      }
+      for (let y = 0; y < state.rows; y += 1) {
+        for (let x = 0; x < state.cols; x += 1) {
+          const i = y * state.cols + x
+          const ox = x * u
+          const oy = y * u
+          const j = (salt) => sfJitter(i, salt)
+          const terrain = state.map[i]
+          if (terrain === SF_TERRAIN.water) {
+            ctx.fillStyle = C.water
+            ctx.fillRect(ox, oy, u, u)
+            put(ox, oy, 0, 0, 1, 0.25, C.waterEdge)
+            // Two wave dashes, deterministically placed.
+            for (let wv = 0; wv < 2; wv += 1) {
+              put(ox, oy, 0.15 + j(wv + 1) * 0.4, 0.3 + wv * 0.35 + j(wv + 4) * 0.1, 0.35, 0.125, C.wave)
+            }
+          } else if (terrain === SF_TERRAIN.rock) {
+            ctx.fillStyle = C.rock
+            ctx.fillRect(ox, oy, u, u)
+            // Chunky boulder: stacked blocks with a lit top-left face.
+            put(ox, oy, 0.2, 0.35, 0.6, 0.5, C.boulder)
+            put(ox, oy, 0.3, 0.15, 0.4, 0.3, C.boulder)
+            put(ox, oy, 0.3, 0.2, 0.15, 0.15, C.boulderLit)
+          } else if (terrain === SF_TERRAIN.grass) {
+            ctx.fillStyle = C.grass
+            ctx.fillRect(ox, oy, u, u)
+            const rustling = state.rustle === i
+            if (rustling) put(ox, oy, 0, 0, 1, 1, 'rgba(142,247,176,0.14)')
+            const blades = 2 + Math.floor(j(3) * 2)
+            for (let b = 0; b < blades; b += 1) {
+              put(
+                ox,
+                oy,
+                0.12 + (b / blades) * 0.7 + j(b + 11) * 0.1,
+                0.25 + j(b + 17) * 0.3,
+                0.125,
+                0.4 + j(b + 23) * 0.2,
+                b % 2 === 0 ? C.blade1 : C.blade2,
+              )
+            }
+            put(ox, oy, 0, 0.8, 1, 0.2, C.grassDark)
+            if (rustling) {
+              // Warning: exclamation mark over the shaking cell.
+              put(ox, oy, 0.45, -0.9, 0.14, 0.5, C.warn)
+              put(ox, oy, 0.45, -0.3, 0.14, 0.14, C.warn)
+            }
+          } else {
+            ctx.fillStyle = C.plain
+            ctx.fillRect(ox, oy, u, u)
+            if (j(41) < 0.3) put(ox, oy, 0.2 + j(43) * 0.6, 0.2 + j(47) * 0.6, 0.125, 0.125, C.plainStar)
+          }
+        }
+      }
+      // Remaining walk path: one green pixel per cell.
+      if (state.route.length > 0) {
+        for (const at of state.route) {
+          const rx = (at % state.cols) * u
+          const ry = Math.floor(at / state.cols) * u
+          put(rx, ry, 0.4, 0.4, 0.2, 0.2, C.mark)
+        }
+      }
+      // Walk target: diamond marker.
+      if (state.target !== null) {
+        const tx = (state.target % state.cols) * u
+        const ty = Math.floor(state.target / state.cols) * u
+        const cxp = tx + u / 2
+        const cyp = ty + u / 2
+        const rr = Math.max(1, Math.round(u * 0.3))
+        ctx.fillStyle = C.mark
+        for (let d = -rr; d <= rr; d += 1) {
+          const span = rr - Math.abs(d)
+          ctx.fillRect(Math.round(cxp - span), Math.round(cyp + d), span * 2 + 1, 1)
+        }
+      }
+      // Unreachable cross.
+      if (state.invalid !== null) {
+        const ix = (state.invalid % state.cols) * u
+        const iy = Math.floor(state.invalid / state.cols) * u
+        const cxp = ix + u / 2
+        const cyp = iy + u / 2
+        const rr = Math.max(1, Math.round(u * 0.3))
+        ctx.fillStyle = C.bad
+        for (let d = -rr; d <= rr; d += 1) {
+          ctx.fillRect(Math.round(cxp + d), Math.round(cyp + d), 1, 1)
+          ctx.fillRect(Math.round(cxp + d), Math.round(cyp - d), 1, 1)
+        }
+      }
+      // The player: a tiny pixel person (head/body/legs), always readable.
+      const pxp = (state.pos % state.cols) * u
+      const pyp = Math.floor(state.pos / state.cols) * u
+      if (u >= 6) {
+        put(pxp, pyp, 0.3, 0.08, 0.4, 0.3, C.player) // head
+        put(pxp, pyp, 0.25, 0.4, 0.5, 0.3, C.player) // body
+        put(pxp, pyp, 0.3, 0.72, 0.14, 0.28, C.player) // legs
+        put(pxp, pyp, 0.56, 0.72, 0.14, 0.28, C.player)
+        put(pxp, pyp, 0.3, 0.08, 0.4, 0.1, C.playerEdge) // cap
+        put(pxp, pyp, 0.25, 0.4, 0.5, 0.08, C.playerEdge) // belt
+      } else {
+        put(pxp, pyp, 0.25, 0.15, 0.5, 0.7, C.player)
+        put(pxp, pyp, 0.25, 0.15, 0.5, 0.15, C.playerEdge)
+      }
+    }
+
+    /**
+     * Full-view / pill painter. Sizes the canvas backing store to the CSS box
+     * times DPR (the snake board convention — without this the default
+     * 300×150 buffer stretches the whole map and crops the player out of the
+     * visible area), then paints the pixel map offscreen and blits it up with
+     * smoothing disabled so every offscreen pixel stays a crisp block.
+     */
+        /**
+     * Games must never take the monitoring view down (D43 spirit): a paint
+     * failure is logged and skipped — the board may go blank, the status
+     * board stays alive.
+     */
+    function sfSafeDraw(fn) {
+      try {
+        fn()
+      } catch (error) {
+        console.error('[wait-buddy] safari paint failed', error)
+      }
+    }
+
     function drawSafariMap(canvas, state) {
       if (canvas === null || canvas === undefined) return
       const width = canvas.clientWidth
@@ -3166,244 +3649,105 @@ const CSS = `
       if (width === 0 || height === 0) return
       const ctx = canvas.getContext('2d')
       if (ctx === null) return
-      // D47b: the map fills the whole board box like the snake board — cells
-      // stretch with the container instead of locking to a centered square.
-      const cell = width / state.cols
-      const cellH = height / state.rows
-      const unit = Math.min(cell, cellH)
+      const dpr =
+        typeof window !== 'undefined' && window.devicePixelRatio > 0
+          ? Math.min(window.devicePixelRatio, 2)
+          : 1
+      const backingW = Math.round(width * dpr)
+      const backingH = Math.round(height * dpr)
+      if (canvas.width !== backingW || canvas.height !== backingH) {
+        canvas.width = backingW
+        canvas.height = backingH
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, width, height)
-      ctx.fillStyle = '#141f2e'
-      ctx.fillRect(0, 0, width, height)
-      for (let y = 0; y < state.rows; y += 1) {
-        for (let x = 0; x < state.cols; x += 1) {
-          const i = y * state.cols + x
-          const px = x * cell
-          const py = y * cellH
-          const terrain = state.map[i]
-          if (terrain === SF_TERRAIN.water) {
-            const g = ctx.createLinearGradient(px, py, px, py + cellH)
-            g.addColorStop(0, '#1b3a58')
-            g.addColorStop(1, '#12283d')
-            ctx.fillStyle = g
-            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
-            ctx.strokeStyle = 'rgba(120,180,220,0.35)'
-            ctx.lineWidth = Math.max(1, unit * 0.04)
-            ctx.beginPath()
-            for (let w = 0; w < 2; w += 1) {
-              const wy = py + cellH * (0.35 + w * 0.35) + sfJitter(i, w + 1) * cellH * 0.1
-              const wx = px + cell * (0.15 + sfJitter(i, w + 7) * 0.3)
-              ctx.moveTo(wx, wy)
-              ctx.quadraticCurveTo(wx + cell * 0.15, wy - cellH * 0.06, wx + cell * 0.3, wy)
-            }
-            ctx.stroke()
-            ctx.lineWidth = 1
-          } else if (terrain === SF_TERRAIN.rock) {
-            ctx.fillStyle = '#1d2836'
-            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
-            const cx = px + cell / 2
-            const cy = py + cellH / 2
-            const r = unit * 0.3
-            ctx.fillStyle = '#46536b'
-            ctx.beginPath()
-            ctx.ellipse(cx, cy + r * 0.12, r * 1.15, r * 0.92, 0, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.fillStyle = '#5b6a86'
-            ctx.beginPath()
-            ctx.ellipse(cx - r * 0.25, cy - r * 0.28, r * 0.62, r * 0.5, -0.4, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.strokeStyle = 'rgba(0,0,0,0.3)'
-            ctx.beginPath()
-            ctx.ellipse(cx, cy + r * 0.12, r * 1.15, r * 0.92, 0, 0, Math.PI * 2)
-            ctx.stroke()
-          } else if (terrain === SF_TERRAIN.grass) {
-            const g = ctx.createLinearGradient(px, py, px, py + cellH)
-            g.addColorStop(0, '#24462f')
-            g.addColorStop(1, '#1c3826')
-            ctx.fillStyle = g
-            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
-            const blades = 4 + Math.floor(sfJitter(i, 3) * 2)
-            for (let b = 0; b < blades; b += 1) {
-              const bx = px + cell * (0.14 + (b / blades) * 0.68 + sfJitter(i, b + 11) * 0.1)
-              const by = py + cellH * (0.78 - sfJitter(i, b + 17) * 0.12)
-              const tip = by - cellH * (0.22 + sfJitter(i, b + 23) * 0.16)
-              const lean = (sfJitter(i, b + 29) - 0.5) * cell * 0.16
-              ctx.strokeStyle = b % 2 === 0 ? 'rgba(88,166,110,0.85)' : 'rgba(64,128,84,0.9)'
-              ctx.lineWidth = Math.max(1, unit * 0.045)
-              ctx.beginPath()
-              ctx.moveTo(bx, by)
-              ctx.quadraticCurveTo(bx + lean * 0.4, (by + tip) / 2, bx + lean, tip)
-              ctx.stroke()
-            }
-            ctx.lineWidth = 1
-          } else {
-            ctx.fillStyle = '#1b2634'
-            ctx.fillRect(px + 0.5, py + 0.5, cell - 1, cellH - 1)
-            if (sfJitter(i, 41) < 0.4) {
-              ctx.fillStyle = 'rgba(255,255,255,0.05)'
-              ctx.beginPath()
-              ctx.arc(
-                px + cell * (0.25 + sfJitter(i, 43) * 0.5),
-                py + cellH * (0.25 + sfJitter(i, 47) * 0.5),
-                unit * 0.05,
-                0,
-                Math.PI * 2,
-              )
-              ctx.fill()
-            }
-          }
-          // Walkable-adjacent affordance: soft corner ticks.
-          if (sfAdjacent(state.pos, i) && sfWalkable(terrain)) {
-            ctx.strokeStyle = 'rgba(142,247,176,0.7)'
-            ctx.lineWidth = Math.max(1.5, unit * 0.06)
-            const inset = unit * 0.14
-            const len = unit * 0.28
-            ctx.beginPath()
-            ctx.moveTo(px + inset, py + inset + len)
-            ctx.lineTo(px + inset, py + inset)
-            ctx.lineTo(px + inset + len, py + inset)
-            ctx.moveTo(px + cell - inset - len, py + inset)
-            ctx.lineTo(px + cell - inset, py + inset)
-            ctx.lineTo(px + cell - inset, py + inset + len)
-            ctx.moveTo(px + cell - inset, py + cellH - inset - len)
-            ctx.lineTo(px + cell - inset, py + cellH - inset)
-            ctx.lineTo(px + cell - inset - len, py + cellH - inset)
-            ctx.moveTo(px + inset + len, py + cellH - inset)
-            ctx.lineTo(px + inset, py + cellH - inset)
-            ctx.lineTo(px + inset, py + cellH - inset - len)
-            ctx.stroke()
-            ctx.lineWidth = 1
-          }
+      ctx.imageSmoothingEnabled = false
+      // Offscreen pixel resolution: 2-8 offscreen pixels per cell, always
+      // below the device-pixel budget so blocks stay chunky, never blurry.
+      const devPerCell = (width * dpr) / state.cols
+      const u = Math.max(2, Math.min(8, Math.floor(devPerCell / 2)))
+      const off =
+        typeof document !== 'undefined' && typeof document.createElement === 'function'
+          ? document.createElement('canvas')
+          : null
+      if (off !== null && typeof off.getContext === 'function') {
+        off.width = state.cols * u
+        off.height = state.rows * u
+        const offCtx = off.getContext('2d')
+        if (offCtx !== null && offCtx !== undefined) {
+          sfPaintPixels(offCtx, state, u)
+          ctx.fillStyle = '#141f2e'
+          ctx.fillRect(0, 0, width, height)
+          ctx.drawImage(off, 0, 0, width, height)
+          return
         }
       }
-      // Hairline grid for readability.
-      ctx.strokeStyle = 'rgba(255,255,255,0.045)'
-      ctx.beginPath()
-      for (let g = 1; g < state.cols; g += 1) {
-        ctx.moveTo(g * cell, 0)
-        ctx.lineTo(g * cell, height)
-      }
-      for (let g = 1; g < state.rows; g += 1) {
-        ctx.moveTo(0, g * cellH)
-        ctx.lineTo(width, g * cellH)
-      }
-      ctx.stroke()
-      // Remaining walk path: a trail of dots so long routes read at a glance.
-      if (state.route.length > 0) {
-        ctx.fillStyle = 'rgba(142,247,176,0.65)'
-        for (const at of state.route) {
-          const rx = (at % state.cols) * cell + cell / 2
-          const ry = Math.floor(at / state.cols) * cellH + cellH / 2
-          ctx.beginPath()
-          ctx.arc(rx, ry, Math.max(1.5, unit * 0.09), 0, Math.PI * 2)
-          ctx.fill()
-        }
-      }
-      // Walk target ring / invalid cross (click feedback, D47b).
-      if (state.target !== null) {
-        const tx = (state.target % state.cols) * cell + cell / 2
-        const ty = Math.floor(state.target / state.cols) * cellH + cellH / 2
-        ctx.strokeStyle = 'rgba(142,247,176,0.9)'
-        ctx.lineWidth = Math.max(1.5, unit * 0.07)
-        ctx.beginPath()
-        ctx.arc(tx, ty, unit * 0.22, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.fillStyle = 'rgba(142,247,176,0.9)'
-        ctx.beginPath()
-        ctx.arc(tx, ty, unit * 0.07, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.lineWidth = 1
-      }
-      if (state.invalid !== null) {
-        const ix = (state.invalid % state.cols) * cell + cell / 2
-        const iy = Math.floor(state.invalid / state.cols) * cellH + cellH / 2
-        const r = unit * 0.16
-        ctx.strokeStyle = 'rgba(229,72,77,0.95)'
-        ctx.lineWidth = Math.max(2, unit * 0.08)
-        ctx.beginPath()
-        ctx.moveTo(ix - r, iy - r)
-        ctx.lineTo(ix + r, iy + r)
-        ctx.moveTo(ix + r, iy - r)
-        ctx.lineTo(ix - r, iy + r)
-        ctx.stroke()
-        ctx.lineWidth = 1
-      }
-      // The player: shadow, rounded body, eyes.
-      const px = (state.pos % state.cols) * cell
-      const py = Math.floor(state.pos / state.cols) * cellH
-      const cx = px + cell / 2
-      const cy = py + cellH / 2
-      // D47b: never smaller than ~5px — a speck avatar reads as "no reaction".
-      const r = Math.max(unit * 0.28, 5)
-      ctx.fillStyle = 'rgba(0,0,0,0.35)'
-      ctx.beginPath()
-      ctx.ellipse(cx, cy + r * 0.85, r * 0.9, r * 0.32, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = '#e6f2ff'
-      ctx.strokeStyle = '#8ef7b0'
-      ctx.lineWidth = Math.max(1.5, unit * 0.05)
-      ctx.beginPath()
-      ctx.arc(cx, cy, r, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.stroke()
-      ctx.lineWidth = 1
-      ctx.fillStyle = '#0a0a0a'
-      for (const side of [-1, 1]) {
-        ctx.beginPath()
-        ctx.arc(cx + side * r * 0.35, cy - r * 0.12, r * 0.14, 0, Math.PI * 2)
-        ctx.fill()
-      }
+      // Fallback (no DOM): paint pixels straight onto the target context.
+      sfPaintPixels(ctx, state, u)
     }
 
-    /** Procedural sprite portrait — body shape × palette × pattern. */
-    function drawSfSprite(ctx, cx, cy, size, species) {
+    /**
+     * Pixel-art species painter: fills a size×size box with u-pixel blocks.
+     * 54 species read from silhouette (round blob + ears / squat block + tail
+     * / tall bean + crest) × palette colour × pattern (belly / spots /
+     * stripes) — no ellipses, no "circle with eyes" (feedback P0).
+     */
+    function sfPaintSprite(ctx, species, u) {
       const body = Math.floor(species / (SF_PALETTES * SF_PATTERNS))
       const palette = Math.floor((species % (SF_PALETTES * SF_PATTERNS)) / SF_PATTERNS)
       const pattern = species % SF_PATTERNS
       const color = SF_PALETTE_COLORS[palette]
-      ctx.save()
-      ctx.fillStyle = color
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)'
-      ctx.beginPath()
-      const rx = body === 1 ? size * 0.42 : size * 0.34
-      const ry = body === 2 ? size * 0.44 : size * 0.32
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.stroke()
-      if (pattern === 1) {
-        ctx.fillStyle = 'rgba(0,0,0,0.3)'
-        for (const [dx, dy, r] of [
-          [-0.14, -0.1, 0.08],
-          [0.16, 0.02, 0.07],
-          [-0.02, 0.18, 0.06],
-        ]) {
-          ctx.beginPath()
-          ctx.arc(cx + size * dx, cy + size * dy, size * r, 0, Math.PI * 2)
-          ctx.fill()
-        }
-      } else if (pattern === 2) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)'
-        ctx.lineWidth = Math.max(1.5, size * 0.05)
-        for (const off of [-0.12, 0.1]) {
-          ctx.beginPath()
-          ctx.ellipse(cx + size * off, cy, rx * 0.55, ry * 0.9, 0, -Math.PI / 2, Math.PI / 2)
-          ctx.stroke()
-        }
-        ctx.lineWidth = 1
+      const put = (fx, fy, fw, fh, fill) => {
+        ctx.fillStyle = fill
+        ctx.fillRect(Math.round(fx * u), Math.round(fy * u), Math.max(1, Math.round(fw * u)), Math.max(1, Math.round(fh * u)))
       }
-      // Eyes.
-      ctx.fillStyle = '#ffffff'
-      for (const side of [-1, 1]) {
-        ctx.beginPath()
-        ctx.arc(cx + side * size * 0.13, cy - size * 0.1, size * 0.09, 0, Math.PI * 2)
-        ctx.fill()
+      const shade = 'rgba(0,0,0,0.28)'
+      const lite = 'rgba(255,255,255,0.3)'
+      // Body silhouettes.
+      if (body === 0) {
+        // Round blob with ears.
+        put(0.14, 0.02, 0.14, 0.16, color)
+        put(0.72, 0.02, 0.14, 0.16, color)
+        put(0.2, 0.16, 0.6, 0.62, color)
+        put(0.1, 0.36, 0.8, 0.44, color)
+        put(0.28, 0.06, 0.44, 0.12, color)
+      } else if (body === 1) {
+        // Squat block with a tail.
+        put(0.88, 0.42, 0.12, 0.1, color)
+        put(0.8, 0.3, 0.12, 0.16, color)
+        put(0.2, 0.2, 0.6, 0.16, color)
+        put(0.1, 0.34, 0.8, 0.5, color)
+      } else {
+        // Tall bean with a crest.
+        put(0.44, 0.0, 0.12, 0.12, color)
+        put(0.4, 0.06, 0.2, 0.08, color)
+        put(0.34, 0.12, 0.32, 0.72, color)
+        put(0.28, 0.2, 0.44, 0.56, color)
       }
-      ctx.fillStyle = '#0a0a0a'
-      for (const side of [-1, 1]) {
-        ctx.beginPath()
-        ctx.arc(cx + side * size * 0.13, cy - size * 0.1, size * 0.045, 0, Math.PI * 2)
-        ctx.fill()
+      // Feet.
+      put(0.28, 0.86, 0.16, 0.12, color)
+      put(0.56, 0.86, 0.16, 0.12, color)
+      // Belly / spots / stripes.
+      if (pattern === 0) {
+        put(0.36, 0.52, 0.28, 0.28, lite)
+      } else if (pattern === 1) {
+        put(0.32, 0.42, 0.1, 0.1, shade)
+        put(0.56, 0.52, 0.09, 0.09, shade)
+        put(0.42, 0.66, 0.08, 0.08, shade)
+      } else {
+        put(0.32, 0.24, 0.08, 0.55, shade)
+        put(0.52, 0.24, 0.08, 0.55, shade)
+        put(0.68, 0.3, 0.08, 0.45, shade)
       }
-      ctx.restore()
+      // Bottom shade for weight.
+      put(0.14, 0.78, 0.72, 0.08, shade)
+      // Eyes (white + pupil), placed inside each silhouette.
+      const eyeY = body === 1 ? 0.4 : 0.34
+      const eyeXs = body === 2 ? [0.4, 0.52] : [0.3, 0.58]
+      for (const ex of eyeXs) {
+        put(ex, eyeY, 0.12, 0.11, '#ffffff')
+        put(ex + 0.04, eyeY + 0.03, 0.06, 0.06, '#0a0a0a')
+      }
     }
 
     function sfPointAt(canvas, state, clientX, clientY) {
@@ -3418,13 +3762,23 @@ const CSS = `
 
     // ---- adapter components -------------------------------------------------
 
+    /** Keycap chip: prominent keyboard hint, e.g. [F] 投球. */
+    function SfKeyHint({ keys, label }) {
+      return h(
+        'span',
+        { className: 'wb-keyHint' },
+        h('span', { className: 'wb-kbd' }, keys),
+        label,
+      )
+    }
+
     /** Encounter overlay: portrait + name + rarity + catch/release. */
     function sfEncounterOverlay(t, state, focusRoot, mini) {
       if (state.encounter === null) return null
       const { species, rarity } = state.encounter
       const portrait = mini
         ? null
-        : h(SfPortrait, { species })
+        : h(SfSpriteIcon, { species, size: 64 })
       return h(
         'div',
         { className: mini ? 'wb-pillMiniOverlay' : 'wb-overlay' },
@@ -3435,8 +3789,16 @@ const CSS = `
         h(
           'span',
           { className: mini ? 'wb-pillMiniScore' : 'wb-overlayBody' },
-          t(`sf.rarity.${rarity}`),
+          `${t(`sf.rarity.${rarity}`)} · ${t('sf.catchRate', { rate: Math.round(SF_CATCH_RATE[rarity] * 100) })}`,
         ),
+        mini
+          ? null
+          : h(
+              'div',
+              { className: 'wb-keyHints' },
+              h(SfKeyHint, { keys: 'F', label: t('sf.throw') }),
+              h(SfKeyHint, { keys: 'Q / Esc', label: t('sf.release') }),
+            ),
         h(
           'button',
           {
@@ -3461,19 +3823,25 @@ const CSS = `
       )
     }
 
-    /** Small canvas portrait of the encountered sprite. */
-    function SfPortrait({ species }) {
+    /** Pixel sprite icon: one small canvas per species. */
+    function SfSpriteIcon({ species, size = 64 }) {
       const canvasRef = React.useRef(null)
       React.useEffect(() => {
         const canvas = canvasRef.current
         if (canvas === null) return
-        drawSfSprite(canvas.getContext('2d'), 32, 32, 56, species)
+        const ctx = canvas.getContext('2d')
+        if (ctx === null) return
+        sfSafeDraw(() => {
+          ctx.clearRect(0, 0, 16, 16)
+          sfPaintSprite(ctx, species, 16)
+        })
       }, [species])
+      // 16×16 pixel buffer, integer-scaled by CSS (pixelated) — crisp blocks.
       return h('canvas', {
         ref: canvasRef,
-        width: 64,
-        height: 64,
-        style: { width: '64px', height: '64px' },
+        width: 16,
+        height: 16,
+        style: { width: `${size}px`, height: `${size}px`, imageRendering: 'pixelated' },
         role: 'img',
         'aria-label': 'sprite',
       })
@@ -3491,14 +3859,19 @@ const CSS = `
         h('div', { className: 'wb-overlayTitle' }, t('sf.dex', { caught: state.dexCaught, total: SF_SPECIES_TOTAL })),
         h(
           'div',
-          { className: 'wb-overlayBody', style: { maxWidth: '280px', maxHeight: '46vh', overflow: 'auto', whiteSpace: 'normal' } },
+          { className: 'wb-dexGrid' },
           entries.length === 0
             ? t('sf.dexEmpty')
             : entries.map(([id, count]) =>
                 h(
                   'div',
-                  { key: id },
-                  `#${String(Number(id) + 1).padStart(3, '0')} ${sfSpeciesName(t, Number(id))} ×${count}`,
+                  {
+                    key: id,
+                    className: 'wb-dexItem',
+                    title: `#${String(Number(id) + 1).padStart(3, '0')} ${sfSpeciesName(t, Number(id))} ×${count}`,
+                  },
+                  h(SfSpriteIcon, { species: Number(id), size: 32 }),
+                  h('span', { className: 'wb-dexCount' }, `×${count}`),
                 ),
               ),
         ),
@@ -3523,21 +3896,49 @@ const CSS = `
         return safariStore.subscribe(sync)
       }, [])
       React.useEffect(() => {
-        drawSafariMap(canvasRef.current, state)
+        sfSafeDraw(() => drawSafariMap(canvasRef.current, state))
       }, [state])
+      // When an encounter window closes, its buttons unmount and focus falls
+      // back to <body> — steering keys would die mid-play. Refocus the board.
+      const prevEncounterRef = React.useRef(null)
+      React.useEffect(() => {
+        if (prevEncounterRef.current !== null && state.encounter === null && state.rustle === null) {
+          const board = boardRef.current
+          if (board !== null && typeof board.focus === 'function') board.focus({ preventScroll: true })
+        }
+        prevEncounterRef.current = state.encounter
+      }, [state.encounter, state.rustle])
       React.useEffect(() => {
         const element = boardRef.current
         if (element === null) return undefined
+        let retries = 0
+        let retryHandle = null
+        // Feedback P0-new: a first measure while the panel is still animating
+        // (rect ≤ 60px) must retry, not silently give up — the board would
+        // otherwise stay at the initial 24×12 forever.
         const measure = () => {
-          drawSafariMap(canvasRef.current, safariStore.getSnapshot())
-          const rect = element.getBoundingClientRect()
-          if (rect.width > 60 && rect.height > 60) safariStore.fitBoard(rect.width, rect.height)
+          sfSafeDraw(() => drawSafariMap(canvasRef.current, safariStore.getSnapshot()))
+          try {
+            const rect = element.getBoundingClientRect()
+            if (rect.width > 60 && rect.height > 60) {
+              safariStore.fitBoard(rect.width, rect.height)
+              return
+            }
+          if (retries >= 10) return
+          retries += 1
+          retryHandle = setTimeout(measure, 50)
+          } catch (error) {
+            console.error('[wait-buddy] safari fit failed', error)
+          }
         }
         measure()
         if (typeof ResizeObserver !== 'function') return undefined
         const observer = new ResizeObserver(measure)
         observer.observe(element)
-        return () => observer.disconnect()
+        return () => {
+          observer.disconnect()
+          if (retryHandle !== null) clearTimeout(retryHandle)
+        }
       }, [])
       return h(
         'div',
@@ -3610,7 +4011,14 @@ const CSS = `
             t('sf.nextRegion'),
           ),
         ),
-        h('div', { className: 'wb-hint' }, t('sf.hint')),
+        h(
+          'div',
+          { className: 'wb-hint wb-keyHints' },
+          h(SfKeyHint, { keys: 'WASD / ↑↓←→', label: t('sf.hint.move') }),
+          h(SfKeyHint, { keys: 'F', label: t('sf.hint.throw') }),
+          h(SfKeyHint, { keys: 'N', label: t('sf.hint.region') }),
+          h('span', { className: 'wb-hintNote' }, t('sf.hint.grass')),
+        ),
       )
     }
 
@@ -3624,7 +4032,7 @@ const CSS = `
       }, [])
       const canvasRef = React.useRef(null)
       React.useEffect(() => {
-        drawSafariMap(canvasRef.current, state)
+        sfSafeDraw(() => drawSafariMap(canvasRef.current, state))
       }, [state])
       return h(
         'div',
@@ -3691,7 +4099,7 @@ const CSS = `
       titleKey: 'sf.title',
       store: () => safariStore,
       pauseOnLeave: false,
-      keyboard: false,
+      keyboard: true,
       Board: SafariBoard,
       Setting: SafariSetting,
       Controls: SafariControls,
@@ -4361,10 +4769,144 @@ const CSS = `
       )
     }
 
+    /**
+     * One activity feed row. The Host folds consecutive same-tool calls into
+     * `count`; render "text ×N" and offer one-click copy of the full text
+     * (feedback P1: a wall of tool lines is unscannable).
+     */
+    function FeedRow({ t, item }) {
+      const [copied, setCopied] = React.useState(false)
+      React.useEffect(() => {
+        if (!copied) return undefined
+        const id = setTimeout(() => setCopied(false), 1400)
+        return () => clearTimeout(id)
+      }, [copied])
+      const copy = async () => {
+        try {
+          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(item.text)
+          setCopied(true)
+        } catch (error) {
+          console.warn('[wait-buddy] copy failed', error)
+        }
+      }
+      const label = item.count > 1 ? `${item.text} ×${item.count}` : item.text
+      return h(
+        'div',
+        { className: 'wb-feedRow' },
+        h(
+          'span',
+          { className: 'wb-feedKind', 'data-kind': item.kind },
+          t(FEED_LABEL[item.kind] || FEED_LABEL.tool),
+        ),
+        h('span', { className: 'wb-feedText', title: item.text }, label),
+        copied
+          ? h('span', { className: 'wb-feedCopied', role: 'status' }, t('feed.copied'))
+          : h(
+              'button',
+              {
+                type: 'button',
+                className: 'wb-feedCopy',
+                'aria-label': t('feed.copy'),
+                title: t('feed.copy'),
+                onClick: copy,
+              },
+              '⧉',
+            ),
+      )
+    }
+
+    /** 12 segments × 5s: which recent buckets saw tool activity. */
+    const PULSE_SEGMENTS = 12
+    const PULSE_BUCKET_MS = 5000
+
+    /**
+     * Activity pulse strip (feedback P1): a real sparkline over the last
+     * minute — lit segments mean the feed head changed in that bucket, so
+     * "quiet but working" and "stuck" are distinguishable at a glance.
+     */
+    function ActivityPulse({ t, activity }) {
+      const pulses = React.useRef([])
+      const [, bump] = React.useState(0)
+      const head = activity[0]
+      const headKey = head === undefined ? '' : `${head.kind}:${head.text}`
+      React.useEffect(() => {
+        if (headKey === '') return
+        const now = Date.now()
+        pulses.current = [...pulses.current, now].filter((at) => now - at < 60000).slice(-40)
+      }, [headKey])
+      React.useEffect(() => {
+        const id = setInterval(() => bump((value) => value + 1), PULSE_BUCKET_MS)
+        return () => clearInterval(id)
+      }, [])
+      const now = Date.now()
+      const marks = pulses.current
+      const segments = []
+      for (let i = 0; i < PULSE_SEGMENTS; i += 1) {
+        const from = now - (PULSE_SEGMENTS - i) * PULSE_BUCKET_MS
+        const to = from + PULSE_BUCKET_MS
+        const on = marks.some((at) => at >= from && at < to)
+        segments.push(
+          h('span', {
+            key: i,
+            className: 'wb-pulseSeg',
+            'data-on': on ? 'true' : 'false',
+          }),
+        )
+      }
+      const live = marks.some((at) => now - at < 60000)
+      return h(
+        'div',
+        { className: 'wb-pulse', 'aria-hidden': true, title: t(live ? 'feed.pulseLive' : 'feed.pulseIdle') },
+        segments,
+      )
+    }
+
     function WaitBuddyView(props) {
       const t = typeof props.t === 'function' ? props.t : boundT
       const rootRef = React.useRef(null)
       const innerRef = React.useRef(null)
+      // Window-level fallback for game keys (feedback: Space scrolled the
+      // page). The React onKeyDown only fires while focus is inside the view
+      // — after an encounter closes, focus falls back to <body> and the
+      // browser scrolls instead of playing. Two more details make it stick:
+      //   1. capture phase — a host that scrolls from its own capture
+      //      listener would otherwise act before our bubble-phase handler;
+      //   2. stopPropagation on consumed keys — the host's handlers must not
+      //      run at all for a key the game consumed.
+      React.useEffect(() => {
+        const onWindowKeyDown = (event) => {
+          const root = rootRef.current
+          let visible = false
+          if (root !== null) {
+            const rect = root.getBoundingClientRect()
+            visible = rect.width !== 0 && rect.height !== 0
+          }
+          if (event.defaultPrevented) return
+          if (root === null) return
+          if (!visible) return
+          const consumed = onGameKeyDown(event)
+          if (!consumed) return
+          event.preventDefault()
+          // stopImmediate: same-node host listeners registered earlier must
+          // not act on a key the game consumed either.
+          event.stopImmediatePropagation()
+          // The conversation's follow-tail animation interrupts on Space /
+          // arrows "unless a child has prevented the key's default action" —
+          // our preventDefault would silently KEEP the tail following, i.e.
+          // the page keeps scrolling while a session streams. The host
+          // interrupts unconditionally on wheel: dispatch a synthetic wheel
+          // pulse (untrusted → no native scroll of its own) to release it.
+          try {
+            document.dispatchEvent(
+              new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true }),
+            )
+          } catch (error) {
+            void error
+          }
+        }
+        window.addEventListener('keydown', onWindowKeyDown, true)
+        return () => window.removeEventListener('keydown', onWindowKeyDown, true)
+      }, [])
       React.useEffect(() => {
         const scrollTop = () => {
           if (innerRef.current !== null) innerRef.current.scrollTop = 0
@@ -4487,13 +5029,25 @@ const CSS = `
                   : null,
               ),
               status === 'running' && state.health === 'ready'
-                ? h(
-                    'div',
-                    { className: 'wb-pulse', 'aria-hidden': true },
-                    h('div', { className: 'wb-pulseFill' }),
-                  )
+                ? h(ActivityPulse, { t, activity: state.activity })
                 : null,
-              h('div', { className: 'wb-disclaimer' }, t('footer.line')),
+              h(
+                'div',
+                {
+                  className: 'wb-disclaimer',
+                  title:
+                    typeof window !== 'undefined' && window.__WB_BUILD_ID__ !== undefined
+                      ? `build ${window.__WB_BUILD_ID__}`
+                      : undefined,
+                },
+                t('footer.line'),
+                // Visible build id: the host serves plugin clients from an
+                // activation-time snapshot, so a page refresh can deliver a
+                // stale bundle — the footer must tell which build is live.
+                typeof window !== 'undefined' && window.__WB_BUILD_ID__ !== undefined
+                  ? h('span', { className: 'wb-buildId' }, ` · ${window.__WB_BUILD_ID__}`)
+                  : null,
+              ),
             ),
             h(
               'div',
@@ -4501,16 +5055,7 @@ const CSS = `
               state.activity.length === 0
                 ? h('div', { className: 'wb-feedEmpty' }, t('feed.empty'))
                 : state.activity.map((item, index) =>
-                    h(
-                      'div',
-                      { className: 'wb-feedRow', key: `${item.kind}-${index}` },
-                      h(
-                        'span',
-                        { className: 'wb-feedKind', 'data-kind': item.kind },
-                        t(FEED_LABEL[item.kind] || FEED_LABEL.tool),
-                      ),
-                      h('span', { className: 'wb-feedText', title: item.text }, item.text),
-                    ),
+                    h(FeedRow, { key: `${item.kind}-${index}`, t, item }),
                   ),
             ),
           ),
@@ -4529,11 +5074,11 @@ const CSS = `
     class ErrorBoundary extends React.Component {
       constructor(props) {
         super(props)
-        this.state = { failed: false }
+        this.state = { failed: false, message: '' }
       }
 
-      static getDerivedStateFromError() {
-        return { failed: true }
+      static getDerivedStateFromError(error) {
+        return { failed: true, message: String((error !== null && error !== undefined && error.message) || error) }
       }
 
       componentDidCatch(error) {
@@ -4545,7 +5090,10 @@ const CSS = `
           return h(
             'div',
             { className: 'wb-crash', role: 'alert' },
-            this.props.t('ui.crashed'),
+            h('div', null, this.props.t('ui.crashed')),
+            // Surface the cause so a screenshot is actionable (a bare
+            // fallback hid every crash's root cause from reports).
+            h('div', { className: 'wb-crashDetail' }, this.state.message),
           )
         }
         return this.props.children
@@ -4726,6 +5274,8 @@ const CSS = `
       /** Full view, exported for static layout tests only. */
       __view: WaitBuddyView,
       __gameStore: gameStore,
+      /** Safari store forwarder, exported for live-DOM harnesses. */
+      __safariStore: safariStore,
       /**
        * Test/visual-harness hook (RT-04): installs a store runtime without a
        * host apply(); production code never calls this.
@@ -4759,8 +5309,18 @@ const CSS = `
         sfSpeciesName,
         sfFitDims,
         sfPath,
+        sfWalkable,
+        sfSpawnOf,
+        sfMigratePos,
+        sfEncounterKey,
+        SF_CATCH_RATE,
+        SF_RUSTLE_MS,
         SF_SPECIES_TOTAL,
         drawSafariMap,
+        sfPaintPixels,
+        sfPaintSprite,
+        sfEncounterOverlay,
+        sfDexOverlay,
         createGameState,
         startGame,
         turnGame,
@@ -4773,3 +5333,5 @@ const CSS = `
     }
   },
 })
+
+;window.__WB_BUILD_ID__ = 'fe8a9918';

@@ -161,3 +161,35 @@ test('tool activity clips the combined tool name and hint', () => {
   assert.equal(state.activity.length, 1)
   assert.ok(state.activity[0].text.length <= 120)
 })
+
+test('consecutive same-tool calls fold into a counted run', () => {
+  let state = started(1)
+  const read = (path) =>
+    event('tool/call', { turn: 1, name: 'Read', arguments: JSON.stringify({ file_path: path }) })
+  state = fold(state, read('/a.js'))
+  state = fold(state, read('/b.js'))
+  state = fold(state, read('/c.js'))
+  assert.equal(state.activity.length, 1)
+  assert.equal(state.activity[0].text, 'Read /c.js')
+  assert.equal(state.activity[0].count, 3)
+})
+
+test('a different tool breaks the run; identical commands fold too', () => {
+  let state = started(1)
+  const tool = (name, path) =>
+    event('tool/call', { turn: 1, name, arguments: JSON.stringify({ file_path: path }) })
+  state = fold(state, tool('Read', '/a.js'))
+  state = fold(state, tool('Grep', '/a.js'))
+  assert.equal(state.activity[0].text, 'Grep /a.js')
+  assert.equal(state.activity[0].count, undefined)
+  const command = (cmd) =>
+    event('tool/call', { turn: 1, name: 'bash', arguments: JSON.stringify({ command: cmd }) })
+  state = fold(state, command('git status'))
+  state = fold(state, command('git status'))
+  assert.equal(state.activity[0].kind, 'command')
+  assert.equal(state.activity[0].count, 2)
+  // A different command is a new run even though the tool (bash) matches.
+  state = fold(state, command('git pull'))
+  assert.equal(state.activity[0].text, 'git pull')
+  assert.equal(state.activity[0].count, undefined)
+})

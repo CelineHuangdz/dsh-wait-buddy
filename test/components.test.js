@@ -187,3 +187,22 @@ test('D43: the error boundary derives a failed state and renders a fallback (RT-
   assert.match(markup, /wb-crash/)
   assert.match(markup, /ui\.crashed/)
 })
+
+test('safari overlays render without undefined references (SfPortrait regression)', () => {
+  const client2 = loadClient({ react: React })
+  const { sfEncounterOverlay, sfDexOverlay, createSafariState } = client2.__game
+  const t = (key, params = {}) => String(key)
+  const base = createSafariState()
+  // Encounter window: renders the pixel portrait.
+  const encounter = sfEncounterOverlay(t, { ...base, encounter: { species: 7, rarity: 'rare' } }, undefined, false)
+  const markup = renderToStaticMarkup(encounter)
+  assert.ok(markup.includes('canvas'), 'encounter overlay includes the sprite canvas')
+  // Pill mini variant: no portrait, still renders.
+  const mini = sfEncounterOverlay(t, { ...base, encounter: { species: 7, rarity: 'rare' } }, undefined, true)
+  assert.ok(renderToStaticMarkup(mini).length > 0)
+  // Dex grid: one icon per caught species.
+  const withDex = { ...base, dexOpen: true, dex: { caught: { '7': 2, '13': 1 } }, dexCaught: 2 }
+  const dex = sfDexOverlay(t, withDex)
+  const dexMarkup = renderToStaticMarkup(dex)
+  assert.equal((dexMarkup.match(/<canvas/g) ?? []).length, 2, 'dex renders one canvas per species')
+})

@@ -9,11 +9,11 @@
     class ErrorBoundary extends React.Component {
       constructor(props) {
         super(props)
-        this.state = { failed: false }
+        this.state = { failed: false, message: '' }
       }
 
-      static getDerivedStateFromError() {
-        return { failed: true }
+      static getDerivedStateFromError(error) {
+        return { failed: true, message: String((error !== null && error !== undefined && error.message) || error) }
       }
 
       componentDidCatch(error) {
@@ -25,7 +25,10 @@
           return h(
             'div',
             { className: 'wb-crash', role: 'alert' },
-            this.props.t('ui.crashed'),
+            h('div', null, this.props.t('ui.crashed')),
+            // Surface the cause so a screenshot is actionable (a bare
+            // fallback hid every crash's root cause from reports).
+            h('div', { className: 'wb-crashDetail' }, this.state.message),
           )
         }
         return this.props.children
@@ -206,6 +209,8 @@
       /** Full view, exported for static layout tests only. */
       __view: WaitBuddyView,
       __gameStore: gameStore,
+      /** Safari store forwarder, exported for live-DOM harnesses. */
+      __safariStore: safariStore,
       /**
        * Test/visual-harness hook (RT-04): installs a store runtime without a
        * host apply(); production code never calls this.
@@ -239,8 +244,18 @@
         sfSpeciesName,
         sfFitDims,
         sfPath,
+        sfWalkable,
+        sfSpawnOf,
+        sfMigratePos,
+        sfEncounterKey,
+        SF_CATCH_RATE,
+        SF_RUSTLE_MS,
         SF_SPECIES_TOTAL,
         drawSafariMap,
+        sfPaintPixels,
+        sfPaintSprite,
+        sfEncounterOverlay,
+        sfDexOverlay,
         createGameState,
         startGame,
         turnGame,

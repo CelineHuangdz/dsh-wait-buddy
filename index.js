@@ -46,6 +46,8 @@ const TEXT_LIMIT = 120
 const activitySchema = z.object({
   kind: z.enum(ACTIVITY_KINDS),
   text: z.string(),
+  /** Folded run length: consecutive same-tool calls collapse to "Read ×N". */
+  count: z.number().int().positive().optional(),
 })
 
 const stateSchema = z.object({
@@ -124,12 +126,22 @@ function hintOf(args) {
   return ''
 }
 
-/** Newest-first feed with adjacent-duplicate suppression. */
+/** Fold key: the tool name for tool entries, the full text for commands. */
+function foldKeyOf(kind, text) {
+  if (kind === 'command') return text
+  const space = text.indexOf(' ')
+  return space === -1 ? text : text.slice(0, space)
+}
+
+/** Newest-first feed with adjacent-duplicate suppression and run folding. */
 function pushActivity(activity, kind, text) {
   const value = typeof text === 'string' ? text.trim() : ''
   if (value === '') return activity
   const head = activity[0]
-  if (head !== undefined && head.kind === kind && head.text === value) return activity
+  if (head !== undefined && head.kind === kind && foldKeyOf(head.kind, head.text) === foldKeyOf(kind, value)) {
+    // Same tool in a row: keep the newest text, bump the run length.
+    return [{ kind, text: value, count: (head.count ?? 1) + 1 }, ...activity.slice(1)]
+  }
   const next = [{ kind, text: value }, ...activity]
   return next.length > ACTIVITY_LIMIT ? next.slice(0, ACTIVITY_LIMIT) : next
 }
@@ -276,7 +288,7 @@ export function apply(ctx) {
   ctx.sessionProjections.register({
     key: 'waitbuddy',
     stateSchema,
-    stateVersion: 5,
+    stateVersion: 6,
     init: () => initial(),
     apply: fold,
     wire: {
