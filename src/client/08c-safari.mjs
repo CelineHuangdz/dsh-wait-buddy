@@ -965,10 +965,12 @@
       // steps. Each entry: [x, y, w, h].
       let rects
       if (body === 0) {
-        // Round blob: two upright ears on a wide head.
+        // Round blob (D48d, tuned to the approved AI reference): dome
+        // silhouette — narrow top, widest upper-middle, tapering hem — with
+        // two upright ears.
         rects = [
-          [0.19, 0.0, 0.12, 0.19], [0.44, 0.0, 0.12, 0.19],
-          [0.12, 0.16, 0.5, 0.31], [0.06, 0.38, 0.62, 0.34], [0.19, 0.7, 0.38, 0.14],
+          [0.19, 0.0, 0.12, 0.16], [0.44, 0.0, 0.12, 0.16],
+          [0.12, 0.12, 0.5, 0.26], [0.06, 0.34, 0.62, 0.3], [0.12, 0.62, 0.5, 0.22],
         ]
       } else if (body === 1) {
         // Squat block: a curled tail on the right.
@@ -977,14 +979,18 @@
           [0.12, 0.2, 0.62, 0.16], [0.06, 0.34, 0.74, 0.42], [0.12, 0.72, 0.62, 0.12],
         ]
       } else {
-        // Tall bean: a crest fin on top.
+        // Chibi upright (D48d, tuned to the approved AI reference): a big
+        // round head over a small body with stubby legs and a crest fin —
+        // not a uniform bean; the first AI tall reference read as bland.
         rects = [
-          [0.44, 0.0, 0.12, 0.12], [0.38, 0.08, 0.24, 0.06],
-          [0.31, 0.12, 0.38, 0.66], [0.25, 0.2, 0.5, 0.5],
+          [0.44, 0.0, 0.12, 0.1], [0.38, 0.06, 0.24, 0.06],
+          [0.14, 0.1, 0.72, 0.34], [0.08, 0.3, 0.84, 0.3], [0.25, 0.6, 0.5, 0.24],
         ]
       }
-      // Feet (shared silhouette base).
-      rects.push([0.28, 0.84, 0.16, 0.14], [0.56, 0.84, 0.16, 0.14])
+      // Feet: two separate feet with a visible gap, stepping below the hem
+      // (the approved references all show separated feet, not a flat base).
+      if (body === 2) rects.push([0.32, 0.84, 0.14, 0.16], [0.54, 0.84, 0.14, 0.16])
+      else rects.push([0.22, 0.86, 0.16, 0.14], [0.5, 0.86, 0.16, 0.14])
       const pad = 1 / 16
       // 1) Outline pass: every silhouette rect expanded by one pixel (D48 S1).
       for (const [x, y, w, hh] of rects) {
@@ -996,23 +1002,28 @@
       }
       // 3) Light top (upper ~30% of the body block) and dark under-edge.
       if (body === 0) {
-        put(0.12, 0.16, 0.5, 0.12, tone.light)
-        put(0.06, 0.66, 0.62, 0.06, tone.dark)
+        put(0.12, 0.12, 0.5, 0.12, tone.light)
+        put(0.06, 0.6, 0.62, 0.06, tone.dark)
       } else if (body === 1) {
         put(0.12, 0.2, 0.62, 0.1, tone.light)
         put(0.06, 0.7, 0.74, 0.06, tone.dark)
       } else {
-        put(0.31, 0.12, 0.38, 0.16, tone.light)
-        put(0.25, 0.64, 0.5, 0.06, tone.dark)
+        put(0.14, 0.1, 0.72, 0.14, tone.light)
+        put(0.08, 0.54, 0.84, 0.06, tone.dark)
       }
       // Feet in the dark tone so the creature "stands".
-      put(0.28, 0.84, 0.16, 0.14, tone.dark)
-      put(0.56, 0.84, 0.16, 0.14, tone.dark)
+      if (body === 2) {
+        put(0.32, 0.84, 0.14, 0.16, tone.dark)
+        put(0.54, 0.84, 0.14, 0.16, tone.dark)
+      } else {
+        put(0.22, 0.86, 0.16, 0.14, tone.dark)
+        put(0.5, 0.86, 0.16, 0.14, tone.dark)
+      }
       // 4) Pattern coverage ~35% of the body (D48 S2), solid tones.
       if (pattern === 0) {
-        // Belly patch.
-        if (body === 2) put(0.31, 0.42, 0.38, 0.3, tone.light)
-        else put(0.19, 0.48, 0.44, 0.26, tone.light)
+        // Belly patch — generous, like the approved references.
+        if (body === 2) put(0.27, 0.64, 0.46, 0.18, tone.light)
+        else put(0.19, 0.44, 0.36, 0.26, tone.light)
       } else if (pattern === 1) {
         // Spots.
         put(0.22, 0.34, 0.14, 0.14, tone.dark)
@@ -1025,9 +1036,11 @@
         put(0.45, 0.26, 0.09, 0.46, tone.dark)
         put(0.63, 0.32, 0.09, 0.38, tone.dark)
       }
-      // 5) Eyes: bigger whites, pupil and a catch-light pixel (S1).
-      const eyeY = body === 1 ? 0.36 : body === 2 ? 0.3 : 0.28
-      const eyeXs = body === 2 ? [0.36, 0.5] : body === 1 ? [0.22, 0.5] : [0.22, 0.44]
+      // 5) Eyes: bigger whites, pupil and a catch-light pixel (S1). Eye line
+      // sits at 38–44% height (D48d: the approved references place eyes at
+      // the vertical middle, not near the top).
+      const eyeY = body === 1 ? 0.42 : body === 2 ? 0.3 : 0.36
+      const eyeXs = body === 2 ? [0.28, 0.56] : body === 1 ? [0.2, 0.5] : [0.2, 0.44]
       for (const ex of eyeXs) {
         put(ex, eyeY, 0.15, 0.14, '#ffffff')
         put(ex + 0.04, eyeY + 0.03, 0.08, 0.08, '#101014')
@@ -1036,23 +1049,23 @@
       // 5b) Face details (D48c): blush cheeks, a tiny mouth, lighter ear
       // inners — the last bits of "cute" come from these micro-accents.
       const blush = sfMixHex(SF_PALETTE_COLORS[palette], 255, 0.5)
-      const cheekY = eyeY + 0.14
-      const cheekXs = body === 2 ? [0.31, 0.58] : body === 1 ? [0.16, 0.68] : [0.14, 0.6]
+      const cheekY = eyeY + 0.16
+      const cheekXs = body === 2 ? [0.2, 0.66] : body === 1 ? [0.14, 0.68] : [0.12, 0.6]
       for (const cxp of cheekXs) {
         put(cxp, cheekY, 0.09, 0.06, blush)
       }
-      const mouthX = body === 2 ? 0.44 : body === 1 ? 0.38 : 0.36
+      const mouthX = body === 2 ? 0.42 : body === 1 ? 0.38 : 0.34
       put(mouthX, eyeY + 0.1, 0.1, 0.05, tone.dark)
       if (body === 0) {
         // Ear inners.
-        put(0.21, 0.03, 0.08, 0.1, tone.light)
-        put(0.46, 0.03, 0.08, 0.1, tone.light)
+        put(0.21, 0.02, 0.08, 0.08, tone.light)
+        put(0.46, 0.02, 0.08, 0.08, tone.light)
       } else if (body === 1) {
         // Tail tip highlight.
         put(0.82, 0.24, 0.12, 0.06, tone.light)
       } else {
         // Crest stripe.
-        put(0.44, 0.0, 0.06, 0.1, tone.light)
+        put(0.46, 0.0, 0.06, 0.08, tone.light)
       }
       // 6) Rarity flourish (D48 S3): deterministic from the species number.
       const rarity = sfRarityOf(species)
