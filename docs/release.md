@@ -81,7 +81,7 @@ npm publish
 
 仓库已 `git init -b main` 并完成首个提交（14 个受版本控制的文件，`node_modules/`、`dist/`、`*.tgz` 已忽略）。
 
-**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；已发布 `v0.4.1`–`v0.12.0`，待发布 `v0.13.0`）。
+**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；已发布 `v0.4.1`–`v0.13.0`）。
 
 **推送到远端**（首次流程，已执行过一遍）：
 
