@@ -49,6 +49,9 @@
       inject: ['slots', 'sessions', 'locale', 'uiSession'],
       apply(ctx) {
         clientCtx = ctx
+        // A re-apply must not reuse an opener closure from the previous heal.
+        viewOpener = null
+        viewOpenerSession = null
         ctx.effect(() => {
           // RT-04: impls live per-apply; dispose clears the DOM listener and a
           // later re-apply rebuilds everything (the forwarding objects above
@@ -182,12 +185,16 @@
           return () => window.removeEventListener('keydown', onKeyDown)
         }, 'wait-buddy: hide shortcut')
       },
+      /** Host adapter helpers, exported for unit/live tests. */
+      __adapter: { openFullView },
       /** Pure monitor reconciliation, exported for unit testing. */
       __monitor: { composeMonitor, sameMonitor, createMonitorSource },
       /** Pure signal conversion, exported for unit testing. */
       __signals: { createSignalHub, diffMonitorSignals },
       /** Pure copy helpers, exported for unit testing. */
-      __ui: { statusText, metaText, failureText },
+      __ui: { statusText, metaText, failureText, formatAge, visibleActivity },
+      /** Dictionaries, exported so tests can enforce zh/en key parity. */
+      __locale: { zh, en },
       /** Low-key presence (D29): store, notifier and pure helpers for tests. */
       __presence: {
         presenceStore,
@@ -202,7 +209,7 @@
         adapterNotice,
       },
       /** Static UI pieces + stylesheet, exported for component tests. */
-      __components: { AlertBanner, gameOverlay, gomokuOverlay, ErrorBoundary },
+      __components: { AlertBanner, gameOverlay, gomokuOverlay, ErrorBoundary, ActivityFeed },
       /** GameAdapter registry (D45), exported for tests and future games. */
       __games: { GAMES, GAME_ORDER },
       __css: CSS,

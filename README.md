@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.12.0-blue)
+![Version](https://img.shields.io/badge/version-0.13.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
-![Tests](https://img.shields.io/badge/tests-100%20%2B%204%20visual-brightgreen)
+![Tests](https://img.shields.io/badge/tests-146%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> Current version **0.12.0**: M1 status board + M2 games + M3 one-way signals + low-key presence, hardened; Safari art overhaul — region theme palettes, edge-aware terrain, animated water, outlined three-tone pixel sprites (D48). Tested on DSH `0.2.1-rc.5`.
+> Current version **0.13.0**: monitor-truth release — tool results and durations in the feed, event-age pulse, per-turn signal dedupe, command-free projection, and no global key/scroll hijacking. Games are frozen (no new content); only Snake consumes Agent signals. Tested on DSH `0.2.1-rc.5`.
 
 ## Table of Contents
 
@@ -44,10 +44,10 @@
 
 WaitBuddy is a **session-view plugin for DSH Desktop**. It adds a **WaitBuddy** tab next to Chat / Trajectory in the current session and lets you:
 
-- see what the Agent is doing: status, completed steps, latest commands/tool calls;
+- see what the Agent is doing: status, completed steps, latest tool calls and their outcomes;
 - get a visible secondary reminder for pending approvals and task failures;
-- play Snake or Gomoku while waiting for a long task;
-- in M3, let Agent events **one-way drive** the game: pause on approval, +5 per step, +50 on success.
+- play Snake, Gomoku or Safari while waiting for a long task;
+- in M3, let Agent events **one-way drive Snake only**: pause on approval, +5 per step, +50 on success. Gomoku and Safari are pure breaks.
 
 It never controls the Agent, never intercepts the native approval dialog, and never writes to the session log.
 
@@ -58,8 +58,9 @@ It never controls the Agent, never intercepts the native approval dialog, and ne
 - **Session view**: registered on `conversation.view`, next to Chat / Trajectory.
 - **Honest status**: loading / ready / degraded / stale; a missing projection is never shown as “idle”.
 - **Real step count**: “N steps completed”; no total steps, no fake percentage.
-- **Activity feed**: only `tool/call` command/tool entries (max 3); **no raw model reasoning** (D27).
-- **Dedicated alert rail**: approval/failure alerts live outside the scrolling content and stay visible.
+- **Activity feed**: the latest 3 tool calls by default (expandable to 8), with `tool/result` status, duration and error code; **no raw model reasoning** (D27) and **no full shell command** (D51).
+- **Dedicated alert rail**: approval/failure alerts live outside the scrolling content and stay visible; pending approvals show their wait age.
+- **Honest activity pulse**: driven by every event revision (steps included), with a readable “last activity Xs ago”; it never claims “stuck”.
 
 ### Low-key presence (v0.5.0)
 
@@ -72,7 +73,7 @@ It never controls the Agent, never intercepts the native approval dialog, and ne
 - **Snake**: Canvas, no external assets, keyboard arrows; direction queue, Space pause/resume, reset, speed presets.
 - **Gomoku**: 15×15, human black vs heuristic AI; difficulty presets; redraws on resize.
 - **Sprite Safari** (0.10.0): explore a 12×12 grid map, encounter procedural sprites in the grass (54 species, 3 bodies × 6 palettes × 3 patterns), one-click catch by rarity, and a dex persisted in localStorage.
-- Both games keep their own state; switching view/session pauses but does not reset.
+- Games keep their own state; switching view/session pauses but does not reset. **Only Snake** consumes Agent signals; Gomoku/Safari do not score or pause on approval.
 
 ### One-way signals (M3)
 
@@ -94,7 +95,7 @@ In DSH: sidebar → **Plugins** → **Add plugin**, then use one of:
 
 | Method | Value | Notes |
 |---|---|---|
-| Git (recommended) | `github:CelineHuangdz/dsh-wait-buddy` | Follows the latest commit; the only published channel |
+| Git (recommended) | `github:CelineHuangdz/dsh-wait-buddy#v0.13.0` | Pinned tag (recommended); a bare spec follows HEAD |
 | Local directory | `/abs/path/to/dsh-wait-buddy` | For development; run `pnpm install` first |
 | Tarball | absolute path to `dist/dsh-wait-buddy-x.y.z.tgz` | Create with `npm pack --pack-destination dist` |
 
@@ -105,9 +106,9 @@ After installing, enable the plugin and refresh the page, then select **WaitBudd
 ## Usage
 
 1. Open a session and switch to **WaitBuddy**.
-2. Send a task: status, steps and activity update from `turn/start` / `step/end` / `tool/call`.
+2. Send a task: status, steps, activity and tool outcomes update from `turn/start` / `step/end` / `tool/call` / `tool/result`.
 3. Click **Start game** to play Snake; arrow keys require focus inside the view (click the board once).
-4. When approval appears, the game pauses; handle it in the native approval panel, then resume manually.
+4. When approval appears, Snake pauses (Gomoku/Safari only show the alert); handle it in the native approval panel, then resume manually.
 5. On success, +50 points; switching views does not replay the toast.
 
 > Arrow keys only act inside the view and never steal composer keys. Touch/pointer-only devices cannot control direction (D7, approved deviation).
@@ -127,7 +128,7 @@ After installing, enable the plugin and refresh the page, then select **WaitBudd
 
 ```text
 Host (index.js)
-  session log ── pure fold ──> waitbuddy projection (stateVersion 4)
+  session log ── pure fold ──> waitbuddy projection (stateVersion 7)
                                       │
 Client (client.js)                    ▼
   projection + sessionStatus ──> composeMonitor ──> TrackState ──> WaitBuddyView
@@ -229,7 +230,7 @@ CHANGELOG.md        Release notes
 - The plugin runs inside the DSH process with the current user's permissions; **there is no sandbox**.
 - Read-only session events; no session-log writes; no network requests; no telemetry.
 - Settings are stored only in local `localStorage`.
-- The activity feed may show tool/command arguments (paths, queries); raw model reasoning was removed by D27.
+- The activity feed stores a safe summary: tool name, path basename / URL host, and shell argument count. It never stores the full command, query text, or URL path. Raw model reasoning was removed by D27; copying a feed row copies only that summary.
 - The plugin never registers, replaces, or intercepts the native approval panel.
 
 ## Contributing

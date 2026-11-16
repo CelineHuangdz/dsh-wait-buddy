@@ -161,7 +161,7 @@
 | DOC-01 | P0 | M0 原文已补录（[baseline-m0.md](baseline-m0.md)），但 README/ui-spec/locale/decisions 与 M0 仍有多处漂移 | `README.md:18/24/35/89`；`ui-spec.md:10/36/125`；D16/D17 | C/G/M | ✅ |
 | DOC-02 | P1 | 铁律"不订阅基线之外的事件" vs D9 新增 `assistant/message`，自相矛盾 | `README.md`；D9/D27 | C/G | ✅ 已移除 reasoning 事件 |
 | CP-01 | P2 | 无 DSH 版本兼容声明/能力探测；`zod` 精确锁 `4.4.3` | `package.json` | C/G | ✅ |
-| PR-01 | P2 | 工具参数/命令可能包含敏感路径或查询词，当前无脱敏/开关 | `index.js` tool/call | C/G/M | ✅ |
+| PR-01 | P2 | 工具参数/命令可能包含敏感路径或查询词，当前无脱敏/开关 | `index.js` tool/call | C/G/M | ✅ 0.13.0 D51：只留安全摘要 |
 
 ### 3.6 M0 / M3 基线补充项
 
@@ -469,7 +469,7 @@
 - 等待日志导出、单会话统计、历史回放（回放建议独立视图/插件，不塞进 WaitBuddy）。
 - 第三款游戏（2048 等），必须先有 GameAdapter。
 - "审批后解锁"只做视觉奖励：原生审批完成后解锁皮肤/关卡；不允许在游戏内批准，不允许"通关才能处理审批"，奖励不与批准/拒绝挂钩，只与响应时长挂钩。
-- 工具参数/命令的 Host 侧脱敏/开关（reasoning 已由 D27 移除，tool/call 仍可能含敏感路径）。
+- ~~工具参数/命令的 Host 侧脱敏/开关~~ ✅ 0.13.0 D51：投影只留安全摘要（可执行文件/参数个数、basename/URL host）。
 
 ---
 
@@ -647,7 +647,7 @@ test/load-client.mjs     // 用 window/document/localStorage stub 加载 client.
 | P2 红叉 450ms 偏短 | ✅ 调整为 800ms |
 | P2 图鉴纯文字 | ✅ 16×16 像素头像网格 + 捕获数，`image-rendering: pixelated` |
 | 看板 1：活动脉冲条 | ✅ 运行态脉冲条改为近 1 分钟活动分段条（12 段 × 5s），可区分"卡住"与"在跑" |
-| 看板 2：活动流折叠 + 复制 | ✅ Host 侧连续同类工具折叠为计数（投影 stateVersion 5→6）+ 每行点击复制全文 |
+| 看板 2：活动流折叠 + 复制 | ✅ Host 侧连续同类工具折叠为计数（投影 stateVersion 5→6）+ 每行点击复制安全摘要（0.13.0 D51 起不再复制全文） |
 | 像素风专题 1–4（离屏整数缩放 / 地形像素化 / 精灵像素稿 / 像素小人） | ✅ `sfPaintPixels` 全量落地（`imageSmoothingEnabled=false`、U 随 dpr 2–8 自适应）；低成本替代方案（扁平色块）也已做 |
 | 玩法 4：捕获率展示 | ✅ 遇怪弹窗标注常见 70% / 稀有 45% / 珍稀 20% |
 | （0.11.0 附带发现）`SfPortrait is not defined` 崩溃、绘制失败拖垮看板 | ✅ 引用修复 + `sfSafeDraw` 防御 + 错误边界显示具体错误信息 |
@@ -688,3 +688,82 @@ test/load-client.mjs     // 用 window/document/localStorage stub 加载 client.
 3. **观感批**（可并入低成本批）：U2 页签下拉、U13 区域色板。
 4. **红线不变**：不做游戏内审批/自动审批/composer 替换（见上文"不做清单"）。
 5. **0.4.0 遗留**：question/plan-review 可见性（ST-03b，需 D28 批准立项）、DSH 真机 E2E、双实例/窄窗实机验收（RT-02/AT-06）。
+
+---
+
+## 12. 0.12.0 对抗性评审复核与 0.13.0 规划（2026-11-16）
+
+> **输入**：[2026-11-16 对抗性评审](reviews/2026-11-16-adversarial.md)
+> **复核**：[逐条核验与误判纠正](reviews/2026-11-16-adversarial-analysis.md)
+> **基线**：0.12.0（`client.js` 5903 行 / `index.js` 299 行）；DSH Desktop `0.2.1-rc.5`。
+> **状态**：已确认并实施（2026-11-16，0.13.0）。Q1 按“只动监控、游戏冻结、9–11 人日”执行；Q2 按“只留摘要”执行。实施结果：146 单测 + 4 visual + live smoke 全绿。
+
+### 12.1 结论与范围
+
+评审的诊断大体成立：产品重心被游戏美术吃掉，宿主集成靠 DOM 文案与 window 按键劫持，活动流/脉冲不能回答“做成了没有”，命令进了持久投影，compat 文档与源码常量漂移。复核同时纠正了 4 条误判（unknown 界面已区分、`pending_approval` 是 M0 六值之一、zod 是宿主契约要求、dock mock 已从 38px 修为 150px），避免把预算花在错处。
+
+**0.13.0 定位：监控可信 + 宿主边界 + 隐私 + 契约；游戏冻结。**
+
+- 只允许改监控、Host 投影、Client 监控组件、宿主适配、文档/测试。
+- 游戏只允许两处改动：撤掉 window 捕获/合成 wheel 对输入的影响；把“Agent 奖励只进贪吃蛇”写清楚。**不做**新游戏、新区域、新物种、新难度、新精灵、新主题色板。
+- 预算：**9–11 人日**（1 名熟悉代码的开发者），不含发版等待与真机验收。若只有 5 人日，保留 P0 四项 + 命令脱敏，砍掉活动流扩容、结果行、`forked` 文案到 0.13.1。
+
+### 12.2 工作包
+
+| ID | P | 工作 | 主要文件 | 验收 | 估时 |
+|---|---|---|---|---|---|
+| H1 | P0 | 撤 `window` 捕获键盘、`stopImmediatePropagation`、合成 `wheel`、`depth<6` 祖先滚动重置；游戏键只在视图/棋盘获得焦点时处理 | `src/client/09-components.mjs`、`07-input-overlays.mjs`、`08c-safari.mjs`、`08-gomoku.mjs` | 焦点在对话页时 F/Q/WASD/方向键不被插件拦截；client.js 无上述四种写法；live test 记录宿主监听器能收到未聚焦按键 | 1.5d |
+| H2 | P0 | `openFullView` 优先已捕获 `openView`；最后兜底按 `[data-conversation-tabs]` + 插件 label 找 tab/More 菜单项；失败给持久提示 | `09-components.mjs`、`05-presence.mjs`、词典 | 无 `更多会话视图`、`session views`、`startsWith('WaitBuddy')`；失败路径显示“请点击顶部 WaitBuddy 标签” | 0.5d |
+| C1 | P0 | compat 与源码常量锁死：`check-compat` 校验 `stateVersion`/NS/投影 key，CI meta 失败即红 | `docs/compat.md`、`tools/check-compat.mjs`（新）、`package.json`、CI | 故意改 `stateVersion` 不改文档，`npm run test:compat` 退出非 0 | 0.5d |
+| M1 | P0 | 接 `tool/result`：按 `callId` 回填结果 `ok/error`、耗时、错误码；`step/end` 更新 `lastActivityAt`；新增 `turnStartedAt/lastToolAt/endedAt`；`stateVersion` 7 | `index.js`、`02-monitor.mjs`、`03-status-copy.mjs`、测试 | 调用+结果合并为一行；失败行可见；未回结果的调用在 turn/end 收口；旧 turn/重复结果/late result 被忽略；schema/版本测试 | 2.5d |
+| M2 | P0 | 脉冲改由 `revision`/`lastActivityAt` 驱动，step/end 也算活动；状态行显示“上次活动 Xs 前”；>60s 用“无新事件”而非“卡住” | `09-components.mjs`、`03-status-copy.mjs`、词典、测试 | 纯推理 step 也能点亮；同一命令重复执行也点亮；长静默显示年龄 | 1d |
+| M3 | P1 | 活动流投影上限 3→8，UI 默认 3 条可展开；行内显示结果状态/耗时；失败高亮；工具按工具名折叠；命令不折叠，避免持久化可暴力破解的命令哈希 | `index.js`、`09-components.mjs`、CSS、测试 | 默认 3 条、展开 8 条；窄窗不溢出；`×N` 折叠保留且不误折 | 1d |
+| P1 | P0 | 命令不进持久投影：只存工具名/参数名/basename/可执行文件+参数数；复制只复制摘要 | `index.js`、`09-components.mjs`、README、测试 | 含 `Authorization: Bearer sk-…` 的 fixture 投影无 token；复制内容无完整命令 | 1d |
+| S1 | P1 | 信号去重按 `session+turn` 分桶，`agent:task_finish` 清桶；500 上限不再影响单轮 | `02-monitor.mjs`、测试 | 单轮 >500 个不重复 step 不重复加分；双视图仍不双倍 | 0.5d |
+| S2 | P1 | `forked` 在状态区留“会话已分叉”一行；unknown 通知用 `notify.unknown`；缺 `turn` 的 `tool/call` 忽略 | `03-status-copy.mjs`、`05-presence.mjs`、`index.js`、词典/测试 | forked 可见；unknown 通知不写“已中断”；malformed tool/call 不污染活动流 | 0.5d |
+| T1 | P1 | `safari-live`/`view-live` 收成 CI 冒烟；新增隐私/结果/去重/按键路由测试 | `.github/workflows/ci.yml`、`tools/*-live.mjs`、`test/` | CI 新 job 绿；live harness 失败能让 PR 红 | 1d |
+| D1 | P1 | README/CHANGELOG/decisions/ui-spec 同步；明确“只有贪吃蛇领 Agent 奖励” | 文档 | 文档与代码一致；D50+ 记录 | 0.5d |
+
+> 说明：M3 的“8 条”是展示上限，不是历史日志；真正的“过去一小时”需要 0.14 的 turn 历史环，不在 0.13.0 承诺。
+
+### 12.3 实施顺序
+
+1. **H1 + H2**（先撤最危险的行为，改动小、可独立验收）。
+2. **C1**（先把验收清单修对，再改 schema）。
+3. **M1 + M2**（监控可信度的主交付，依赖 `stateVersion` 7）。
+4. **P1**（隐私收口，和 M1 同一次 schema bump）。
+5. **S1 + S2**（边界语义，纯 Client/小改 Host）。
+6. **M3 + T1 + D1**（容量、CI、文档；时间不够可延到 0.13.1）。
+
+### 12.4 发布门槛（Definition of Done）
+
+- [x] `client.js` 无 `stopImmediatePropagation`、`new WheelEvent`、`更多会话视图`、`session views`、`window.addEventListener('keydown', …, true)`；视图兜底按 `[data-conversation-tabs]` + 插件 `t('view.label')`，无 `startsWith('WaitBuddy')`。
+- [x] `stateVersion` 7；`docs/compat.md` 与 `index.js`/`00-prologue.mjs` 一致；`test:compat` 在 CI meta 中通过。
+- [x] 隐私 fixture：含 token 的 `tool/call` 投影不含 token；`FeedRow` 复制内容为摘要。
+- [x] 结果 fixture：`tool/call` + `tool/result(error)` 显示一行失败；`tool/result` late/duplicate 不覆盖当前 turn。
+- [x] 活动 fixture：`step/end` 点亮脉冲；同一命令重复执行点亮；>60s 静默显示“无新事件/上次活动 Xs 前”。
+- [x] 去重 fixture：单轮 >500 个不重复 step 不重复加分；双视图仍只加一次。
+- [x] 按键边界：`test/host-boundary` 锁定无 window 捕获/合成 wheel/硬编码宿主人文案；`view-live` IME Space 探针确认视图外不被消费。
+- [x] 146 单测 + 4 视觉场景 + `view-live`/`safari-live` 冒烟通过。
+- [ ] 真机验收（需桌面端）：审批告警等待时长、工具失败行、胶囊打开失败的持久提示、浅色主题。静态/视觉已覆盖布局，真机待产品确认。
+
+### 12.5 0.14.0 / 0.15.0 方向
+
+- **0.14.0（等待者视图）**：多会话只读总览（U1，running/pending 优先，`uiSession.sessionStatus` + `sessions.list`）、最近 5 轮结果/时长、审批等待时长、token usage（只读、不存正文）、可访问性批次（脉冲文本、Canvas 动态状态、遇怪 `role="dialog"`、reduced-motion 全覆盖）。
+- **0.15.0（结构）**：游戏拆独立插件或真实模块边界；单文件 bundle 的懒加载 spike；`stateSchema`→`viewSchema` 单源；`files`/源码分发决策；`window.__WB_BUILD_ID__` 改 `dataset`。
+- **不承诺**：在宿主没有懒加载边界之前，0.13/0.14 不承诺 245KB 解析成本下降；0.13 未改 `immediately`，也未推迟游戏 store/图集初始化（0.15 spike）。
+
+### 12.6 未决问题
+
+1. **Q1 范围/预算（已确认）**：0.13.0 只动监控、游戏冻结、9–11 人日；不拆游戏插件（0.15 评估）。
+2. **Q2 命令投影（已确认）**：投影只留安全摘要（可执行文件/参数个数、basename/URL host）；完整命令只在宿主会话日志。见 D51。
+3. **Q3 宿主版本（已核实）**：`0.2.1-rc.5`；compat 的版本行不需要变，变的是插件常量。若近期升级桌面端，先跑 `check-compat` + `view-live` 再改代码。
+
+### 12.7 明确不做（0.13.0）
+
+- 不做新游戏/新区域/新物种/新难度/新精灵/新主题色板/新音效。
+- 不做五子棋/抓精灵的 Agent 奖励联动；只把“奖励只进贪吃蛇”写进 UI/README。
+- 不做多会话总览、token 统计、turn 历史（0.14）。
+- 不新增 `unknown` status（D22 冻结六值）；不删除 `pending_approval`。
+- 不删 zod（宿主契约要求 `.parse`）；不改 `immediately` 为 false（会丢胶囊/通知）。
+- 不再加 DOM 探测去“精确适配” dock；0.13.0 只做保守修正并记录宿主 API 需求。

@@ -11,7 +11,7 @@
 | 改动 | 文件 | 说明 |
 |---|---|---|
 | `fold` / `endedWith` 可测试化 | `index.js` | 导出纯函数；`node --test` 可直接覆盖 |
-| 未知 `turn/end` 不再判成功 | `index.js` | 显式 `completed` → `success`；未知 reason → `aborted` + 「未知结束原因：kind」；`stateVersion` 升到 4（D27） |
+| 未知 `turn/end` 不再判成功 | `index.js` | 显式 `completed` → `success`；未知 reason → `aborted` + 「未知结束原因：kind」；`stateVersion` 当期为 4（D27），0.13.0 已升至 7（D54） |
 | 事件 turn 守卫 | `index.js` | `tool/call` 只在 running 且 turn 匹配时更新；`turn/end` 忽略迟到/重复 turn |
 | 工具活动二次截断 | `index.js` | 工具名 + 参数摘要拼接后再 `clip()`，避免超过 120 字 |
 | 状态协调矩阵 | `client.js` | 新增纯函数 `composeMonitor`：新轮 running 覆盖旧终态；`running=false` + durable running 5 秒后 `health=stale`；投影缺失走 `loading`/`degraded` |

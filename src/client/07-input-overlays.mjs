@@ -15,10 +15,10 @@
     }
 
     /**
-     * Returns true when the key was consumed (prevented / handled) so the
-     * window-capture fallback knows to stop the host's own key handlers —
-     * a host that scrolls the page from a capture-phase listener would
-     * otherwise race ahead of our bubble-phase preventDefault.
+     * Returns true when the key was consumed (prevented / handled). This is
+     * bound to the view root only: the plugin does not capture keys at the
+     * window and does not stop propagation, so the host and other plugins
+     * keep their own input handling.
      */
     function onGameKeyDown(event) {
       // D45: only keyboard-driven games (see GAMES.keyboard) consume keys.

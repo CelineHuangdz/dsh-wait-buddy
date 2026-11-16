@@ -14,6 +14,11 @@
       activity: EMPTY_ACTIVITY,
       updatedAt: 0,
       revision: 0,
+      turnStartedAt: 0,
+      lastActivityAt: 0,
+      lastToolAt: 0,
+      endedAt: 0,
+      pendingSince: 0,
       approvalTool: '',
       pendingKind: '',
       pendingKey: '',
@@ -35,6 +40,11 @@
         left.errorMessage === right.errorMessage &&
         left.updatedAt === right.updatedAt &&
         left.revision === right.revision &&
+        left.turnStartedAt === right.turnStartedAt &&
+        left.lastActivityAt === right.lastActivityAt &&
+        left.lastToolAt === right.lastToolAt &&
+        left.endedAt === right.endedAt &&
+        left.pendingSince === right.pendingSince &&
         left.approvalTool === right.approvalTool &&
         left.pendingKind === right.pendingKind &&
         left.pendingKey === right.pendingKey &&
@@ -93,6 +103,7 @@
       const now = input.now
       const mountedAt = input.mountedAt
       const mismatchSince = input.mismatchSince
+      const pendingSince = input.pendingSince === undefined ? 0 : input.pendingSince
       const projectionError = input.projectionError === true
       const ready = durable !== undefined
       const base = ready ? durable : EMPTY_STATE
@@ -137,6 +148,11 @@
         activity: Array.isArray(base.activity) ? base.activity : EMPTY_ACTIVITY,
         updatedAt: base.updatedAt === undefined ? 0 : base.updatedAt,
         revision: base.revision === undefined ? 0 : base.revision,
+        turnStartedAt: base.turnStartedAt === undefined ? 0 : base.turnStartedAt,
+        lastActivityAt: base.lastActivityAt === undefined ? 0 : base.lastActivityAt,
+        lastToolAt: base.lastToolAt === undefined ? 0 : base.lastToolAt,
+        endedAt: base.endedAt === undefined ? 0 : base.endedAt,
+        pendingSince: blocked ? pendingSince : 0,
         approvalTool:
           pendingKind === 'approval' && typeof pending.toolName === 'string' ? pending.toolName : '',
         pendingKind,
@@ -147,24 +163,73 @@
       }
     }
 
-    /** Bound on remembered signal keys; enough for one long turn's steps. */
+    /** Bound on remembered signal keys per session+turn bucket. */
     const SIGNAL_SEEN_LIMIT = 500
 
     /**
+     * Dedupe bucket for one signal. Step/task signals carry the turn either in
+     * `detail.turn` or in the leading `turn:` of their key; approvals are not
+     * turn-scoped and share the `pending` bucket.
+     */
+    function signalTurnKey(signal) {
+      const detail = signal.detail
+      if (detail !== undefined && detail !== null && Number.isInteger(detail.turn)) {
+        return String(detail.turn)
+      }
+      const match = String(signal.key === undefined ? '' : signal.key).match(/^(\d+):/u)
+      return match === null ? 'pending' : match[1]
+    }
+
+    /**
      * Client-only signal hub. Monitor sources publish; game runtimes consume.
-     * Dedupe is global so two views of the same session cannot double-reward.
+     * Dedupe is bucketed per session+turn so two views of the same session
+     * cannot double-reward, while a new turn drops the previous turn's keys.
      */
     function createSignalHub() {
       const listeners = new Set()
-      const seen = new Set()
+      /** @type {Map<string, Map<string, Set<string>>>} */
+      const seen = new Map()
+
+      const bucketFor = (sessionId, turnKey) => {
+        let turns = seen.get(sessionId)
+        if (turns === undefined) {
+          turns = new Map()
+          seen.set(sessionId, turns)
+        }
+        let bucket = turns.get(turnKey)
+        if (bucket === undefined) {
+          bucket = new Set()
+          turns.set(turnKey, bucket)
+        }
+        return bucket
+      }
+
       return {
         emit(signal) {
-          const identity = `${signal.type}:${signal.sessionId}:${signal.key}`
-          if (seen.has(identity)) return
-          seen.add(identity)
-          if (seen.size > SIGNAL_SEEN_LIMIT) {
-            const oldest = seen.values().next().value
-            if (oldest !== undefined) seen.delete(oldest)
+          const sessionId = String(signal.sessionId === undefined ? '' : signal.sessionId)
+          const turnKey = signalTurnKey(signal)
+          const bucket = bucketFor(sessionId, turnKey)
+          const identity = `${signal.type}:${signal.key}`
+          if (bucket.has(identity)) return
+          bucket.add(identity)
+          // The same approval key may reappear after being handled; allow the
+          // re-entry edge while still deduping duplicate enters from 2 views.
+          if (signal.type === 'agent:approval_leave') {
+            bucket.delete(`agent:approval_enter:${signal.key}`)
+          }
+          if (bucket.size > SIGNAL_SEEN_LIMIT) {
+            const oldest = bucket.values().next().value
+            if (oldest !== undefined) bucket.delete(oldest)
+          }
+          // A new turn starts: forget older turn buckets for this session.
+          // Keep the current turn and the non-turn `pending` bucket.
+          if (signal.type === 'agent:task_start' && Number.isInteger(Number(turnKey))) {
+            const turns = seen.get(sessionId)
+            if (turns !== undefined) {
+              for (const key of [...turns.keys()]) {
+                if (key !== 'pending' && Number(key) < Number(turnKey)) turns.delete(key)
+              }
+            }
           }
           for (const listener of [...listeners]) {
             try {
@@ -258,6 +323,8 @@
       let disposers = []
       let mountedAt = Date.now()
       let mismatchSince = null
+      let pendingSince = 0
+      let pendingKeySeen = ''
       let projectionError = false
       let healthTimer = null
       let hasBaseline = false
@@ -292,6 +359,17 @@
         const live = readSessionStatus()
         const session = readSession()
         const pending = live === undefined ? undefined : live.pendingInteraction
+        const pendingKey =
+          pending !== undefined && pending !== null && typeof pending.key === 'string'
+            ? pending.key
+            : ''
+        if (pendingKey === '') {
+          pendingSince = 0
+          pendingKeySeen = ''
+        } else if (pendingKey !== pendingKeySeen) {
+          pendingSince = Date.now()
+          pendingKeySeen = pendingKey
+        }
         const liveRunning =
           live !== undefined && live.running !== undefined
             ? live.running
@@ -311,6 +389,7 @@
           now: Date.now(),
           mountedAt,
           mismatchSince,
+          pendingSince,
           projectionError,
         })
       }
@@ -388,6 +467,8 @@
       const start = () => {
         mountedAt = Date.now()
         mismatchSince = null
+        pendingSince = 0
+        pendingKeySeen = ''
         projectionError = false
         projectionAttempts = 0
         hasBaseline = false

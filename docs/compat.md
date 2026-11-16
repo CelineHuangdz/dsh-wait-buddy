@@ -8,18 +8,20 @@
 
 | # | 层 | API / 契约 | 必需性 | 缺失时行为 |
 |---|---|---|---|---|
-| H1 | Host | `inject: ['sessionProjections']` + `ctx.sessionProjections.register({ name:'waitbuddy', …, stateVersion: 4 })` | **硬依赖** | 插件加载失败，无降级可能 |
-| H2 | Host | 会话事件：`turn/start`、`step/end`、`turn/end`（reason ∈ completed/error/max-tokens/blocked/aborted/interrupted，未知 reason → `aborted`+原因文本） | **硬依赖** | 投影状态停留在 `idle`；未知终态有兜底（D22） |
+| H1 | Host | `inject: ['sessionProjections']` + `ctx.sessionProjections.register({ key:'waitbuddy', …, stateVersion: 7 })` | **硬依赖** | 插件加载失败，无降级可能 |
+| H2 | Host | 会话事件：`turn/start`、`step/end`、`turn/end`（reason ∈ completed/error/max-tokens/blocked/aborted/interrupted/forked，未知 reason → `aborted` + `reasonCode: unknown` + 原始原因文本） | **硬依赖** | 投影状态停留在 `idle`；未知终态有兜底（D22/D41） |
 | H3 | Host | `pendingInteraction`（任意非空 `kind`，含 question / plan-review / 未来未知 kind） | 可选 | 只影响"待审批"告警与文案细分（D28）；缺失则不显示阻塞告警 |
-| H4 | Host | `tool/call` 事件（命令 / 工具名 + 参数摘要） | 可选 | 活动流为空，其余功能不受影响 |
-| C1 | Client | 注入 `['slots', 'sessions', 'locale']` 三服务 | **硬依赖** | 插件无法渲染任何形态 |
+| H4 | Host | `tool/call` 事件（`callId` / 工具名 / `command` 参数） | 可选 | 活动流为空，其余功能不受影响 |
+| H5 | Host | `tool/result` 事件（`message.toolCallId` / `message.isError` / `error.code`） | 可选 | 活动流只显示调用，不显示成败与耗时 |
+| C1 | Client | 注入 `['slots', 'sessions', 'locale', 'uiSession']` 四服务（`uiSession` 用于进程内 running / pendingInteraction） | **硬依赖**（monitor 对晚到 binding 有重试） | 插件可能不激活；即使激活，running/pending 可能退化为仅 durable 投影 |
 | C2 | Client | `ctx.slots.inject('conversation.view')` → 注册 `waitbuddy` 会话视图 tab | **硬依赖** | 无完整视图；胶囊/小窗仍可工作 |
 | C3 | Client | `ctx.slots.inject('shell.overlay')` → 注册全局胶囊 | 可选（try/catch 包裹） | 宿主无 overlay 槽位则静默跳过（D29 预案） |
 | C4 | Client | `ctx.slots.inject('conversation.session.header.views.actions')` → 「打开 WaitBuddy 看板」菜单项 | 可选（try/catch 包裹） | 菜单入口消失；胶囊「后台」按钮退化为仅 `presence=quiet` 不跳视图（D36 已知限制） |
 | C5 | Client | `ctx.sessions.binding`（跟随主视图会话） | 可选 | 胶囊无法跟随会话，状态可能为空 |
 | C6 | Client | `ctx.sessions.refreshProjections` | 可选 | 首次数据拉取依赖宿主自动刷新；可能初始为 `loading/degraded` |
-| C7 | Client | `ctx.locale.register` / `ctx.locale.bind`（NS `wait-buddy`） | 可选 | 词典缺失会显示键名；建议宿主必有 locale 服务 |
-| C8 | Client | 投影状态 schema（`index.js` `stateSchema`，`stateVersion: 4`：status/activity/stepCount/health/pendingKind 等） | **硬依赖** | Host/Client 版本错配时视图显示同步中断提示 |
+| C7 | Client | `ctx.locale.register` / `ctx.locale.bind`（NS `waitBuddy`） | 可选 | 词典缺失会显示键名；建议宿主必有 locale 服务 |
+| C8 | Client | 投影状态 schema（`index.js` `stateSchema`，`stateVersion: 7`：status/turn/stepCount/reasonCode/errorMessage/updatedAt/revision/turnStartedAt/lastActivityAt/lastToolAt/endedAt/activity；activity 条目含 status/startedAt/endedAt/durationMs/errorCode；`health`/`pendingKind`/`pendingSince` 是 Client 展示字段，不在 Host schema 内） | **硬依赖** | 旧缓存失效重算；schema 不兼容时视图显示降级/错误 |
+| C9 | Client | `[data-conversation-tabs]`、`[role="tab"]`、`button[aria-haspopup="menu"]` 的语义结构（视图跳转最后兜底；按插件自身 `t('view.label')` 匹配） | 可选 | 退回持久提示；不硬编码宿主人文案 |
 | B1 | Bundle | `package.json` `dsh.client.inject: ['@deepseek-ai/dsh-client-ui-conversation']`、`dsh.bundle.patch: cordis.patch.yml` | **硬依赖** | 宿主加载器不识别该字段则插件不生效 |
 | W1 | Web 平台 | `Notification`（窗口失焦时系统通知） | 可选（`notify` 设置可关） | 无通知能力时静默失败 |
 | W2 | Web 平台 | `localStorage`（`dsh-wait-buddy.settings.v1`、`pillPos`） | 可选 | 设置不持久化，回落默认值 |
@@ -28,10 +30,12 @@
 
 | DSH 版本 | 结论 | 依据 |
 |---|---|---|
-| `0.2.1-rc.5` | ✅ 全量验证（79 单测 + 4 visual + 真机验收；question/plan-review 真机链路 2026-11-10 产品负责人确认已验） | 本文档 §1 全部条目实测 |
+| `0.2.1-rc.5` | ✅ 0.12.0 全量验证（含真机；question/plan-review 链路 2026-11-10 产品负责人确认）；0.13.0 146 单测 + 4 visual + live smoke 通过，真机待验收 | 本文档 §1 全部条目实测；2026-11-16 复核桌面端仍为 rc.5 |
 | 其他版本 | ❓ 未验证 | 新版本发布后按 §3 流程核对 |
 
-`activateView`（编程式视图切换）在宿主仍非公开 API（D15 结论，rc.5 复核成立）——D36 的视图跳转因此走等价 UI 驱动；宿主未来若公开该服务可替换实现。
+`activateView`（编程式视图切换）在宿主仍非公开 API（D15 结论，rc.5 复核成立）。0.13.0 优先使用可捕获的 `props.openView` / `onOpen`；最后兜底读取 C9 的语义 tab/menu 结构，按插件自身 label 匹配，不再硬编码宿主人文案；宿主未来若公开该服务可替换实现。
+
+> **0.13.0 已实现**：接入 `tool/result`、命令脱敏、活动流结果状态/耗时、时序字段，`stateVersion` 7；`check-compat` 在 CI meta 中校验 H1/H5/C7/C8 与源码常量。
 
 ## 3. 新版本核对流程
 

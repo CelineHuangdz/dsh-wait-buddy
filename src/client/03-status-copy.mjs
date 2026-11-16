@@ -20,8 +20,19 @@
       return t('status.failed')
     }
 
+    /** Compact age label: 42s / 3m / 2h (locale-neutral units). */
+    function formatAge(ms) {
+      const total = Math.max(0, Math.floor(ms / 1000))
+      if (total < 60) return `${total}s`
+      const minutes = Math.floor(total / 60)
+      if (minutes < 60) return `${minutes}m`
+      return `${Math.floor(minutes / 60)}h`
+    }
+
     /** Status line copy for one monitor state. */
     function statusText(t, state) {
+      // A fork is a terminal-ish idle state; without this line it is invisible.
+      if (state.status === 'idle' && state.reasonCode === 'forked') return t('status.forked')
       // Approval/failure are the highest-priority copy; health never hides them.
       if (state.status !== 'pending_approval' && state.status !== 'failed') {
         if (state.health === 'loading') return t('status.loading')
@@ -30,7 +41,9 @@
       }
       switch (state.status) {
         case 'running':
-          return state.activity.length > 0 ? t('status.running') : t('status.runningStart')
+          return state.activity.length > 0 || state.stepCount > 0
+            ? t('status.running')
+            : t('status.runningStart')
         case 'pending_approval':
           // D28: copy follows the blocking kind; unknown future kinds get the
           // generic "agent is waiting" line instead of an approval claim.
@@ -49,10 +62,23 @@
       }
     }
 
-    /** Right-hand meta: last observed time + real step count (M0 §6). */
-    function metaText(t, state) {
+    /**
+     * Right-hand meta: age of the last event while running (so a long quiet
+     * spell is visible, not guessed), otherwise the last observed clock; plus
+     * the real step count. The approval wait age lives in AlertBanner.
+     */
+    function metaText(t, state, now = Date.now()) {
       const parts = []
-      if (state.updatedAt > 0) parts.push(t('status.updated', { time: clockOf(state.updatedAt) }))
+      if (
+        state.status === 'running' &&
+        typeof state.lastActivityAt === 'number' &&
+        state.lastActivityAt > 0 &&
+        now >= state.lastActivityAt
+      ) {
+        parts.push(t('status.lastActivity', { age: formatAge(now - state.lastActivityAt) }))
+      } else if (state.updatedAt > 0) {
+        parts.push(t('status.updated', { time: clockOf(state.updatedAt) }))
+      }
       if (state.stepCount > 0) parts.push(t('status.steps', { count: state.stepCount }))
       return parts.join(' · ')
     }

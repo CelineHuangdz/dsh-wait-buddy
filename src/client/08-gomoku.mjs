@@ -642,7 +642,7 @@
     }
 
     /** One alert banner; the native dialog always keeps precedence. */
-    function AlertBanner({ t, state }) {
+    function AlertBanner({ t, state, now = Date.now() }) {
       if (state.status === 'pending_approval') {
         // D28: every blocking pending interaction alerts, with per-kind copy.
         const kind = state.pendingKind
@@ -670,11 +670,22 @@
                   { className: 'wb-alertMeta', title: state.pendingDetail },
                   state.pendingDetail,
                 )
+        const wait =
+          typeof state.pendingSince === 'number' &&
+          state.pendingSince > 0 &&
+          now >= state.pendingSince
+            ? h(
+                'span',
+                { className: 'wb-alertMeta' },
+                t('status.waiting', { age: formatAge(now - state.pendingSince) }),
+              )
+            : null
         return h(
           'div',
           { className: 'wb-alert', 'data-kind': kind === '' ? 'approval' : kind, role: 'alert' },
           h('span', { className: 'wb-alertTitle' }, t(titleKey)),
           meta,
+          wait,
         )
       }
       if (state.status === 'failed') {
@@ -726,9 +737,15 @@ const CSS = `
 .wb-pulseFill{position:absolute;top:0;bottom:0;width:32%;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-alias-state-warn-primary),transparent);animation:wb-sweep 1.6s linear infinite}
 @keyframes wb-sweep{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
 .wb-feed{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:2px}
-.wb-feedRow{display:flex;align-items:baseline;gap:8px;min-width:0}
+.wb-feedRow{display:flex;align-items:baseline;gap:6px;min-width:0}
+.wb-feedStatus{flex:none;width:12px;text-align:center;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary)}
+.wb-feedStatus[data-status="ok"]{color:var(--dsw-alias-state-success-primary)}
+.wb-feedStatus[data-status="error"]{color:var(--dsw-alias-state-error-primary)}
+.wb-feedStatus[data-status="running"]{color:var(--dsw-alias-label-secondary)}
+.wb-feedRow[data-status="error"] .wb-feedText{color:var(--dsw-alias-state-error-primary)}
 .wb-feedKind{flex:none;width:30px;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary)}
 .wb-feedText{flex:1;min-width:0;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dsw-alias-label-primary)}
+.wb-feedDur{flex:none;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
 .wb-feedCopy{flex:none;appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;padding:0 2px;cursor:pointer;border-radius:4px}
 .wb-feedCopy:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .wb-feedCopy:focus-visible{outline:2px solid var(--dsw-alias-brand-primary)}
@@ -737,6 +754,9 @@ const CSS = `
 .wb-dexItem{display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border-radius:6px;background:rgba(255,255,255,0.04)}
 .wb-dexCount{font-size:9px;line-height:11px;color:rgba(230,242,255,.76)}
 .wb-feedEmpty{font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary)}
+.wb-feedMore{align-self:flex-start;appearance:none;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;padding:1px 8px;font-size:11px;line-height:16px;font-family:inherit;cursor:pointer}
+.wb-feedMore:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.wb-feedMore:focus-visible{outline:2px solid var(--dsw-alias-brand-primary)}
 .wb-game{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px}
 .wb-boardWrap{position:relative;flex:1 1 auto;width:100%;height:min(46vh,480px);min-height:200px;max-height:520px;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;overflow:hidden;background:#0d1624}
 .wb-board{display:block;width:100%;height:100%}

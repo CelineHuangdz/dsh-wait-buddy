@@ -5,7 +5,7 @@
 
 > **分发渠道（2026-11-10 产品决策）：仅 GitHub。** 不发布 npm——下文 npm 相关章节保留作参考，不再执行；发布 = git push + tag。安装方式见 README「Install」。
 
-## 0. 本次发布决定（2026-11-15，v0.12.0）
+## 0. 本次发布决定（2026-11-16，v0.13.0）
 
 - 包名：**`dsh-wait-buddy`**（不带 scope）。包名仍是 Client 模块 id，必须与 `cordis.patch.yml` / `client.js` 三处一致。
 - ~~发布形态：公共 npm 包~~（2026-11-10 起裁撤，仅 GitHub）。
@@ -35,7 +35,7 @@ DSH 的「插件」页（侧边栏 → Plugins → **Add plugin**）接受与 `p
 4. **`files` 必须覆盖运行时所需**：`index.js`、`client.js`、`cordis.patch.yml`、`locale/*.json`、`icon.svg`、`README.md`、`LICENSE`。
    用 `npm pack --dry-run` 核对，不要依赖“本地能跑”。
 5. **依赖声明**：Host 半用到 `zod`，必须留在 `dependencies`（不能是 devDependencies），发布后由用户的 pnpm 安装。
-6. **版本号**：当前 `v0.12.0`（D48 抓精灵美术升级：区域主题色板 + 边缘感知地形 + 水面动画 + 轮廓三段色阶精灵 + 玩家主题配色；第 5 轮反馈存档与逐条分析入 iteration-plan §11）。发布流程 = git push + `git tag v0.12.0 && git push --tags`。之后遵循 semver。
+6. **版本号**：当前 `v0.13.0`（监控可信度 + 宿主边界：tool/result、活动脉冲/年龄、命令脱敏、按轮次去重、撤除全局按键/合成 wheel、compat 门禁；实施见 iteration-plan §12）。发布流程 = git push + `git tag v0.13.0 && git push --tags`。之后遵循 semver。
 7. **兼容性**：当前针对 DSH `0.2.1-rc.5` 开发；先在 README 写清"测试过的 DSH 版本"。
    是否加 `engines.dsh` 要谨慎——管理器会用它做安装前校验，范围写错会直接挡住安装。
 
@@ -81,7 +81,7 @@ npm publish
 
 仓库已 `git init -b main` 并完成首个提交（14 个受版本控制的文件，`node_modules/`、`dist/`、`*.tgz` 已忽略）。
 
-**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；已发布 `v0.4.1`–`v0.11.0`，待发布 `v0.12.0`）。
+**当前仓库**：<https://github.com/CelineHuangdz/dsh-wait-buddy>（public，已推 `main`；已发布 `v0.4.1`–`v0.12.0`，待发布 `v0.13.0`）。
 
 **推送到远端**（首次流程，已执行过一遍）：
 
@@ -174,5 +174,5 @@ npm pack --dry-run
 
 - 插件代码在 DSH 进程内以当前用户权限运行，**没有沙箱**；发布前应让使用者知道这一点。
 - WaitBuddy 只读取当前会话的事件（投影 fold），不写会话日志、不注册审批应答、不发送网络请求。
-- 活动流只显示 `tool/call` 的命令/工具条目；**不展示模型推理原文**（D27，2026-11-06 起）。
+- 活动流显示 `tool/call` + `tool/result` 的安全摘要（工具名/可执行文件、basename/URL host、参数个数）；**不展示模型推理原文**（D27）和**完整 shell 命令**（D51，2026-11-16 起）。
 - 设置只存本机 localStorage，不上传。

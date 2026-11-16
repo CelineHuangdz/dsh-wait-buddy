@@ -180,3 +180,12 @@ test('sameMonitor treats a new approval key as a change', () => {
   assert.equal(sameMonitor(left, right), false)
   assert.equal(sameMonitor(left, left), true)
 })
+
+test('pendingSince is carried only while a blocking interaction is present', () => {
+  const blocked = compose(
+    input({ pending: { kind: 'approval', key: 'approval:1' }, pendingSince: 1_000 }),
+  )
+  assert.equal(blocked.pendingSince, 1_000)
+  const clear = compose(input({ pending: undefined, pendingSince: 1_000 }))
+  assert.equal(clear.pendingSince, 0)
+})

@@ -144,6 +144,30 @@ const mountResult = await page.evaluate(() => {
 console.log('mount:', JSON.stringify(mountResult))
 await page.waitForTimeout(1200)
 
+// Fallback probe: with no captured opener, a semantic WaitBuddy tab must be
+// clicked by the host-adapter fallback (and never by hardcoded host copy).
+const fallback = await page.evaluate(async () => {
+  const tablist = document.createElement('div')
+  tablist.setAttribute('data-conversation-tabs', '')
+  const tab = document.createElement('button')
+  tab.setAttribute('role', 'tab')
+  tab.textContent = 'WaitBuddy'
+  let clicked = false
+  tab.addEventListener('click', () => {
+    clicked = true
+  })
+  tablist.append(tab)
+  document.body.prepend(tablist)
+  const opened = await window.__API__.__adapter.openFullView(null, 'WaitBuddy')
+  tablist.remove()
+  return { opened, clicked }
+})
+console.log('view fallback:', JSON.stringify(fallback))
+if (!fallback.opened || !fallback.clicked) {
+  console.error('[view-live] FAIL: semantic WaitBuddy tab fallback did not fire')
+  process.exitCode = 1
+}
+
 // Interact: switch to the Safari tab, open dex, click the board.
 const interactions = []
 for (const [name, text] of [['safari', 'sf.title'], ['dex', 'sf.dexBtn'], ['close', 'sf.dexClose']]) {
@@ -171,7 +195,7 @@ const probe = await page.evaluate(() => {
   return { win: window.scrollY, doc: document.scrollingElement.scrollTop, scrollables }
 })
 console.log('before space:', JSON.stringify(probe))
-// ime probe: an IME-mangled Space (key='Process', code='Space') must still be consumed
+// probe: a Space dispatched at document must not be consumed by the view
 const ime = await page.evaluate(() => {
   const ev = new KeyboardEvent('keydown', { key: 'Process', code: 'Space', bubbles: true, cancelable: true })
   document.dispatchEvent(ev)
@@ -198,5 +222,13 @@ const crash = await page.evaluate(() => {
   return el === null ? null : el.textContent
 })
 console.log('crash:', crash === null ? 'none' : crash)
+if (mountResult.mounted !== true || crash !== null) {
+  console.error('[view-live] FAIL: view did not mount cleanly')
+  process.exitCode = 1
+}
+if (ime.prevented) {
+  console.error('[view-live] FAIL: Space was captured outside the view')
+  process.exitCode = 1
+}
 await page.screenshot({ path: 'test-results/view-live.png', fullPage: false })
 await browser.close()

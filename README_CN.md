@@ -16,12 +16,12 @@
   <a href="https://github.com/CelineHuangdz/dsh-wait-buddy">GitHub</a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.12.0-blue)
+![Version](https://img.shields.io/badge/version-0.13.0-blue)
 ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-lightgrey)
-![Tests](https://img.shields.io/badge/tests-100%20%2B%204%20visual-brightgreen)
+![Tests](https://img.shields.io/badge/tests-146%20%2B%204%20visual-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 当前版本 **0.12.0**：M1 状态看板 + M2 贪吃蛇/五子棋 + M3 单向联动 + 低调模式并完成加固；抓精灵美术升级——区域主题色板、地形边缘感知、水面动画、轮廓+三段色阶像素精灵（D48）。已在 DSH `0.2.1-rc.5` 上测试。
+> 当前版本 **0.13.0**：监控可信度版本——活动流补工具结果/耗时、脉冲按事件年龄驱动、信号按轮次去重、命令不进投影、撤除全局按键/滚动劫持。游戏冻结（不新增内容），只有贪吃蛇消费 Agent 信号。已在 DSH `0.2.1-rc.5` 上测试。
 
 ## 目录
 
@@ -44,10 +44,10 @@
 
 WaitBuddy 是 DSH 桌面版的一个**会话视图插件**。它在当前会话的 Chat / Trajectory 旁边增加一个 **WaitBuddy** 标签，用来：
 
-- 看 Agent 当前在做什么：状态、已完成步数、最近命令/工具调用；
+- 看 Agent 当前在做什么：状态、已完成步数、最近工具调用与成败；
 - 在等待审批、任务失败时给出醒目的辅助提醒；
 - 在长任务等待期间提供贪吃蛇/五子棋，消磨时间；
-- 在 M3 中让 Agent 事件**单向驱动**游戏：审批暂停、step +5、success +50。
+- 在 M3 中让 Agent 事件**只单向驱动贪吃蛇**：审批暂停、step +5、success +50；五子棋/抓精灵不参与计分与暂停。
 
 它不控制 Agent，不拦截原生审批，不写会话日志。
 
@@ -58,8 +58,9 @@ WaitBuddy 是 DSH 桌面版的一个**会话视图插件**。它在当前会话�
 - **Session View**：注册到 `conversation.view`，与 Chat / Trajectory 并列。
 - **状态真实性**：区分 loading / ready / degraded / stale；不把投影失败伪装成“空闲”。
 - **真实步数**：显示「已完成 N 步」，不显示总步数、不显示百分比。
-- **活动流**：只显示 `tool/call` 的命令/工具条目，最多 3 条；**不展示模型推理原文**（D27）。
-- **独立告警区**：审批/失败告警在滚动容器外，不会被棋盘滚走。
+- **活动流**：默认显示最近 3 条（可展开到 8 条），并显示 `tool/result` 的成败、耗时与错误码；**不展示模型推理原文**（D27），**不保存完整 shell 命令**（D51）。
+- **独立告警区**：审批/失败告警在滚动容器外，不会被棋盘滚走；审批告警显示已等待时长。
+- **活动脉冲**：由所有事件 revision 驱动（含 step/end），并显示「上次活动 Xs 前」；不把长静默直接判成“卡住”。
 
 ### 低调模式（v0.5.0）
 
@@ -72,11 +73,11 @@ WaitBuddy 是 DSH 桌面版的一个**会话视图插件**。它在当前会话�
 - **贪吃蛇**：Canvas、无外部资源、键盘方向键；方向队列、空格暂停/继续、重置、速度档位。
 - **五子棋**：15×15，人执黑 vs 启发式电脑；难度档位；窗口缩放重绘。
 - **抓精灵**（0.10.0）：12×12 网格地图探索，草地随机遇怪；54 种程序化精灵（体型×配色×花纹）；单击按稀有度捕获；图鉴存 localStorage，重开不丢。
-- 两局独立保留；切换会话/视图时暂停，不重置进度。
+- 三款游戏各自保留状态；切换会话/视图时暂停，不重置进度。**只有贪吃蛇**消费 Agent 信号；五子棋/抓精灵不因审批暂停，也不计分。
 
 ### 单向联动（M3）
 
-- 审批出现：游戏自动暂停，显示「等待审批」。
+- 审批出现：贪吃蛇自动暂停并显示「等待审批」；五子棋/抓精灵只显示顶部告警。
 - 审批处理完：**不自动恢复**，提示「已处理，按空格或点击继续」，由用户手动继续。
 - step +5、success +50、failed/abort 只提示，不重置本局。
 - 信号按 `agent:*` 广播，游戏只消费信号；监控层不定义奖励。
@@ -94,7 +95,7 @@ DSH 侧边栏 → **Plugins** → **Add plugin**，任选一种：
 
 | 方式 | 填入 | 说明 |
 |---|---|---|
-| Git（推荐） | `github:CelineHuangdz/dsh-wait-buddy` | 跟随仓库最新提交；唯一分发渠道 |
+| Git（推荐） | `github:CelineHuangdz/dsh-wait-buddy#v0.13.0` | 固定 tag（推荐）；裸 spec 跟随 HEAD |
 | 本地目录 | `/abs/path/to/dsh-wait-buddy` | 开发调试用，需先 `pnpm install` |
 | tarball | `dist/dsh-wait-buddy-x.y.z.tgz` 的绝对路径 | `npm pack --pack-destination dist` 生成 |
 
@@ -105,9 +106,9 @@ DSH 侧边栏 → **Plugins** → **Add plugin**，任选一种：
 ## 使用
 
 1. 打开一个会话，切到 **WaitBuddy**。
-2. 发一个任务：状态、步数、活动流会随 `turn/start` / `step/end` / `tool/call` 更新。
+2. 发一个任务：状态、步数、活动流与工具成败会随 `turn/start` / `step/end` / `tool/call` / `tool/result` 更新。
 3. 点「开始游戏」玩贪吃蛇；方向键需要焦点在视图内（点一下棋盘）。
-4. 审批出现：游戏自动暂停，在原生审批面板处理；处理后手动继续。
+4. 审批出现：贪吃蛇自动暂停（五子棋/抓精灵只显示告警），在原生审批面板处理；处理后手动继续。
 5. 任务完成：+50 分提示；切视图不会重复播放。
 
 > 方向键只在视图内生效，不会抢输入框的按键。触屏/纯鼠标设备无法控制方向（D7，已批准偏离）。
@@ -127,7 +128,7 @@ DSH 侧边栏 → **Plugins** → **Add plugin**，任选一种：
 
 ```text
 Host (index.js)
-  session log ── pure fold ──> waitbuddy projection (stateVersion 4)
+  session log ── pure fold ──> waitbuddy projection (stateVersion 7)
                                       │
 Client (client.js)                    ▼
   projection + sessionStatus ──> composeMonitor ──> TrackState ──> WaitBuddyView
@@ -229,7 +230,7 @@ CHANGELOG.md        版本变更
 - 插件在 DSH 进程内以当前用户权限运行，**没有沙箱**。
 - 只读会话事件；不写会话日志；不发网络请求；无遥测。
 - 设置只存本机 `localStorage`。
-- 活动流会显示工具/命令参数，可能包含路径或查询词；D27 已移除模型推理原文。
+- 活动流只保存安全摘要：工具名、路径 basename / URL host、shell 参数个数；不保存完整命令、查询词或 URL 路径。复制按钮只复制摘要。D27 已移除模型推理原文。
 - 不注册、不替换、不拦截原生审批面板；审批仍由 DSH 处理。
 
 ## 贡献

@@ -21,6 +21,20 @@
       return state
     }
 
+    /**
+     * Coarse clock for the status row/pulse. One timer while a turn is
+     * running or blocked; inactive views pay nothing.
+     */
+    function useNow(active, intervalMs = 5000) {
+      const [, setTick] = React.useState(0)
+      React.useEffect(() => {
+        if (!active) return undefined
+        const id = setInterval(() => setTick((value) => value + 1), intervalMs)
+        return () => clearInterval(id)
+      }, [active, intervalMs])
+      return Date.now()
+    }
+
 
     /**
      * Session picker for the presence pill (D29 §8.4; the L1 status dot was
@@ -74,7 +88,10 @@
 .wb-hdMenuBtn{border:none;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:6px 10px;width:100%;text-align:left}
 .wb-pillGomoku{position:relative;width:184px;height:184px;margin:0 auto;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden}
 .wb-pillGomoku canvas{width:100%;height:100%;display:block;cursor:pointer}
-.wb-pillNotice{padding:5px 10px;border-top:1px solid var(--dsw-alias-border-l2);font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);white-space:normal}
+.wb-pillNotice{display:flex;align-items:flex-start;gap:8px;padding:5px 10px;border-top:1px solid var(--dsw-alias-border-l2);font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);white-space:normal}
+.wb-pillNoticeText{flex:1 1 auto;min-width:0}
+.wb-pillNoticeClose{flex:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font-size:14px;line-height:16px;padding:0 2px;border-radius:4px}
+.wb-pillNoticeClose:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 `
 
     /** Panel width (px) for the expanded floating window (D30). */
@@ -274,6 +291,7 @@
     }
 
     let viewOpener = null
+    let viewOpenerSession = null
 
     /**
      * D42: transient visible feedback when a host-coupling workaround fails
@@ -287,18 +305,33 @@
       const push = () => {
         for (const listener of [...listeners]) listener()
       }
+      const clear = () => {
+        if (timer !== null) {
+          clearTimeout(timer)
+          timer = null
+        }
+        if (text === '') return
+        text = ''
+        push()
+      }
       return {
         get: () => text,
-        show(next) {
+        show(next, options) {
           text = next
           if (timer !== null) clearTimeout(timer)
-          timer = setTimeout(() => {
-            text = ''
-            timer = null
-            push()
-          }, 4000)
+          timer = null
+          // A failed view switch is persistent: the user needs the instruction
+          // until they act or dismiss it, not a 4-second toast.
+          if (options === undefined || options.persistent !== true) {
+            timer = setTimeout(() => {
+              text = ''
+              timer = null
+              push()
+            }, 4000)
+          }
           push()
         },
+        clear,
         subscribe(listener) {
           listeners.add(listener)
           return () => listeners.delete(listener)
@@ -306,55 +339,107 @@
       }
     })()
 
+    /** Does this element's visible/ARIA label name the WaitBuddy view? */
+    function matchesViewLabel(element, label) {
+      if (label === '') return false
+      const text = (element.textContent || '').replace(/\s+/gu, ' ').trim()
+      const aria = (element.getAttribute('aria-label') || '').trim()
+      return text === label || text.includes(label) || aria === label || aria.includes(label)
+    }
+
+    /** Exact label wins; substring matching is only a second pass. */
+    function pickByLabel(elements, label) {
+      const exact = elements.find((element) => {
+        const text = (element.textContent || '').replace(/\s+/gu, ' ').trim()
+        const aria = (element.getAttribute('aria-label') || '').trim()
+        return text === label || aria === label
+      })
+      return exact ?? elements.find((element) => matchesViewLabel(element, label))
+    }
+
+    /** The first visible conversation tablist, or the document as a fallback. */
+    function viewTabScope() {
+      if (typeof document === 'undefined') return undefined
+      const lists = Array.from(document.querySelectorAll('[data-conversation-tabs]'))
+      return lists.find((element) => element.offsetParent !== null) ?? lists[0] ?? document
+    }
+
+    /** Last-resort semantic tab lookup; the visible label is our own i18n. */
+    function findViewTab(label) {
+      const scope = viewTabScope()
+      if (scope === undefined) return undefined
+      return pickByLabel(Array.from(scope.querySelectorAll('[role="tab"]')), label)
+    }
+
+    /** Poll for the More-views menu item; bounded, never an unbounded delay. */
+    async function findViewMenuItem(label, timeoutMs = 500) {
+      const startedAt = Date.now()
+      while (Date.now() - startedAt < timeoutMs) {
+        const menu = document.querySelector('[role="menu"]')
+        const scope = menu ?? document
+        const item = pickByLabel(
+          Array.from(scope.querySelectorAll('[role="menuitem"], button')),
+          label,
+        )
+        if (item !== undefined) return item
+        await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      return undefined
+    }
+
     /**
-     * D36/D42 (hostAdapter): open the WaitBuddy conversation view. No public
-     * service exists (activateView depends on host-internal store actions),
-     * so this drives the same UI a user would: the WaitBuddy tab in the
-     * session header, or the More-views menu entry when the tab is collapsed
-     * into it. Callers must surface a `false` result — never fail silently.
+     * D36/D42/D53 (hostAdapter): open the WaitBuddy conversation view.
+     * Primary: the host-provided `openView` captured from the mounted view or
+     * the views-actions entry. Last resort: the visible tab / More-views item,
+     * matched by our own localized label (never hardcoded host copy).
+     * Callers must surface a `false` result — never fail silently.
      */
-    async function openFullView() {
+    async function openFullView(sessionId, label) {
+      // Primary: the host-provided openView, captured from the mounted view or
+      // the views-actions entry (persists after its menu unmounts).
       if (viewOpener !== null) {
-        // Preferred: a captured onOpen from the views-actions menu entry
-        // (available once that menu has been opened at least once).
-        try {
-          viewOpener('waitbuddy')
-          return true
-        } catch (error) {
-          console.warn('[wait-buddy] openView failed', error)
+        if (viewOpenerSession === null || sessionId === undefined || viewOpenerSession === sessionId) {
+          try {
+            viewOpener('waitbuddy')
+            return true
+          } catch (error) {
+            console.warn('[wait-buddy] openView failed', error)
+          }
         }
       }
-      const findTab = () => {
-        const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
-        return tabs.find((el) => (el.textContent || '').trim().startsWith('WaitBuddy'))
-      }
-      const tab = findTab()
+      // Last resort: the visible tab / More-views item, matched by our own
+      // localized label (never hardcoded host copy). Bounded polling, and a
+      // false result still produces the persistent user instruction.
+      const tab = findViewTab(label)
       if (tab !== undefined) {
         tab.click()
         return true
       }
-      const more = Array.from(document.querySelectorAll('button')).find((el) => {
-        const label = el.getAttribute('aria-label') || el.textContent || ''
-        return label.includes('更多会话视图') || label.includes('session views')
-      })
-      if (more === undefined) return false
-      more.click()
-      await new Promise((resolve) => setTimeout(resolve, 120))
-      const items = Array.from(document.querySelectorAll('button, [role="menuitem"]'))
-      const item = items.find((el) => (el.textContent || '').trim().startsWith('WaitBuddy'))
-      if (item === undefined) return false
-      item.click()
-      return true
+      const scope = viewTabScope()
+      if (scope === undefined) return false
+      const more = scope.querySelector('button[aria-haspopup="menu"]')
+      if (more !== null) {
+        // Do not toggle an already-open menu closed.
+        if (document.querySelector('[role="menu"]') === null) more.click()
+        const item = await findViewMenuItem(label)
+        if (item !== undefined) {
+          item.click()
+          return true
+        }
+      }
+      return false
     }
 
     function ViewMenuEntry(props) {
       const t = typeof props.t === 'function' ? props.t : boundT
       React.useEffect(() => {
+        // Capture persistently: the host renders this entry inside a menu that
+        // unmounts when closed. The old cleanup made `onOpen` available only
+        // while the menu was open, so the pill's background button always fell
+        // back to a failure. A captured opener stays valid for its session.
         viewOpener = typeof props.onOpen === 'function' ? props.onOpen : null
-        return () => {
-          if (viewOpener === props.onOpen) viewOpener = null
-        }
-      }, [props.onOpen])
+        viewOpenerSession = typeof props.sessionId === 'string' ? props.sessionId : null
+      }, [props.onOpen, props.sessionId])
       return h(
         'button',
         {
@@ -517,11 +602,16 @@
       // D42: a failed view switch is never silent — pill notice + optional
       // system notification (quiet mode has no UI left to show it in).
       const goBackground = async () => {
-        settingsStore.setPresence('quiet')
-        const opened = await openFullView()
-        if (opened) return
+        const opened = await openFullView(sessionId, t('view.label'))
+        if (opened) {
+          adapterNotice.clear()
+          settingsStore.setPresence('quiet')
+          return
+        }
+        // Keep the pill visible on failure: going quiet first would hide the
+        // only surface that can tell the user what to click.
         console.warn('[wait-buddy] openFullView failed on this host')
-        adapterNotice.show(t('adapter.openViewFailed'))
+        adapterNotice.show(t('adapter.openViewFailed'), { persistent: true })
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           try {
             new Notification(t('notify.title'), { body: t('adapter.openViewFailed') })
@@ -588,7 +678,24 @@
         h('style', { key: 'wb-pill-style' }, PILL_CSS),
         notice === ''
           ? null
-          : h('div', { className: 'wb-pillNotice', role: 'status' }, notice),
+          : h(
+              'div',
+              { className: 'wb-pillNotice', role: 'status' },
+              h('span', { className: 'wb-pillNoticeText' }, notice),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'wb-pillNoticeClose',
+                  'aria-label': t('notice.dismiss'),
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    adapterNotice.clear()
+                  },
+                },
+                '×',
+              ),
+            ),
         h(
           'div',
           {
@@ -660,10 +767,25 @@
       )
     }
 
+    /** Compact duration (locale-neutral units). */
+    function formatDuration(ms) {
+      if (typeof ms !== 'number' || !Number.isFinite(ms)) return ''
+      return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
+    }
+
+    /** Collapsed glance rows; the projection keeps up to ACTIVITY_LIMIT. */
+    const FEED_COLLAPSED = 3
+
+    /** Pure collapsed/expanded slice, exported for tests. */
+    function visibleActivity(activity, expanded) {
+      if (expanded || activity.length <= FEED_COLLAPSED) return activity
+      return activity.slice(0, FEED_COLLAPSED)
+    }
+
     /**
      * One activity feed row. The Host folds consecutive same-tool calls into
-     * `count`; render "text ×N" and offer one-click copy of the full text
-     * (feedback P1: a wall of tool lines is unscannable).
+     * `count` and attaches the matching result; render the safe summary plus
+     * status/duration, and copy only that summary (never a raw command).
      */
     function FeedRow({ t, item }) {
       const [copied, setCopied] = React.useState(false)
@@ -672,24 +794,43 @@
         const id = setTimeout(() => setCopied(false), 1400)
         return () => clearTimeout(id)
       }, [copied])
+      const status = item.status === 'error' ? 'error' : item.status === 'ok' ? 'ok' : 'running'
+      const summary = `${item.text}${item.hint ? ` · ${item.hint}` : ''}${
+        item.argCount > 0 ? ` · ${t('feed.args', { count: item.argCount })}` : ''
+      }`
+      const label = item.count > 1 ? `${summary} ×${item.count}` : summary
+      const title = item.errorCode ? `${summary} · ${item.errorCode}` : summary
+      const mark = status === 'error' ? '✕' : status === 'ok' ? '✓' : '·'
+      const statusLabel = t(`feed.${status}`)
+      const duration = formatDuration(item.durationMs)
       const copy = async () => {
         try {
-          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(item.text)
+          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(summary)
           setCopied(true)
         } catch (error) {
           console.warn('[wait-buddy] copy failed', error)
         }
       }
-      const label = item.count > 1 ? `${item.text} ×${item.count}` : item.text
       return h(
         'div',
-        { className: 'wb-feedRow' },
+        { className: 'wb-feedRow', 'data-status': status },
+        h(
+          'span',
+          {
+            className: 'wb-feedStatus',
+            'data-status': status,
+            title: statusLabel,
+            'aria-label': statusLabel,
+          },
+          mark,
+        ),
         h(
           'span',
           { className: 'wb-feedKind', 'data-kind': item.kind },
           t(FEED_LABEL[item.kind] || FEED_LABEL.tool),
         ),
-        h('span', { className: 'wb-feedText', title: item.text }, label),
+        h('span', { className: 'wb-feedText', title }, label),
+        duration === '' ? null : h('span', { className: 'wb-feedDur' }, duration),
         copied
           ? h('span', { className: 'wb-feedCopied', role: 'status' }, t('feed.copied'))
           : h(
@@ -697,12 +838,42 @@
               {
                 type: 'button',
                 className: 'wb-feedCopy',
-                'aria-label': t('feed.copy'),
-                title: t('feed.copy'),
+                'aria-label': t('feed.copySummary'),
+                title: t('feed.copySummary'),
                 onClick: copy,
               },
               '⧉',
             ),
+      )
+    }
+
+    /** Glanceable feed: three rows by default, expandable to the projection cap. */
+    function ActivityFeed({ t, activity, turn }) {
+      const [expanded, setExpanded] = React.useState(false)
+      React.useEffect(() => {
+        setExpanded(false)
+      }, [turn])
+      const shown = visibleActivity(activity, expanded)
+      const hidden = activity.length - shown.length
+      return h(
+        'div',
+        { className: 'wb-feed', 'data-card': 'feed' },
+        shown.length === 0
+          ? h('div', { className: 'wb-feedEmpty' }, t('feed.empty'))
+          : shown.map((item, index) =>
+              h(FeedRow, { key: item.callId ?? `${item.kind}-${index}`, t, item }),
+            ),
+        activity.length > FEED_COLLAPSED
+          ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'wb-feedMore',
+                onClick: () => setExpanded((value) => !value),
+              },
+              expanded ? t('feed.less') : t('feed.more', { count: hidden }),
+            )
+          : null,
       )
     }
 
@@ -711,29 +882,22 @@
     const PULSE_BUCKET_MS = 5000
 
     /**
-     * Activity pulse strip (feedback P1): a real sparkline over the last
-     * minute — lit segments mean the feed head changed in that bucket, so
-     * "quiet but working" and "stuck" are distinguishable at a glance.
+     * Activity pulse strip: a real sparkline over the last minute. It is
+     * driven by `revision`/`lastActivityAt`, so step/end and result events
+     * count — not just a change of the feed head text.
      */
-    function ActivityPulse({ t, activity }) {
+    function ActivityPulse({ t, revision, lastActivityAt, now }) {
       const pulses = React.useRef([])
-      const [, bump] = React.useState(0)
-      const head = activity[0]
-      const headKey = head === undefined ? '' : `${head.kind}:${head.text}`
       React.useEffect(() => {
-        if (headKey === '') return
-        const now = Date.now()
-        pulses.current = [...pulses.current, now].filter((at) => now - at < 60000).slice(-40)
-      }, [headKey])
-      React.useEffect(() => {
-        const id = setInterval(() => bump((value) => value + 1), PULSE_BUCKET_MS)
-        return () => clearInterval(id)
-      }, [])
-      const now = Date.now()
-      const marks = pulses.current
+        if (typeof lastActivityAt !== 'number' || lastActivityAt <= 0) return
+        const cutoff = Date.now() - 60000
+        pulses.current = [...pulses.current.filter((at) => at >= cutoff), lastActivityAt].slice(-60)
+      }, [revision, lastActivityAt])
+      const current = typeof now === 'number' ? now : Date.now()
+      const marks = pulses.current.filter((at) => current - at < 60000)
       const segments = []
       for (let i = 0; i < PULSE_SEGMENTS; i += 1) {
-        const from = now - (PULSE_SEGMENTS - i) * PULSE_BUCKET_MS
+        const from = current - (PULSE_SEGMENTS - i) * PULSE_BUCKET_MS
         const to = from + PULSE_BUCKET_MS
         const on = marks.some((at) => at >= from && at < to)
         segments.push(
@@ -744,10 +908,14 @@
           }),
         )
       }
-      const live = marks.some((at) => now - at < 60000)
+      const live =
+        typeof lastActivityAt === 'number' &&
+        lastActivityAt > 0 &&
+        current - lastActivityAt < 60000
+      const label = t(live ? 'feed.pulseLive' : 'feed.pulseIdle')
       return h(
         'div',
-        { className: 'wb-pulse', 'aria-hidden': true, title: t(live ? 'feed.pulseLive' : 'feed.pulseIdle') },
+        { className: 'wb-pulse', role: 'img', 'aria-label': label, title: label },
         segments,
       )
     }
@@ -756,66 +924,23 @@
       const t = typeof props.t === 'function' ? props.t : boundT
       const rootRef = React.useRef(null)
       const innerRef = React.useRef(null)
-      // Window-level fallback for game keys (feedback: Space scrolled the
-      // page). The React onKeyDown only fires while focus is inside the view
-      // — after an encounter closes, focus falls back to <body> and the
-      // browser scrolls instead of playing. Two more details make it stick:
-      //   1. capture phase — a host that scrolls from its own capture
-      //      listener would otherwise act before our bubble-phase handler;
-      //   2. stopPropagation on consumed keys — the host's handlers must not
-      //      run at all for a key the game consumed.
+      // Keep the host's openView for the pill: the view may unmount when the
+      // user is in Chat, but the closure stays valid for its session.
       React.useEffect(() => {
-        const onWindowKeyDown = (event) => {
-          const root = rootRef.current
-          let visible = false
-          if (root !== null) {
-            const rect = root.getBoundingClientRect()
-            visible = rect.width !== 0 && rect.height !== 0
-          }
-          if (event.defaultPrevented) return
-          if (root === null) return
-          if (!visible) return
-          const consumed = onGameKeyDown(event)
-          if (!consumed) return
-          event.preventDefault()
-          // stopImmediate: same-node host listeners registered earlier must
-          // not act on a key the game consumed either.
-          event.stopImmediatePropagation()
-          // The conversation's follow-tail animation interrupts on Space /
-          // arrows "unless a child has prevented the key's default action" —
-          // our preventDefault would silently KEEP the tail following, i.e.
-          // the page keeps scrolling while a session streams. The host
-          // interrupts unconditionally on wheel: dispatch a synthetic wheel
-          // pulse (untrusted → no native scroll of its own) to release it.
-          try {
-            document.dispatchEvent(
-              new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true }),
-            )
-          } catch (error) {
-            void error
-          }
-        }
-        window.addEventListener('keydown', onWindowKeyDown, true)
-        return () => window.removeEventListener('keydown', onWindowKeyDown, true)
-      }, [])
+        if (typeof props.openView !== 'function') return
+        viewOpener = props.openView
+        viewOpenerSession = typeof props.sessionId === 'string' ? props.sessionId : null
+      }, [props.openView, props.sessionId])
+      // Game keys are handled by the view's own onKeyDown only. There is no
+      // capture-phase key handling, no propagation stop and no synthetic wheel:
+      // consuming a key outside this view is the host's and other plugins'
+      // business, and the follow-tail animation must not be faked away.
       React.useEffect(() => {
         const scrollTop = () => {
+          // Only this view's own scrollport is reset. Walking ancestors and
+          // guessing which one the host scrolls was another DOM-mind-reading
+          // hack; if the host keeps an outer scroll offset, that is its state.
           if (innerRef.current !== null) innerRef.current.scrollTop = 0
-          // The host conversation view scrolls an ancestor container (the
-          // session scroll body), not `.wb-inner`; on layouts where the panel
-          // grows past the viewport, a view switch must also reset that
-          // ancestor or the status row / alert area stay scrolled away (F6).
-          let el = innerRef.current === null ? null : innerRef.current.parentElement
-          for (let depth = 0; el !== null && el !== document.body && depth < 6; depth += 1) {
-            const style = window.getComputedStyle(el)
-            if (
-              el.scrollTop > 0 &&
-              (style.overflowY === 'auto' || style.overflowY === 'scroll')
-            ) {
-              el.scrollTop = 0
-            }
-            el = el.parentElement
-          }
         }
         scrollTop()
         const root = rootRef.current
@@ -856,7 +981,8 @@
       }
       const state = useMonitorState(props.sessionId, props.__state)
       const status = state.status
-      const meta = metaText(t, state)
+      const now = useNow(status === 'running' || status === 'pending_approval', 5000)
+      const meta = metaText(t, state, now)
       const canOpenChat = typeof props.openView === 'function'
       const finished = status === 'success' || status === 'failed' || status === 'aborted'
       const openChat = () => {
@@ -882,6 +1008,7 @@
           key: state.pendingKey === '' ? `${state.status}:${state.updatedAt}` : state.pendingKey,
           t,
           state,
+          now,
         }),
         h(
           'div',
@@ -920,7 +1047,12 @@
                   : null,
               ),
               status === 'running' && state.health === 'ready'
-                ? h(ActivityPulse, { t, activity: state.activity })
+                ? h(ActivityPulse, {
+                    t,
+                    revision: state.revision,
+                    lastActivityAt: state.lastActivityAt,
+                    now,
+                  })
                 : null,
               h(
                 'div',
@@ -940,15 +1072,7 @@
                   : null,
               ),
             ),
-            h(
-              'div',
-              { className: 'wb-feed', 'data-card': 'feed' },
-              state.activity.length === 0
-                ? h('div', { className: 'wb-feedEmpty' }, t('feed.empty'))
-                : state.activity.map((item, index) =>
-                    h(FeedRow, { key: `${item.kind}-${index}`, t, item }),
-                  ),
-            ),
+            h(ActivityFeed, { t, activity: state.activity, turn: state.turn }),
           ),
           h(GameArea, { t, sessionId: props.sessionId, focusRoot, pendingKind: state.pendingKind }),
         ),

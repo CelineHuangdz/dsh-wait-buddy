@@ -124,3 +124,63 @@ test('leaving approval is still emitted if the projection goes unavailable', () 
   )
   assert.deepEqual(signals.map((s) => s.type), ['agent:approval_leave'])
 })
+
+test('a long turn cannot evict the approval dedupe bucket', () => {
+  const hub = createSignalHub()
+  const seen = []
+  const stop = hub.subscribe((signal) => seen.push(signal))
+  const approval = {
+    type: 'agent:approval_enter',
+    sessionId: 's1',
+    key: 'approval:1',
+    detail: { kind: 'approval', tool: 'bash' },
+  }
+  hub.emit(approval)
+  for (let index = 0; index < 600; index += 1) {
+    hub.emit({
+      type: 'agent:step_advance',
+      sessionId: 's1',
+      key: `1:${index}`,
+      detail: { turn: 1, stepCount: index },
+    })
+  }
+  hub.emit({ ...approval })
+  assert.equal(seen.filter((signal) => signal.type === 'agent:approval_enter').length, 1)
+  stop()
+  hub.dispose()
+})
+
+test('step signals are deduped inside their turn bucket', () => {
+  const hub = createSignalHub()
+  const seen = []
+  const stop = hub.subscribe((signal) => seen.push(signal))
+  const step = {
+    type: 'agent:step_advance',
+    sessionId: 's1',
+    key: '1:1',
+    detail: { turn: 1, stepCount: 1 },
+  }
+  hub.emit(step)
+  hub.emit({ ...step })
+  assert.equal(seen.length, 1)
+  stop()
+  hub.dispose()
+})
+
+test('the same approval key can re-enter after a leave edge', () => {
+  const hub = createSignalHub()
+  const seen = []
+  const stop = hub.subscribe((signal) => seen.push(signal))
+  const enter = { type: 'agent:approval_enter', sessionId: 's1', key: 'approval:1', detail: {} }
+  const leave = { type: 'agent:approval_leave', sessionId: 's1', key: 'approval:1', detail: {} }
+  hub.emit(enter)
+  hub.emit(leave)
+  hub.emit(enter)
+  assert.deepEqual(seen.map((signal) => signal.type), [
+    'agent:approval_enter',
+    'agent:approval_leave',
+    'agent:approval_enter',
+  ])
+  stop()
+  hub.dispose()
+})

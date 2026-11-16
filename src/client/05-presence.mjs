@@ -74,8 +74,13 @@
         if (signal === undefined || signal === null) return null
         if (signal.type === 'agent:approval_enter') return 'approval'
         if (signal.type === 'agent:task_finish') {
-          const status = signal.detail === undefined ? '' : signal.detail.status
-          if (status === 'success' || status === 'aborted') return status
+          const detail = signal.detail === undefined || signal.detail === null ? {} : signal.detail
+          const status = detail.status
+          if (status === 'aborted') {
+            // D22/D41: an unknown terminal reason is not a user-visible cancel.
+            return detail.reasonCode === 'unknown' ? 'unknown' : 'aborted'
+          }
+          if (status === 'success') return status
           return 'failed'
         }
         return null

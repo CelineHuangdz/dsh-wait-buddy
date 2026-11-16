@@ -568,3 +568,76 @@
 **影响面**：`assets/sprite-src/`（新）、`tools/embed-sprite-atlas.mjs`（新）、`src/client/08b5-sprite-atlas.mjs`（新）、`src/client/08c-safari.mjs`（SfSpriteIcon 走图集 + 回退）、ui-spec §6.4。
 
 **影响面**：`src/client/08c-safari.mjs`（SF_THEMES/sfThemeOf、sfPaintPixels、sfPaintSprite、drawSafariMap、双 Board 波纹动画 effect、页脚主题名）、`src/client/01-dictionaries.mjs`（sf.theme.* 8 键）、`test/safari.test.js`、`tools/sprite-sheet.mjs` 验收图、ui-spec §6.4。
+
+## D50 0.13.0 范围：监控优先，游戏冻结（2026-11-16，产品确认）
+
+**问题**：0.10–0.12 的发布预算被抓精灵美术吃掉；监控本身的活动流仍只记调用、不记结果，脉冲仍把“推理中”画成“卡住”，宿主输入/视图跳转仍靠 window 捕获与 DOM 文案匹配。
+
+**结论**：0.13.0 只做监控、宿主边界、隐私与契约；游戏冻结——不新增游戏、区域、物种、难度、精灵、主题色板或音效。游戏侧只允许两类改动：撤除对宿主输入/滚动的影响；把“Agent 奖励只进贪吃蛇”写进文案。
+
+**理由**：监控是插件存在的唯一理由；上述 P0 不需要动游戏美术。拆游戏插件/懒加载是结构手术，且 `immediately: true` 是胶囊/通知在未打开视图时仍工作的前提，留到 0.15 评估。
+
+**影响面**：`docs/iteration-plan.md` §12；0.13.0 changelog；README/README_CN 的游戏联动文案。
+
+## D51 命令不进持久投影：只留安全摘要（2026-11-16，产品确认）
+
+**问题**：`tool/call` 的 `command` 截 120 字写进 Host 投影并一键复制；`curl -H "Authorization: Bearer …"`、带 token 的 URL、密钥路径都可能进入宿主缓存。
+
+**结论**：投影只保存安全摘要：
+1. shell 命令：可执行文件名（basename）+ 参数个数；完整命令行不进入投影；命令不折叠，也不持久化任何命令哈希（32 位哈希可被暴力枚举出 token）；
+2. 其它工具：工具名 + `file_path`/`path` 的 basename 或 `url` 的 hostname；`query`/`pattern` 等不进入投影；
+3. `FeedRow` 复制按钮只复制摘要；完整命令留在宿主自己的会话日志/对话流里。
+
+**理由**：投影是持久缓存，不是内存日志；120 字截断挡不住 token。摘要仍能回答“用了什么工具/哪个文件”，细节可点“查看对话”。
+
+**影响面**：`index.js` `toolActivity`/`activitySchema`；`09-components.mjs` `FeedRow`；`stateVersion` 7；README 隐私声明；`test/fold.test.js` / `test/schema.test.js`。
+
+## D52 撤除全局按键与合成滚轮（2026-11-16，已实现）
+
+**问题**：`WaitBuddyView` 在 window 捕获阶段监听 keydown，消费后 `stopImmediatePropagation`，再对 `document` 派发合成 `wheel`；还逐层猜祖先滚动容器。这会吃掉宿主/其他插件的按键与滚轮，并依赖未公开的跟随尾巴行为。
+
+**结论**：删除 window 捕获、`stopImmediatePropagation`、合成 `WheelEvent`、`depth < 6` 祖先滚动重置。游戏键只在 `WaitBuddyView` 的 `onKeyDown` 中处理（焦点在视图内），只 `preventDefault` 被消费的键。视图切换只重置自己的 `.wb-inner` 滚动。
+
+**理由**：四轮空格战争证明对抗路线不可持续；输入属于宿主与其他插件。失去焦点后按键不生效是明确的代价，提示文案已写“点棋盘后生效”。
+
+**边界**：`Ctrl/Cmd+Shift+W` 的插件自身隐藏快捷键保留（bubble 阶段、可关闭、只匹配该组合），不属于游戏键捕获。
+
+**影响面**：`src/client/09-components.mjs`、`07-input-overlays.mjs`；`test/host-boundary.test.js`；`tools/view-live.mjs`。
+
+## D53 视图跳转不再扫 DOM 文案（2026-11-16，已实现）
+
+**问题**：`openFullView` 用 `[role="tab"]` + `startsWith('WaitBuddy')`，再全页找「更多会话视图」/「session views」，并用 120ms 等菜单。非中英文界面已是活 bug，多一个同名按钮就点错。
+
+**结论**：
+1. **首选**宿主提供的 `openView`：优先从已挂载的 `WaitBuddyView` 的 `props.openView` 捕获（视图卸载后闭包仍有效），其次从 `views.actions` 菜单的 `onOpen` 捕获；捕获在菜单卸载后保留（带 session 校验），重新 apply 时清空。
+2. **最后兜底**：按 `[data-conversation-tabs] [role="tab"]` 找可见标签，用**插件自己的** `t('view.label')` 匹配（不硬编码中文/英文）；标签收进 More 菜单时，用 `aria-haspopup="menu"` 打开菜单，再按同一 label 找菜单项。菜单轮询上限 500ms，不是固定 120ms 魔法延时。
+3. 两条路都失败时返回 false，胶囊保持可见并显示**可关闭的持久提示**“请手动点击 WaitBuddy 标签”；不再先切 quiet（否则提示无处显示）。
+
+**理由**：少一个快捷入口比点错/静默失败安全；宿主若将来公开 `openView`，替换 `viewOpener` 实现即可。
+
+**影响面**：`09-components.mjs` `openFullView`/`goBackground`/`adapterNotice`；词典 `adapter.openViewFailed`/`notice.dismiss`；`test/host-boundary.test.js`。
+
+## D54 工具结果与真实活动时序（2026-11-16，已实现）
+
+**问题**：活动流只处理 `tool/call`，不处理 `tool/result`；脉冲只看活动流头条文本，`step/end` 不点亮；没有 turn 开始/最后活动时间，长静默无法判断。
+
+**结论**：
+1. Fold `tool/result`，按 `callId` 回填 `ok/error`、`durationMs`、`errorCode`（只存错误码，不存原文）；`turn/end` 时把仍未回结果的 `running` 条目标记为 `error` / `no-result`，不让看板永远显示进行中；
+2. 投影新增 `turnStartedAt` / `lastActivityAt` / `lastToolAt` / `endedAt`；`stateVersion` 7；
+3. 活动流投影上限 8；UI 默认显示 3 条、可展开/收起；结果完成后把连续同名工具调用折叠为 `×N`；
+4. 脉冲由 `revision`/`lastActivityAt` 驱动，状态行显示“上次活动 Xs 前”；不把长静默直接判成“卡住”；
+5. 审批由 Client 记录 `pendingSince`，告警条显示等待时长。
+
+**理由**：等待者要的是“做成了没有/多久没动”，不是“刚才喊了什么”。推理期间没有工具事件，只能用年龄诚实表达，不能伪造脉冲。
+
+**影响面**：`index.js`；`02-monitor.mjs`；`03-status-copy.mjs`；`09-components.mjs`；词典；`test/fold.test.js`/`schema.test.js`/`ui.test.js`；compat H4/H5/C8。
+
+## D55 信号去重按 session+turn 分桶（2026-11-16，已实现）
+
+**问题**：全局 `Set` 上限 500，长回合超过 500 个不重复信号后旧键被淘汰，双视图防重只在短回合成立。
+
+**结论**：去重改为 `Map<sessionId, Map<turnKey, Set<identity>>>`，`turnKey` 从 `detail.turn` 或 key 前缀读取；`agent:task_start` 清理该会话更早的轮次桶；审批键放独立的 `pending` 桶，不受 step 数量影响。单桶仍保留 500 上限。
+
+**理由**：step 键单调递增，桶内淘汰不会让旧 step 重放；审批键独立后，长回合不会让审批去重失效。
+
+**影响面**：`02-monitor.mjs` `createSignalHub`；`test/signals.test.js`。

@@ -12,8 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node tools/check-version.mjs
-      - run: node tools/build-client.mjs --check
+      - run: npm run test:meta
 
   test:
     runs-on: ubuntu-latest
@@ -30,6 +29,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - run: npm run test:visual
+      - run: npm run test:live
       - uses: actions/upload-artifact@v4
         if: always()
         with:

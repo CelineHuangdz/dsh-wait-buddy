@@ -50,7 +50,6 @@ window.__ModuleLoader__.load({
     /** Simplified Chinese dictionary — the key-set source of truth. */
     const zh = {
       'view.label': 'WaitBuddy',
-      'view.openLabel': 'Open the WaitBuddy board',
       'view.openLabel': '打开 WaitBuddy 看板',
       'status.idle': '空闲 · 等待本会话任务',
       'status.runningStart': '任务开始，Agent 正在规划',
@@ -69,6 +68,9 @@ window.__ModuleLoader__.load({
       'status.degraded': '监控数据不可用',
       'status.stale': '状态同步中断（可能已断开）',
       'status.endedUnknown': '本轮已结束（未知原因）',
+      'status.forked': '会话已分叉',
+      'status.lastActivity': '上次活动 {age} 前',
+      'status.waiting': '已等待 {age}',
       'status.steps': '已完成 {count} 步',
       'status.openChat': '查看对话',
       'status.updated': '更新于 {time}',
@@ -81,17 +83,24 @@ window.__ModuleLoader__.load({
       'feed.command': '命令',
       'feed.tool': '工具',
       'feed.empty': '等待 Agent 活动',
-      'feed.copy': '复制全文',
+      'feed.running': '进行中',
+      'feed.ok': '完成',
+      'feed.error': '失败',
+      'feed.args': '{count} 参数',
+      'feed.more': '展开其余 {count} 条',
+      'feed.less': '收起',
+      'feed.copySummary': '复制摘要',
       'feed.copied': '已复制',
-      'feed.pulseIdle': '近 1 分钟无工具活动',
-      'feed.pulseLive': '近 1 分钟工具活动',
+      'notice.dismiss': '关闭提示',
+      'feed.pulseIdle': '近 1 分钟无新事件',
+      'feed.pulseLive': '近 1 分钟有新事件',
       'alert.approval.title': '【重要】等待你审批工具调用',
       'alert.approval.tool': '工具 {tool}',
       'alert.question.title': '【重要】Agent 有问题等你回答',
       'alert.planReview.title': '【重要】Agent 的计划等你确认',
       'alert.pending.title': '【重要】Agent 在等你处理请求',
       'alert.failed.title': '任务执行失败',
-      'footer.line': '仅跟踪当前会话 · 游戏与任务独立 · 辅助提醒，不拦截原生弹窗',
+      'footer.line': '仅跟踪当前会话 · 仅贪吃蛇随任务计分 · 辅助提醒，不拦截原生弹窗',
       'game.title': '贪吃蛇',
       'game.score': '得分 {score}',
       'game.best': '最高 {best}',
@@ -147,6 +156,7 @@ window.__ModuleLoader__.load({
       'notify.success': '会话 {session} 任务完成',
       'notify.failed': '会话 {session} 任务失败',
       'notify.aborted': '会话 {session} 任务已中断',
+      'notify.unknown': '会话 {session} 本轮已结束（未知原因）',
       'game.hiddenPausedBody': '已一键隐藏（Ctrl+Shift+W），游戏保持暂停',
       'game.hiddenResumeBody': '已从隐藏中恢复，按空格或点击继续',
       'sf.title': '抓精灵',
@@ -207,6 +217,7 @@ window.__ModuleLoader__.load({
     /** English dictionary, complete against the Chinese key set. */
     const en = {
       'view.label': 'WaitBuddy',
+      'view.openLabel': 'Open the WaitBuddy board',
       'status.idle': 'Idle · waiting for a task in this session',
       'status.runningStart': 'Task started, the agent is planning',
       'status.running': 'Running the task',
@@ -224,6 +235,9 @@ window.__ModuleLoader__.load({
       'status.degraded': 'Monitoring data unavailable',
       'status.stale': 'Status sync interrupted (possibly disconnected)',
       'status.endedUnknown': 'Turn ended (unknown reason)',
+      'status.forked': 'Session was forked',
+      'status.lastActivity': 'Last activity {age} ago',
+      'status.waiting': 'Waiting {age}',
       'status.steps': '{count} steps completed',
       'status.openChat': 'Open chat',
       'status.updated': 'Updated {time}',
@@ -236,17 +250,24 @@ window.__ModuleLoader__.load({
       'feed.command': 'Command',
       'feed.tool': 'Tool',
       'feed.empty': 'Waiting for agent activity',
-      'feed.copy': 'Copy full text',
+      'feed.running': 'running',
+      'feed.ok': 'done',
+      'feed.error': 'failed',
+      'feed.args': '{count} args',
+      'feed.more': 'Show {count} more',
+      'feed.less': 'Show less',
+      'feed.copySummary': 'Copy summary',
       'feed.copied': 'Copied',
-      'feed.pulseIdle': 'No tool activity in the last minute',
-      'feed.pulseLive': 'Tool activity in the last minute',
+      'notice.dismiss': 'Dismiss',
+      'feed.pulseIdle': 'No new events in the last minute',
+      'feed.pulseLive': 'New events in the last minute',
       'alert.approval.title': 'Important: a tool call is waiting for your approval',
       'alert.approval.tool': 'tool {tool}',
       'alert.question.title': 'Important: the agent has a question for you',
       'alert.planReview.title': 'Important: a plan is waiting for your review',
       'alert.pending.title': 'Important: the agent is waiting for you',
       'alert.failed.title': 'Task failed',
-      'footer.line': 'This session only · the game is independent · a secondary reminder that never intercepts the native dialogs',
+      'footer.line': 'This session only · only Snake scores task rewards · a secondary reminder that never intercepts native dialogs',
       'game.title': 'Snake',
       'game.score': 'Score {score}',
       'game.best': 'Best {best}',
@@ -302,6 +323,7 @@ window.__ModuleLoader__.load({
       'notify.success': 'Session {session} finished successfully',
       'notify.failed': 'Session {session} failed',
       'notify.aborted': 'Session {session} was interrupted',
+      'notify.unknown': 'Session {session} ended for an unknown reason',
       'game.hiddenPausedBody': 'Hidden by shortcut (Ctrl+Shift+W); the game stays paused',
       'game.hiddenResumeBody': 'Restored from hidden — press Space or click Resume',
       'sf.title': 'Sprite Safari',
@@ -377,6 +399,11 @@ window.__ModuleLoader__.load({
       activity: EMPTY_ACTIVITY,
       updatedAt: 0,
       revision: 0,
+      turnStartedAt: 0,
+      lastActivityAt: 0,
+      lastToolAt: 0,
+      endedAt: 0,
+      pendingSince: 0,
       approvalTool: '',
       pendingKind: '',
       pendingKey: '',
@@ -398,6 +425,11 @@ window.__ModuleLoader__.load({
         left.errorMessage === right.errorMessage &&
         left.updatedAt === right.updatedAt &&
         left.revision === right.revision &&
+        left.turnStartedAt === right.turnStartedAt &&
+        left.lastActivityAt === right.lastActivityAt &&
+        left.lastToolAt === right.lastToolAt &&
+        left.endedAt === right.endedAt &&
+        left.pendingSince === right.pendingSince &&
         left.approvalTool === right.approvalTool &&
         left.pendingKind === right.pendingKind &&
         left.pendingKey === right.pendingKey &&
@@ -456,6 +488,7 @@ window.__ModuleLoader__.load({
       const now = input.now
       const mountedAt = input.mountedAt
       const mismatchSince = input.mismatchSince
+      const pendingSince = input.pendingSince === undefined ? 0 : input.pendingSince
       const projectionError = input.projectionError === true
       const ready = durable !== undefined
       const base = ready ? durable : EMPTY_STATE
@@ -500,6 +533,11 @@ window.__ModuleLoader__.load({
         activity: Array.isArray(base.activity) ? base.activity : EMPTY_ACTIVITY,
         updatedAt: base.updatedAt === undefined ? 0 : base.updatedAt,
         revision: base.revision === undefined ? 0 : base.revision,
+        turnStartedAt: base.turnStartedAt === undefined ? 0 : base.turnStartedAt,
+        lastActivityAt: base.lastActivityAt === undefined ? 0 : base.lastActivityAt,
+        lastToolAt: base.lastToolAt === undefined ? 0 : base.lastToolAt,
+        endedAt: base.endedAt === undefined ? 0 : base.endedAt,
+        pendingSince: blocked ? pendingSince : 0,
         approvalTool:
           pendingKind === 'approval' && typeof pending.toolName === 'string' ? pending.toolName : '',
         pendingKind,
@@ -510,24 +548,73 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Bound on remembered signal keys; enough for one long turn's steps. */
+    /** Bound on remembered signal keys per session+turn bucket. */
     const SIGNAL_SEEN_LIMIT = 500
 
     /**
+     * Dedupe bucket for one signal. Step/task signals carry the turn either in
+     * `detail.turn` or in the leading `turn:` of their key; approvals are not
+     * turn-scoped and share the `pending` bucket.
+     */
+    function signalTurnKey(signal) {
+      const detail = signal.detail
+      if (detail !== undefined && detail !== null && Number.isInteger(detail.turn)) {
+        return String(detail.turn)
+      }
+      const match = String(signal.key === undefined ? '' : signal.key).match(/^(\d+):/u)
+      return match === null ? 'pending' : match[1]
+    }
+
+    /**
      * Client-only signal hub. Monitor sources publish; game runtimes consume.
-     * Dedupe is global so two views of the same session cannot double-reward.
+     * Dedupe is bucketed per session+turn so two views of the same session
+     * cannot double-reward, while a new turn drops the previous turn's keys.
      */
     function createSignalHub() {
       const listeners = new Set()
-      const seen = new Set()
+      /** @type {Map<string, Map<string, Set<string>>>} */
+      const seen = new Map()
+
+      const bucketFor = (sessionId, turnKey) => {
+        let turns = seen.get(sessionId)
+        if (turns === undefined) {
+          turns = new Map()
+          seen.set(sessionId, turns)
+        }
+        let bucket = turns.get(turnKey)
+        if (bucket === undefined) {
+          bucket = new Set()
+          turns.set(turnKey, bucket)
+        }
+        return bucket
+      }
+
       return {
         emit(signal) {
-          const identity = `${signal.type}:${signal.sessionId}:${signal.key}`
-          if (seen.has(identity)) return
-          seen.add(identity)
-          if (seen.size > SIGNAL_SEEN_LIMIT) {
-            const oldest = seen.values().next().value
-            if (oldest !== undefined) seen.delete(oldest)
+          const sessionId = String(signal.sessionId === undefined ? '' : signal.sessionId)
+          const turnKey = signalTurnKey(signal)
+          const bucket = bucketFor(sessionId, turnKey)
+          const identity = `${signal.type}:${signal.key}`
+          if (bucket.has(identity)) return
+          bucket.add(identity)
+          // The same approval key may reappear after being handled; allow the
+          // re-entry edge while still deduping duplicate enters from 2 views.
+          if (signal.type === 'agent:approval_leave') {
+            bucket.delete(`agent:approval_enter:${signal.key}`)
+          }
+          if (bucket.size > SIGNAL_SEEN_LIMIT) {
+            const oldest = bucket.values().next().value
+            if (oldest !== undefined) bucket.delete(oldest)
+          }
+          // A new turn starts: forget older turn buckets for this session.
+          // Keep the current turn and the non-turn `pending` bucket.
+          if (signal.type === 'agent:task_start' && Number.isInteger(Number(turnKey))) {
+            const turns = seen.get(sessionId)
+            if (turns !== undefined) {
+              for (const key of [...turns.keys()]) {
+                if (key !== 'pending' && Number(key) < Number(turnKey)) turns.delete(key)
+              }
+            }
           }
           for (const listener of [...listeners]) {
             try {
@@ -621,6 +708,8 @@ window.__ModuleLoader__.load({
       let disposers = []
       let mountedAt = Date.now()
       let mismatchSince = null
+      let pendingSince = 0
+      let pendingKeySeen = ''
       let projectionError = false
       let healthTimer = null
       let hasBaseline = false
@@ -655,6 +744,17 @@ window.__ModuleLoader__.load({
         const live = readSessionStatus()
         const session = readSession()
         const pending = live === undefined ? undefined : live.pendingInteraction
+        const pendingKey =
+          pending !== undefined && pending !== null && typeof pending.key === 'string'
+            ? pending.key
+            : ''
+        if (pendingKey === '') {
+          pendingSince = 0
+          pendingKeySeen = ''
+        } else if (pendingKey !== pendingKeySeen) {
+          pendingSince = Date.now()
+          pendingKeySeen = pendingKey
+        }
         const liveRunning =
           live !== undefined && live.running !== undefined
             ? live.running
@@ -674,6 +774,7 @@ window.__ModuleLoader__.load({
           now: Date.now(),
           mountedAt,
           mismatchSince,
+          pendingSince,
           projectionError,
         })
       }
@@ -751,6 +852,8 @@ window.__ModuleLoader__.load({
       const start = () => {
         mountedAt = Date.now()
         mismatchSince = null
+        pendingSince = 0
+        pendingKeySeen = ''
         projectionError = false
         projectionAttempts = 0
         hasBaseline = false
@@ -863,8 +966,19 @@ window.__ModuleLoader__.load({
       return t('status.failed')
     }
 
+    /** Compact age label: 42s / 3m / 2h (locale-neutral units). */
+    function formatAge(ms) {
+      const total = Math.max(0, Math.floor(ms / 1000))
+      if (total < 60) return `${total}s`
+      const minutes = Math.floor(total / 60)
+      if (minutes < 60) return `${minutes}m`
+      return `${Math.floor(minutes / 60)}h`
+    }
+
     /** Status line copy for one monitor state. */
     function statusText(t, state) {
+      // A fork is a terminal-ish idle state; without this line it is invisible.
+      if (state.status === 'idle' && state.reasonCode === 'forked') return t('status.forked')
       // Approval/failure are the highest-priority copy; health never hides them.
       if (state.status !== 'pending_approval' && state.status !== 'failed') {
         if (state.health === 'loading') return t('status.loading')
@@ -873,7 +987,9 @@ window.__ModuleLoader__.load({
       }
       switch (state.status) {
         case 'running':
-          return state.activity.length > 0 ? t('status.running') : t('status.runningStart')
+          return state.activity.length > 0 || state.stepCount > 0
+            ? t('status.running')
+            : t('status.runningStart')
         case 'pending_approval':
           // D28: copy follows the blocking kind; unknown future kinds get the
           // generic "agent is waiting" line instead of an approval claim.
@@ -892,10 +1008,23 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Right-hand meta: last observed time + real step count (M0 §6). */
-    function metaText(t, state) {
+    /**
+     * Right-hand meta: age of the last event while running (so a long quiet
+     * spell is visible, not guessed), otherwise the last observed clock; plus
+     * the real step count. The approval wait age lives in AlertBanner.
+     */
+    function metaText(t, state, now = Date.now()) {
       const parts = []
-      if (state.updatedAt > 0) parts.push(t('status.updated', { time: clockOf(state.updatedAt) }))
+      if (
+        state.status === 'running' &&
+        typeof state.lastActivityAt === 'number' &&
+        state.lastActivityAt > 0 &&
+        now >= state.lastActivityAt
+      ) {
+        parts.push(t('status.lastActivity', { age: formatAge(now - state.lastActivityAt) }))
+      } else if (state.updatedAt > 0) {
+        parts.push(t('status.updated', { time: clockOf(state.updatedAt) }))
+      }
       if (state.stepCount > 0) parts.push(t('status.steps', { count: state.stepCount }))
       return parts.join(' · ')
     }
@@ -1501,8 +1630,13 @@ window.__ModuleLoader__.load({
         if (signal === undefined || signal === null) return null
         if (signal.type === 'agent:approval_enter') return 'approval'
         if (signal.type === 'agent:task_finish') {
-          const status = signal.detail === undefined ? '' : signal.detail.status
-          if (status === 'success' || status === 'aborted') return status
+          const detail = signal.detail === undefined || signal.detail === null ? {} : signal.detail
+          const status = detail.status
+          if (status === 'aborted') {
+            // D22/D41: an unknown terminal reason is not a user-visible cancel.
+            return detail.reasonCode === 'unknown' ? 'unknown' : 'aborted'
+          }
+          if (status === 'success') return status
           return 'failed'
         }
         return null
@@ -1629,10 +1763,10 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Returns true when the key was consumed (prevented / handled) so the
-     * window-capture fallback knows to stop the host's own key handlers —
-     * a host that scrolls the page from a capture-phase listener would
-     * otherwise race ahead of our bubble-phase preventDefault.
+     * Returns true when the key was consumed (prevented / handled). This is
+     * bound to the view root only: the plugin does not capture keys at the
+     * window and does not stop propagation, so the host and other plugins
+     * keep their own input handling.
      */
     function onGameKeyDown(event) {
       // D45: only keyboard-driven games (see GAMES.keyboard) consume keys.
@@ -2456,7 +2590,7 @@ window.__ModuleLoader__.load({
     }
 
     /** One alert banner; the native dialog always keeps precedence. */
-    function AlertBanner({ t, state }) {
+    function AlertBanner({ t, state, now = Date.now() }) {
       if (state.status === 'pending_approval') {
         // D28: every blocking pending interaction alerts, with per-kind copy.
         const kind = state.pendingKind
@@ -2484,11 +2618,22 @@ window.__ModuleLoader__.load({
                   { className: 'wb-alertMeta', title: state.pendingDetail },
                   state.pendingDetail,
                 )
+        const wait =
+          typeof state.pendingSince === 'number' &&
+          state.pendingSince > 0 &&
+          now >= state.pendingSince
+            ? h(
+                'span',
+                { className: 'wb-alertMeta' },
+                t('status.waiting', { age: formatAge(now - state.pendingSince) }),
+              )
+            : null
         return h(
           'div',
           { className: 'wb-alert', 'data-kind': kind === '' ? 'approval' : kind, role: 'alert' },
           h('span', { className: 'wb-alertTitle' }, t(titleKey)),
           meta,
+          wait,
         )
       }
       if (state.status === 'failed') {
@@ -2540,9 +2685,15 @@ const CSS = `
 .wb-pulseFill{position:absolute;top:0;bottom:0;width:32%;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-alias-state-warn-primary),transparent);animation:wb-sweep 1.6s linear infinite}
 @keyframes wb-sweep{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
 .wb-feed{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:2px}
-.wb-feedRow{display:flex;align-items:baseline;gap:8px;min-width:0}
+.wb-feedRow{display:flex;align-items:baseline;gap:6px;min-width:0}
+.wb-feedStatus{flex:none;width:12px;text-align:center;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary)}
+.wb-feedStatus[data-status="ok"]{color:var(--dsw-alias-state-success-primary)}
+.wb-feedStatus[data-status="error"]{color:var(--dsw-alias-state-error-primary)}
+.wb-feedStatus[data-status="running"]{color:var(--dsw-alias-label-secondary)}
+.wb-feedRow[data-status="error"] .wb-feedText{color:var(--dsw-alias-state-error-primary)}
 .wb-feedKind{flex:none;width:30px;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary)}
 .wb-feedText{flex:1;min-width:0;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dsw-alias-label-primary)}
+.wb-feedDur{flex:none;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
 .wb-feedCopy{flex:none;appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;padding:0 2px;cursor:pointer;border-radius:4px}
 .wb-feedCopy:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .wb-feedCopy:focus-visible{outline:2px solid var(--dsw-alias-brand-primary)}
@@ -2551,6 +2702,9 @@ const CSS = `
 .wb-dexItem{display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border-radius:6px;background:rgba(255,255,255,0.04)}
 .wb-dexCount{font-size:9px;line-height:11px;color:rgba(230,242,255,.76)}
 .wb-feedEmpty{font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary)}
+.wb-feedMore{align-self:flex-start;appearance:none;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;padding:1px 8px;font-size:11px;line-height:16px;font-family:inherit;cursor:pointer}
+.wb-feedMore:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.wb-feedMore:focus-visible{outline:2px solid var(--dsw-alias-brand-primary)}
 .wb-game{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px}
 .wb-boardWrap{position:relative;flex:1 1 auto;width:100%;height:min(46vh,480px);min-height:200px;max-height:520px;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;overflow:hidden;background:#0d1624}
 .wb-board{display:block;width:100%;height:100%}
@@ -4694,6 +4848,20 @@ const CSS = `
       return state
     }
 
+    /**
+     * Coarse clock for the status row/pulse. One timer while a turn is
+     * running or blocked; inactive views pay nothing.
+     */
+    function useNow(active, intervalMs = 5000) {
+      const [, setTick] = React.useState(0)
+      React.useEffect(() => {
+        if (!active) return undefined
+        const id = setInterval(() => setTick((value) => value + 1), intervalMs)
+        return () => clearInterval(id)
+      }, [active, intervalMs])
+      return Date.now()
+    }
+
 
     /**
      * Session picker for the presence pill (D29 §8.4; the L1 status dot was
@@ -4747,7 +4915,10 @@ const CSS = `
 .wb-hdMenuBtn{border:none;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:6px 10px;width:100%;text-align:left}
 .wb-pillGomoku{position:relative;width:184px;height:184px;margin:0 auto;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden}
 .wb-pillGomoku canvas{width:100%;height:100%;display:block;cursor:pointer}
-.wb-pillNotice{padding:5px 10px;border-top:1px solid var(--dsw-alias-border-l2);font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);white-space:normal}
+.wb-pillNotice{display:flex;align-items:flex-start;gap:8px;padding:5px 10px;border-top:1px solid var(--dsw-alias-border-l2);font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);white-space:normal}
+.wb-pillNoticeText{flex:1 1 auto;min-width:0}
+.wb-pillNoticeClose{flex:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font-size:14px;line-height:16px;padding:0 2px;border-radius:4px}
+.wb-pillNoticeClose:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 `
 
     /** Panel width (px) for the expanded floating window (D30). */
@@ -4947,6 +5118,7 @@ const CSS = `
     }
 
     let viewOpener = null
+    let viewOpenerSession = null
 
     /**
      * D42: transient visible feedback when a host-coupling workaround fails
@@ -4960,18 +5132,33 @@ const CSS = `
       const push = () => {
         for (const listener of [...listeners]) listener()
       }
+      const clear = () => {
+        if (timer !== null) {
+          clearTimeout(timer)
+          timer = null
+        }
+        if (text === '') return
+        text = ''
+        push()
+      }
       return {
         get: () => text,
-        show(next) {
+        show(next, options) {
           text = next
           if (timer !== null) clearTimeout(timer)
-          timer = setTimeout(() => {
-            text = ''
-            timer = null
-            push()
-          }, 4000)
+          timer = null
+          // A failed view switch is persistent: the user needs the instruction
+          // until they act or dismiss it, not a 4-second toast.
+          if (options === undefined || options.persistent !== true) {
+            timer = setTimeout(() => {
+              text = ''
+              timer = null
+              push()
+            }, 4000)
+          }
           push()
         },
+        clear,
         subscribe(listener) {
           listeners.add(listener)
           return () => listeners.delete(listener)
@@ -4979,55 +5166,107 @@ const CSS = `
       }
     })()
 
+    /** Does this element's visible/ARIA label name the WaitBuddy view? */
+    function matchesViewLabel(element, label) {
+      if (label === '') return false
+      const text = (element.textContent || '').replace(/\s+/gu, ' ').trim()
+      const aria = (element.getAttribute('aria-label') || '').trim()
+      return text === label || text.includes(label) || aria === label || aria.includes(label)
+    }
+
+    /** Exact label wins; substring matching is only a second pass. */
+    function pickByLabel(elements, label) {
+      const exact = elements.find((element) => {
+        const text = (element.textContent || '').replace(/\s+/gu, ' ').trim()
+        const aria = (element.getAttribute('aria-label') || '').trim()
+        return text === label || aria === label
+      })
+      return exact ?? elements.find((element) => matchesViewLabel(element, label))
+    }
+
+    /** The first visible conversation tablist, or the document as a fallback. */
+    function viewTabScope() {
+      if (typeof document === 'undefined') return undefined
+      const lists = Array.from(document.querySelectorAll('[data-conversation-tabs]'))
+      return lists.find((element) => element.offsetParent !== null) ?? lists[0] ?? document
+    }
+
+    /** Last-resort semantic tab lookup; the visible label is our own i18n. */
+    function findViewTab(label) {
+      const scope = viewTabScope()
+      if (scope === undefined) return undefined
+      return pickByLabel(Array.from(scope.querySelectorAll('[role="tab"]')), label)
+    }
+
+    /** Poll for the More-views menu item; bounded, never an unbounded delay. */
+    async function findViewMenuItem(label, timeoutMs = 500) {
+      const startedAt = Date.now()
+      while (Date.now() - startedAt < timeoutMs) {
+        const menu = document.querySelector('[role="menu"]')
+        const scope = menu ?? document
+        const item = pickByLabel(
+          Array.from(scope.querySelectorAll('[role="menuitem"], button')),
+          label,
+        )
+        if (item !== undefined) return item
+        await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      return undefined
+    }
+
     /**
-     * D36/D42 (hostAdapter): open the WaitBuddy conversation view. No public
-     * service exists (activateView depends on host-internal store actions),
-     * so this drives the same UI a user would: the WaitBuddy tab in the
-     * session header, or the More-views menu entry when the tab is collapsed
-     * into it. Callers must surface a `false` result — never fail silently.
+     * D36/D42/D53 (hostAdapter): open the WaitBuddy conversation view.
+     * Primary: the host-provided `openView` captured from the mounted view or
+     * the views-actions entry. Last resort: the visible tab / More-views item,
+     * matched by our own localized label (never hardcoded host copy).
+     * Callers must surface a `false` result — never fail silently.
      */
-    async function openFullView() {
+    async function openFullView(sessionId, label) {
+      // Primary: the host-provided openView, captured from the mounted view or
+      // the views-actions entry (persists after its menu unmounts).
       if (viewOpener !== null) {
-        // Preferred: a captured onOpen from the views-actions menu entry
-        // (available once that menu has been opened at least once).
-        try {
-          viewOpener('waitbuddy')
-          return true
-        } catch (error) {
-          console.warn('[wait-buddy] openView failed', error)
+        if (viewOpenerSession === null || sessionId === undefined || viewOpenerSession === sessionId) {
+          try {
+            viewOpener('waitbuddy')
+            return true
+          } catch (error) {
+            console.warn('[wait-buddy] openView failed', error)
+          }
         }
       }
-      const findTab = () => {
-        const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
-        return tabs.find((el) => (el.textContent || '').trim().startsWith('WaitBuddy'))
-      }
-      const tab = findTab()
+      // Last resort: the visible tab / More-views item, matched by our own
+      // localized label (never hardcoded host copy). Bounded polling, and a
+      // false result still produces the persistent user instruction.
+      const tab = findViewTab(label)
       if (tab !== undefined) {
         tab.click()
         return true
       }
-      const more = Array.from(document.querySelectorAll('button')).find((el) => {
-        const label = el.getAttribute('aria-label') || el.textContent || ''
-        return label.includes('更多会话视图') || label.includes('session views')
-      })
-      if (more === undefined) return false
-      more.click()
-      await new Promise((resolve) => setTimeout(resolve, 120))
-      const items = Array.from(document.querySelectorAll('button, [role="menuitem"]'))
-      const item = items.find((el) => (el.textContent || '').trim().startsWith('WaitBuddy'))
-      if (item === undefined) return false
-      item.click()
-      return true
+      const scope = viewTabScope()
+      if (scope === undefined) return false
+      const more = scope.querySelector('button[aria-haspopup="menu"]')
+      if (more !== null) {
+        // Do not toggle an already-open menu closed.
+        if (document.querySelector('[role="menu"]') === null) more.click()
+        const item = await findViewMenuItem(label)
+        if (item !== undefined) {
+          item.click()
+          return true
+        }
+      }
+      return false
     }
 
     function ViewMenuEntry(props) {
       const t = typeof props.t === 'function' ? props.t : boundT
       React.useEffect(() => {
+        // Capture persistently: the host renders this entry inside a menu that
+        // unmounts when closed. The old cleanup made `onOpen` available only
+        // while the menu was open, so the pill's background button always fell
+        // back to a failure. A captured opener stays valid for its session.
         viewOpener = typeof props.onOpen === 'function' ? props.onOpen : null
-        return () => {
-          if (viewOpener === props.onOpen) viewOpener = null
-        }
-      }, [props.onOpen])
+        viewOpenerSession = typeof props.sessionId === 'string' ? props.sessionId : null
+      }, [props.onOpen, props.sessionId])
       return h(
         'button',
         {
@@ -5190,11 +5429,16 @@ const CSS = `
       // D42: a failed view switch is never silent — pill notice + optional
       // system notification (quiet mode has no UI left to show it in).
       const goBackground = async () => {
-        settingsStore.setPresence('quiet')
-        const opened = await openFullView()
-        if (opened) return
+        const opened = await openFullView(sessionId, t('view.label'))
+        if (opened) {
+          adapterNotice.clear()
+          settingsStore.setPresence('quiet')
+          return
+        }
+        // Keep the pill visible on failure: going quiet first would hide the
+        // only surface that can tell the user what to click.
         console.warn('[wait-buddy] openFullView failed on this host')
-        adapterNotice.show(t('adapter.openViewFailed'))
+        adapterNotice.show(t('adapter.openViewFailed'), { persistent: true })
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           try {
             new Notification(t('notify.title'), { body: t('adapter.openViewFailed') })
@@ -5261,7 +5505,24 @@ const CSS = `
         h('style', { key: 'wb-pill-style' }, PILL_CSS),
         notice === ''
           ? null
-          : h('div', { className: 'wb-pillNotice', role: 'status' }, notice),
+          : h(
+              'div',
+              { className: 'wb-pillNotice', role: 'status' },
+              h('span', { className: 'wb-pillNoticeText' }, notice),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'wb-pillNoticeClose',
+                  'aria-label': t('notice.dismiss'),
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    adapterNotice.clear()
+                  },
+                },
+                '×',
+              ),
+            ),
         h(
           'div',
           {
@@ -5333,10 +5594,25 @@ const CSS = `
       )
     }
 
+    /** Compact duration (locale-neutral units). */
+    function formatDuration(ms) {
+      if (typeof ms !== 'number' || !Number.isFinite(ms)) return ''
+      return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
+    }
+
+    /** Collapsed glance rows; the projection keeps up to ACTIVITY_LIMIT. */
+    const FEED_COLLAPSED = 3
+
+    /** Pure collapsed/expanded slice, exported for tests. */
+    function visibleActivity(activity, expanded) {
+      if (expanded || activity.length <= FEED_COLLAPSED) return activity
+      return activity.slice(0, FEED_COLLAPSED)
+    }
+
     /**
      * One activity feed row. The Host folds consecutive same-tool calls into
-     * `count`; render "text ×N" and offer one-click copy of the full text
-     * (feedback P1: a wall of tool lines is unscannable).
+     * `count` and attaches the matching result; render the safe summary plus
+     * status/duration, and copy only that summary (never a raw command).
      */
     function FeedRow({ t, item }) {
       const [copied, setCopied] = React.useState(false)
@@ -5345,24 +5621,43 @@ const CSS = `
         const id = setTimeout(() => setCopied(false), 1400)
         return () => clearTimeout(id)
       }, [copied])
+      const status = item.status === 'error' ? 'error' : item.status === 'ok' ? 'ok' : 'running'
+      const summary = `${item.text}${item.hint ? ` · ${item.hint}` : ''}${
+        item.argCount > 0 ? ` · ${t('feed.args', { count: item.argCount })}` : ''
+      }`
+      const label = item.count > 1 ? `${summary} ×${item.count}` : summary
+      const title = item.errorCode ? `${summary} · ${item.errorCode}` : summary
+      const mark = status === 'error' ? '✕' : status === 'ok' ? '✓' : '·'
+      const statusLabel = t(`feed.${status}`)
+      const duration = formatDuration(item.durationMs)
       const copy = async () => {
         try {
-          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(item.text)
+          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(summary)
           setCopied(true)
         } catch (error) {
           console.warn('[wait-buddy] copy failed', error)
         }
       }
-      const label = item.count > 1 ? `${item.text} ×${item.count}` : item.text
       return h(
         'div',
-        { className: 'wb-feedRow' },
+        { className: 'wb-feedRow', 'data-status': status },
+        h(
+          'span',
+          {
+            className: 'wb-feedStatus',
+            'data-status': status,
+            title: statusLabel,
+            'aria-label': statusLabel,
+          },
+          mark,
+        ),
         h(
           'span',
           { className: 'wb-feedKind', 'data-kind': item.kind },
           t(FEED_LABEL[item.kind] || FEED_LABEL.tool),
         ),
-        h('span', { className: 'wb-feedText', title: item.text }, label),
+        h('span', { className: 'wb-feedText', title }, label),
+        duration === '' ? null : h('span', { className: 'wb-feedDur' }, duration),
         copied
           ? h('span', { className: 'wb-feedCopied', role: 'status' }, t('feed.copied'))
           : h(
@@ -5370,12 +5665,42 @@ const CSS = `
               {
                 type: 'button',
                 className: 'wb-feedCopy',
-                'aria-label': t('feed.copy'),
-                title: t('feed.copy'),
+                'aria-label': t('feed.copySummary'),
+                title: t('feed.copySummary'),
                 onClick: copy,
               },
               '⧉',
             ),
+      )
+    }
+
+    /** Glanceable feed: three rows by default, expandable to the projection cap. */
+    function ActivityFeed({ t, activity, turn }) {
+      const [expanded, setExpanded] = React.useState(false)
+      React.useEffect(() => {
+        setExpanded(false)
+      }, [turn])
+      const shown = visibleActivity(activity, expanded)
+      const hidden = activity.length - shown.length
+      return h(
+        'div',
+        { className: 'wb-feed', 'data-card': 'feed' },
+        shown.length === 0
+          ? h('div', { className: 'wb-feedEmpty' }, t('feed.empty'))
+          : shown.map((item, index) =>
+              h(FeedRow, { key: item.callId ?? `${item.kind}-${index}`, t, item }),
+            ),
+        activity.length > FEED_COLLAPSED
+          ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'wb-feedMore',
+                onClick: () => setExpanded((value) => !value),
+              },
+              expanded ? t('feed.less') : t('feed.more', { count: hidden }),
+            )
+          : null,
       )
     }
 
@@ -5384,29 +5709,22 @@ const CSS = `
     const PULSE_BUCKET_MS = 5000
 
     /**
-     * Activity pulse strip (feedback P1): a real sparkline over the last
-     * minute — lit segments mean the feed head changed in that bucket, so
-     * "quiet but working" and "stuck" are distinguishable at a glance.
+     * Activity pulse strip: a real sparkline over the last minute. It is
+     * driven by `revision`/`lastActivityAt`, so step/end and result events
+     * count — not just a change of the feed head text.
      */
-    function ActivityPulse({ t, activity }) {
+    function ActivityPulse({ t, revision, lastActivityAt, now }) {
       const pulses = React.useRef([])
-      const [, bump] = React.useState(0)
-      const head = activity[0]
-      const headKey = head === undefined ? '' : `${head.kind}:${head.text}`
       React.useEffect(() => {
-        if (headKey === '') return
-        const now = Date.now()
-        pulses.current = [...pulses.current, now].filter((at) => now - at < 60000).slice(-40)
-      }, [headKey])
-      React.useEffect(() => {
-        const id = setInterval(() => bump((value) => value + 1), PULSE_BUCKET_MS)
-        return () => clearInterval(id)
-      }, [])
-      const now = Date.now()
-      const marks = pulses.current
+        if (typeof lastActivityAt !== 'number' || lastActivityAt <= 0) return
+        const cutoff = Date.now() - 60000
+        pulses.current = [...pulses.current.filter((at) => at >= cutoff), lastActivityAt].slice(-60)
+      }, [revision, lastActivityAt])
+      const current = typeof now === 'number' ? now : Date.now()
+      const marks = pulses.current.filter((at) => current - at < 60000)
       const segments = []
       for (let i = 0; i < PULSE_SEGMENTS; i += 1) {
-        const from = now - (PULSE_SEGMENTS - i) * PULSE_BUCKET_MS
+        const from = current - (PULSE_SEGMENTS - i) * PULSE_BUCKET_MS
         const to = from + PULSE_BUCKET_MS
         const on = marks.some((at) => at >= from && at < to)
         segments.push(
@@ -5417,10 +5735,14 @@ const CSS = `
           }),
         )
       }
-      const live = marks.some((at) => now - at < 60000)
+      const live =
+        typeof lastActivityAt === 'number' &&
+        lastActivityAt > 0 &&
+        current - lastActivityAt < 60000
+      const label = t(live ? 'feed.pulseLive' : 'feed.pulseIdle')
       return h(
         'div',
-        { className: 'wb-pulse', 'aria-hidden': true, title: t(live ? 'feed.pulseLive' : 'feed.pulseIdle') },
+        { className: 'wb-pulse', role: 'img', 'aria-label': label, title: label },
         segments,
       )
     }
@@ -5429,66 +5751,23 @@ const CSS = `
       const t = typeof props.t === 'function' ? props.t : boundT
       const rootRef = React.useRef(null)
       const innerRef = React.useRef(null)
-      // Window-level fallback for game keys (feedback: Space scrolled the
-      // page). The React onKeyDown only fires while focus is inside the view
-      // — after an encounter closes, focus falls back to <body> and the
-      // browser scrolls instead of playing. Two more details make it stick:
-      //   1. capture phase — a host that scrolls from its own capture
-      //      listener would otherwise act before our bubble-phase handler;
-      //   2. stopPropagation on consumed keys — the host's handlers must not
-      //      run at all for a key the game consumed.
+      // Keep the host's openView for the pill: the view may unmount when the
+      // user is in Chat, but the closure stays valid for its session.
       React.useEffect(() => {
-        const onWindowKeyDown = (event) => {
-          const root = rootRef.current
-          let visible = false
-          if (root !== null) {
-            const rect = root.getBoundingClientRect()
-            visible = rect.width !== 0 && rect.height !== 0
-          }
-          if (event.defaultPrevented) return
-          if (root === null) return
-          if (!visible) return
-          const consumed = onGameKeyDown(event)
-          if (!consumed) return
-          event.preventDefault()
-          // stopImmediate: same-node host listeners registered earlier must
-          // not act on a key the game consumed either.
-          event.stopImmediatePropagation()
-          // The conversation's follow-tail animation interrupts on Space /
-          // arrows "unless a child has prevented the key's default action" —
-          // our preventDefault would silently KEEP the tail following, i.e.
-          // the page keeps scrolling while a session streams. The host
-          // interrupts unconditionally on wheel: dispatch a synthetic wheel
-          // pulse (untrusted → no native scroll of its own) to release it.
-          try {
-            document.dispatchEvent(
-              new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true }),
-            )
-          } catch (error) {
-            void error
-          }
-        }
-        window.addEventListener('keydown', onWindowKeyDown, true)
-        return () => window.removeEventListener('keydown', onWindowKeyDown, true)
-      }, [])
+        if (typeof props.openView !== 'function') return
+        viewOpener = props.openView
+        viewOpenerSession = typeof props.sessionId === 'string' ? props.sessionId : null
+      }, [props.openView, props.sessionId])
+      // Game keys are handled by the view's own onKeyDown only. There is no
+      // capture-phase key handling, no propagation stop and no synthetic wheel:
+      // consuming a key outside this view is the host's and other plugins'
+      // business, and the follow-tail animation must not be faked away.
       React.useEffect(() => {
         const scrollTop = () => {
+          // Only this view's own scrollport is reset. Walking ancestors and
+          // guessing which one the host scrolls was another DOM-mind-reading
+          // hack; if the host keeps an outer scroll offset, that is its state.
           if (innerRef.current !== null) innerRef.current.scrollTop = 0
-          // The host conversation view scrolls an ancestor container (the
-          // session scroll body), not `.wb-inner`; on layouts where the panel
-          // grows past the viewport, a view switch must also reset that
-          // ancestor or the status row / alert area stay scrolled away (F6).
-          let el = innerRef.current === null ? null : innerRef.current.parentElement
-          for (let depth = 0; el !== null && el !== document.body && depth < 6; depth += 1) {
-            const style = window.getComputedStyle(el)
-            if (
-              el.scrollTop > 0 &&
-              (style.overflowY === 'auto' || style.overflowY === 'scroll')
-            ) {
-              el.scrollTop = 0
-            }
-            el = el.parentElement
-          }
         }
         scrollTop()
         const root = rootRef.current
@@ -5529,7 +5808,8 @@ const CSS = `
       }
       const state = useMonitorState(props.sessionId, props.__state)
       const status = state.status
-      const meta = metaText(t, state)
+      const now = useNow(status === 'running' || status === 'pending_approval', 5000)
+      const meta = metaText(t, state, now)
       const canOpenChat = typeof props.openView === 'function'
       const finished = status === 'success' || status === 'failed' || status === 'aborted'
       const openChat = () => {
@@ -5555,6 +5835,7 @@ const CSS = `
           key: state.pendingKey === '' ? `${state.status}:${state.updatedAt}` : state.pendingKey,
           t,
           state,
+          now,
         }),
         h(
           'div',
@@ -5593,7 +5874,12 @@ const CSS = `
                   : null,
               ),
               status === 'running' && state.health === 'ready'
-                ? h(ActivityPulse, { t, activity: state.activity })
+                ? h(ActivityPulse, {
+                    t,
+                    revision: state.revision,
+                    lastActivityAt: state.lastActivityAt,
+                    now,
+                  })
                 : null,
               h(
                 'div',
@@ -5613,15 +5899,7 @@ const CSS = `
                   : null,
               ),
             ),
-            h(
-              'div',
-              { className: 'wb-feed', 'data-card': 'feed' },
-              state.activity.length === 0
-                ? h('div', { className: 'wb-feedEmpty' }, t('feed.empty'))
-                : state.activity.map((item, index) =>
-                    h(FeedRow, { key: `${item.kind}-${index}`, t, item }),
-                  ),
-            ),
+            h(ActivityFeed, { t, activity: state.activity, turn: state.turn }),
           ),
           h(GameArea, { t, sessionId: props.sessionId, focusRoot, pendingKind: state.pendingKind }),
         ),
@@ -5678,6 +5956,9 @@ const CSS = `
       inject: ['slots', 'sessions', 'locale', 'uiSession'],
       apply(ctx) {
         clientCtx = ctx
+        // A re-apply must not reuse an opener closure from the previous heal.
+        viewOpener = null
+        viewOpenerSession = null
         ctx.effect(() => {
           // RT-04: impls live per-apply; dispose clears the DOM listener and a
           // later re-apply rebuilds everything (the forwarding objects above
@@ -5811,12 +6092,16 @@ const CSS = `
           return () => window.removeEventListener('keydown', onKeyDown)
         }, 'wait-buddy: hide shortcut')
       },
+      /** Host adapter helpers, exported for unit/live tests. */
+      __adapter: { openFullView },
       /** Pure monitor reconciliation, exported for unit testing. */
       __monitor: { composeMonitor, sameMonitor, createMonitorSource },
       /** Pure signal conversion, exported for unit testing. */
       __signals: { createSignalHub, diffMonitorSignals },
       /** Pure copy helpers, exported for unit testing. */
-      __ui: { statusText, metaText, failureText },
+      __ui: { statusText, metaText, failureText, formatAge, visibleActivity },
+      /** Dictionaries, exported so tests can enforce zh/en key parity. */
+      __locale: { zh, en },
       /** Low-key presence (D29): store, notifier and pure helpers for tests. */
       __presence: {
         presenceStore,
@@ -5831,7 +6116,7 @@ const CSS = `
         adapterNotice,
       },
       /** Static UI pieces + stylesheet, exported for component tests. */
-      __components: { AlertBanner, gameOverlay, gomokuOverlay, ErrorBoundary },
+      __components: { AlertBanner, gameOverlay, gomokuOverlay, ErrorBoundary, ActivityFeed },
       /** GameAdapter registry (D45), exported for tests and future games. */
       __games: { GAMES, GAME_ORDER },
       __css: CSS,
@@ -5900,4 +6185,4 @@ const CSS = `
   },
 })
 
-;window.__WB_BUILD_ID__ = 'ee489b35';
+;window.__WB_BUILD_ID__ = '20bc175d';

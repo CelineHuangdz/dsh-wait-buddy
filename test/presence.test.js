@@ -20,6 +20,7 @@ const dict = {
   'notify.success': 'session {session} done',
   'notify.failed': 'session {session} failed',
   'notify.aborted': 'session {session} interrupted',
+  'notify.unknown': 'session {session} ended for an unknown reason',
 }
 const t = (key, params = {}) =>
   String(dict[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''))
@@ -258,5 +259,28 @@ test('D42: adapterNotice shows host-workaround failures and notifies subscribers
   adapterNotice.show('switch failed')
   assert.equal(adapterNotice.get(), 'switch failed')
   assert.deepEqual(seen, ['switch failed'])
+  adapterNotice.clear()
   stop()
+})
+
+test('unknown terminal reasons do not notify as a user cancel', () => {
+  const env = fakeNotifierEnv()
+  env.emit({
+    type: 'agent:task_finish',
+    sessionId: 's1',
+    key: '1:aborted',
+    detail: { status: 'aborted', reasonCode: 'unknown' },
+  })
+  assert.deepEqual(env.shown.map((entry) => entry.body), [
+    'session sess-s1 ended for an unknown reason',
+  ])
+})
+
+test('adapterNotice keeps a persistent failure notice until cleared', () => {
+  const { adapterNotice } = client.__presence
+  adapterNotice.clear()
+  adapterNotice.show('manual open required', { persistent: true })
+  assert.equal(adapterNotice.get(), 'manual open required')
+  adapterNotice.clear()
+  assert.equal(adapterNotice.get(), '')
 })

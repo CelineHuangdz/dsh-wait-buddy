@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { loadClient } from '../test-support/load-client.mjs'
 
 const client = loadClient()
-const { statusText, metaText } = client.__ui
+const { statusText, metaText, visibleActivity } = client.__ui
 
 const dict = {
   'status.idle': 'idle',
@@ -23,6 +23,9 @@ const dict = {
   'status.degraded': 'degraded',
   'status.stale': 'stale',
   'status.endedUnknown': 'ended-unknown',
+  'status.forked': 'forked',
+  'status.lastActivity': 'last-activity {age}',
+  'status.waiting': 'waiting {age}',
   'status.updated': 'updated {time}',
   'status.steps': 'steps {count}',
 }
@@ -36,6 +39,8 @@ const state = (over = {}) => ({
   activity: [],
   errorMessage: '',
   updatedAt: 1_700_000_000_000,
+  lastActivityAt: 1_700_000_000_000,
+  pendingSince: 0,
   stepCount: 3,
   ...over,
 })
@@ -76,12 +81,37 @@ test('D41: failed copy follows the reason code, not the raw message', () => {
 })
 
 test('meta includes the real step count when present', () => {
-  const text = metaText(t, state())
+  const text = metaText(t, state({ lastActivityAt: 0 }))
   assert.match(text, /updated \d{2}:\d{2}:\d{2}/)
   assert.match(text, /steps 3/)
 })
 
 test('meta omits step count at zero', () => {
-  const text = metaText(t, state({ stepCount: 0 }))
+  const text = metaText(t, state({ stepCount: 0, lastActivityAt: 0 }))
   assert.doesNotMatch(text, /steps/)
+})
+
+test('a forked session is visible instead of collapsing to idle', () => {
+  assert.equal(statusText(t, state({ status: 'idle', reasonCode: 'forked' })), 'forked')
+})
+
+test('running meta reports age since the last event, not a frozen clock', () => {
+  const text = metaText(t, state({ lastActivityAt: 1_000, updatedAt: 1_000 }), 51_000)
+  assert.match(text, /last-activity 50s/)
+  assert.doesNotMatch(text, /updated/)
+})
+
+test('formatAge uses compact locale-neutral units', () => {
+  const { formatAge } = loadClient().__ui
+  assert.equal(formatAge(0), '0s')
+  assert.equal(formatAge(59_999), '59s')
+  assert.equal(formatAge(60_000), '1m')
+  assert.equal(formatAge(3_600_000), '1h')
+})
+
+test('activity feed collapses to three rows and expands on demand', () => {
+  const activity = Array.from({ length: 8 }, (_, index) => ({ kind: 'tool', text: `t${index}` }))
+  assert.equal(visibleActivity(activity, false).length, 3)
+  assert.equal(visibleActivity(activity, true).length, 8)
+  assert.equal(visibleActivity(activity.slice(0, 2), false).length, 2)
 })

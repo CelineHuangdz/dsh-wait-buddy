@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.13.0 — 2026-11-16
+
+监控可信度与宿主边界版本。游戏冻结：不新增游戏内容/美术；仅撤除输入劫持并澄清“只有贪吃蛇消费 Agent 信号”。
+
+### Added
+
+- **工具结果进入活动流（H5）**：Host 折叠 `tool/result`，按 `callId` 回填 `ok/error`、耗时与 `errorCode`；活动流显示状态标记、耗时，失败行高亮。`stateVersion` 6 → 7。
+- **真实时序字段**：投影新增 `turnStartedAt` / `lastActivityAt` / `lastToolAt` / `endedAt`；Client 在运行/审批中显示“上次活动 Xs 前”“已等待 Xs”。
+- **活动脉冲按 revision 驱动**：`step/end`、`tool/call`、`tool/result` 都会点亮；不再只看活动流头条文本。脉冲改为 `role="img"` + 可读标签，不再对读屏隐藏。
+- **审批等待时长**：客户端记录 `pendingSince`，告警条与状态行显示已等待时长。
+- **compat 漂移门禁**：新增 `tools/check-compat.mjs`，校验 `stateVersion` / 投影 key / locale NS / `tool/result` 与 `docs/compat.md` 一致，接入 `test:meta` 与 CI。
+- **live harness 进 CI**：`view-live` / `safari-live` 加入 `test:live`，带挂载、崩溃、棋盘拟合断言；CI test job 执行。
+- **词典一致性测试**：zh/en 键集与占位符必须一致。
+
+### Changed
+
+- **命令不进持久投影（D51）**：`toolActivity` 只保存可执行文件名 + 参数个数；工具条目只保存 basename / URL host。完整命令、查询词、URL path 不进入投影，复制按钮只复制安全摘要。
+- **活动流投影上限 3 → 8，UI 默认只显示 3 条，可展开/收起**；结果到达后把连续同名工具调用折叠为 `×N`（工具按工具名折叠；命令不折叠，避免持久化可暴力破解的命令哈希）。
+- **信号去重按 `session+turn` 分桶（D55）**：`agent:task_start` 清理旧轮桶；审批键独立于轮次桶，长回合超过 500 个 step 也不会让审批去重失效。
+- **`forked` 可见**：状态行显示“会话已分叉”，不再静默归零为 idle。
+- **未回结果的调用在 `turn/end` 收口**：仍为 `running` 的活动标记为 `error` / `no-result` 并补耗时，不让看板永远显示“进行中”。
+- **unknown 终态通知**：通知按 `reasonCode` 使用 `notify.unknown`，不再把未知原因说成“已中断”。
+- **缺 `turn` 的 `tool/call` / `tool/result` 忽略**：malformed 事件不再污染当前轮活动流。
+- **活动流折叠键**：工具按工具名折叠；命令一律不折叠（不持久化任何命令哈希）。
+
+### Fixed
+
+- **撤除宿主输入/滚动劫持（H1）**：删除 window 捕获键盘、`stopImmediatePropagation`、合成 `wheel`、`depth < 6` 祖先滚动重置。游戏键只在 WaitBuddy 视图获得焦点时处理；宿主与其他插件的按键/滚轮监听不再被吃掉。
+- **视图跳转去硬编码 DOM 文案（H2）**：`openFullView` 优先使用宿主 `openView`（从视图/菜单捕获并持久化），最后兜底才按 `[data-conversation-tabs]` + 插件自己的 `t('view.label')` 找可见标签/More 菜单项；删除 `看板/更多会话视图` 硬编码与 120ms 固定等待。失败时胶囊保持可见并显示可关闭的持久提示（不再先切 quiet 导致提示无处可显示）。
+- **隐私回归**：新增 fixture 断言含 `Authorization: Bearer …` 的 `tool/call` 投影不含 token；`FeedRow` 复制内容为安全摘要。
+- **脉冲不再把“推理中”画成“卡住”**：没有新事件时显示年龄，而不是用零脉冲暗示死循环。
+
+### Tests
+
+- 146 单测 + 4 视觉场景 + live smoke（`view-live` / `safari-live`）；`test:meta` 含版本、build、compat 三道门禁。
+
 ## 0.12.0 — 2026-11-15
 
 第 5 轮反馈的"游戏之外"专题入档 + D48/D48b/D48c 抓精灵美术升级（产品确认全量方案）。

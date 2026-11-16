@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { loadClient } from '../test-support/load-client.mjs'
 
 const client = loadClient({ react: React })
-const { AlertBanner, gameOverlay } = client.__components
+const { AlertBanner, gameOverlay, ActivityFeed } = client.__components
 
 const dict = {
   'alert.approval.title': '【重要】等待你审批工具调用',
@@ -14,6 +14,18 @@ const dict = {
   'alert.planReview.title': '【重要】Agent 的计划等你确认',
   'alert.pending.title': '【重要】Agent 在等你处理请求',
   'alert.failed.title': '任务执行失败',
+  'status.waiting': '已等待 {age}',
+  'feed.command': '命令',
+  'feed.tool': '工具',
+  'feed.args': '{count} 参数',
+  'feed.copySummary': '复制摘要',
+  'feed.ok': '完成',
+  'feed.running': '进行中',
+  'feed.error': '失败',
+  'feed.empty': '等待活动',
+  'feed.more': '展开其余 {count} 条',
+  'feed.less': '收起',
+  'feed.copied': '已复制',
   'game.startBody': '方向键控制，吃到果实得分。',
   'game.start': '开始游戏',
   'game.pausedTitle': '已暂停',
@@ -205,4 +217,33 @@ test('safari overlays render without undefined references (SfPortrait regression
   const dex = sfDexOverlay(t, withDex)
   const dexMarkup = renderToStaticMarkup(dex)
   assert.equal((dexMarkup.match(/<canvas/g) ?? []).length, 2, 'dex renders one canvas per species')
+})
+
+test('AlertBanner shows the approval wait age', () => {
+  const html = render(
+    React.createElement(AlertBanner, {
+      t,
+      now: 61_000,
+      state: {
+        status: 'pending_approval',
+        pendingKind: 'approval',
+        approvalTool: 'bash',
+        pendingSince: 1_000,
+        errorMessage: '',
+      },
+    }),
+  )
+  assert.match(html, /已等待 1m/)
+})
+
+test('activity feed shows three rows and a bounded expand control', () => {
+  const activity = Array.from({ length: 5 }, (_, index) => ({
+    kind: 'tool',
+    text: `tool${index}`,
+    status: 'ok',
+    startedAt: index,
+  }))
+  const html = render(React.createElement(ActivityFeed, { t, activity }))
+  assert.equal((html.match(/wb-feedRow/gu) ?? []).length, 3)
+  assert.match(html, /展开其余 2 条/)
 })

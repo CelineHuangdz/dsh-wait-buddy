@@ -99,10 +99,18 @@ const dict = {
   'feed.command': '命令',
   'feed.tool': '工具',
   'feed.empty': '等待 Agent 活动',
-  'feed.copy': '复制全文',
+  'feed.copySummary': '复制摘要',
+  'feed.running': '进行中',
+  'feed.ok': '完成',
+  'feed.error': '失败',
+  'feed.args': '{count} 参数',
+  'status.forked': '会话已分叉',
+  'status.lastActivity': '上次活动 {age} 前',
+  'status.waiting': '已等待 {age}',
+  'notice.dismiss': '关闭提示',
   'feed.copied': '已复制',
-  'feed.pulseIdle': '近 1 分钟无工具活动',
-  'feed.pulseLive': '近 1 分钟工具活动',
+  'feed.pulseIdle': '近 1 分钟无新事件',
+  'feed.pulseLive': '近 1 分钟有新事件',
   'game.title': '贪吃蛇',
   'gomoku.title': '五子棋',
   'sf.title': '抓精灵',
@@ -170,7 +178,7 @@ await page.getByText('抓精灵', { exact: true }).first().click()
 await page.waitForTimeout(600)
 await page.getByText('图鉴', { exact: true }).first().click().catch((e) => console.log('[dex click]', e.message))
 await page.waitForTimeout(400)
-await page.locator('.wb-boardWrap > canvas').click({ position: { x: 200, y: 180 } }).catch((e) => console.log('[board click]', e.message))
+await page.locator('.wb-boardWrap > canvas').click({ position: { x: 200, y: 180 }, timeout: 3000 }).catch((e) => console.log('[board click]', e.message))
 await page.waitForTimeout(800)
 await page.getByText('关闭', { exact: true }).first().click().catch(() => {})
 
@@ -193,6 +201,16 @@ const report = await page.evaluate(() => {
   }
 })
 console.log(JSON.stringify(report, null, 2))
+if (
+  report.canvasRect === null ||
+  report.storeDims.cols !== report.expectedDims.cols ||
+  report.storeDims.rows !== report.expectedDims.rows ||
+  report.manualFitDims.cols !== report.expectedDims.cols ||
+  report.manualFitDims.rows !== report.expectedDims.rows
+) {
+  console.error('[safari-live] FAIL: board fit does not match the measured canvas')
+  process.exitCode = 1
+}
 
 const board = page.locator('.wb-boardWrap')
 await board.screenshot({ path: 'test-results/safari-live.png' })
@@ -213,5 +231,9 @@ const after = await page.evaluate(() => {
   }
 })
 console.log('after resize:', JSON.stringify(after))
+if (!after.refitAfterResize) {
+  console.error('[safari-live] FAIL: board did not refit after a resize')
+  process.exitCode = 1
+}
 await board.screenshot({ path: 'test-results/safari-live-resized.png' })
 await browser.close()
