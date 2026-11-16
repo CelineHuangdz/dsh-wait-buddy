@@ -745,7 +745,7 @@ test/load-client.mjs     // 用 window/document/localStorage stub 加载 client.
 - [x] 去重 fixture：单轮 >500 个不重复 step 不重复加分；双视图仍只加一次。
 - [x] 按键边界：`test/host-boundary` 锁定无 window 捕获/合成 wheel/硬编码宿主人文案；`view-live` IME Space 探针确认视图外不被消费。
 - [x] 146 单测 + 4 视觉场景 + `view-live`/`safari-live` 冒烟通过。
-- [ ] 真机验收（需桌面端）：审批告警等待时长、工具失败行、胶囊打开失败的持久提示、浅色主题。静态/视觉已覆盖布局，真机待产品确认。
+- [x] 真机验收（2026-11-16，产品负责人确认）：胶囊「后台」可切换、活动流默认 3 条可展开、审批等待/工具失败行可见、命令只显示摘要。
 
 ### 12.5 0.14.0 / 0.15.0 方向
 

@@ -5,7 +5,7 @@
 > **宿主基线**：DSH Desktop `0.2.1-rc.5`（`hostProtocolVersion 4`），桌面端 `Info.plist`、`app.asar/dsh/package.json` 与 `docs/compat.md` 三处一致。
 > **方法**：逐条读当前源码；对照 `app.asar` 内 `dsh-api-session-controller`、`dsh-session-projection`、`dsh-client-ui-conversation`、`dsh-client-modules` 的实现；运行 `node --test`（119 通过）与 `npm run test:visual`（4 场景）。
 > **结论**：评审的大部分工程风险成立，但**有 4 条关键事实误判**；这些误判如果照单全收，会把预算花在错误的地方。0.13.0 应先撤输入劫持、修监控真实性、收隐私与 compat，而不是先拆游戏插件。
-> **实施状态（2026-11-16）**：0.13.0 已按第 6 节落地（`stateVersion` 7、146 单测 + 4 visual + live smoke）；见 [CHANGELOG](../../CHANGELOG.md) 与 [iteration-plan §12](../iteration-plan.md#L694)。
+> **实施状态（2026-11-16）**：0.13.0 已按第 6 节落地并经真机验收（`stateVersion` 7、146 单测 + 4 visual + live smoke）；见 [CHANGELOG](../../CHANGELOG.md) 与 [iteration-plan §12](../iteration-plan.md#L694)。
 > **实机回归补充**：仅靠 `onOpen` 在“从未打开过 More 菜单”时不可用（胶囊后台按钮首次点击失败）。最终保留**语义 tab/More + 插件自身 `t('view.label')`** 的最后兜底；不再硬编码宿主人文案，失败仍有持久提示。
 
 ---
